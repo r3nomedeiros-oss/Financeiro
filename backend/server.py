@@ -79,28 +79,34 @@ async def register(user: UserRegister):
 
 @app.post("/api/auth/login", response_model=Token)
 async def login(credentials: UserLogin):
-    supabase = get_supabase()
-    
-    # Buscar usuário
-    result = supabase.table("users").select("*").eq("email", credentials.email).execute()
-    
-    if not result.data:
-        raise HTTPException(status_code=401, detail="Email ou senha incorretos")
-    
-    user = result.data[0]
-    
-    # Verificar senha
-    if not verify_password(credentials.password, user["password_hash"]):
-        raise HTTPException(status_code=401, detail="Email ou senha incorretos")
-    
-    # Criar token
-    token = create_access_token({"sub": user["id"], "email": user["email"]})
-    
-    return {
-        "access_token": token,
-        "token_type": "bearer",
-        "user": {"id": user["id"], "email": user["email"], "nome": user["nome"]}
-    }
+    try:
+        supabase = get_supabase()
+        
+        # Buscar usuário
+        result = supabase.table("users").select("*").eq("email", credentials.email).execute()
+        
+        if not result.data:
+            raise HTTPException(status_code=401, detail="Email ou senha incorretos")
+        
+        user = result.data[0]
+        
+        # Verificar senha
+        if not verify_password(credentials.password, user["password_hash"]):
+            raise HTTPException(status_code=401, detail="Email ou senha incorretos")
+        
+        # Criar token
+        token = create_access_token({"sub": user["id"], "email": user["email"]})
+        
+        return {
+            "access_token": token,
+            "token_type": "bearer",
+            "user": {"id": user["id"], "email": user["email"], "nome": user["nome"]}
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Erro no login: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erro interno: {str(e)}")
 
 @app.get("/api/auth/me")
 async def get_me(user_id: str = Depends(get_current_user)):
