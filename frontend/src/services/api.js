@@ -93,6 +93,8 @@ export const dashboardAPI = {
 
 export const dreAPI = {
   get: (mes, ano) => api.get(`/api/dre/${mes}/${ano}`),
+  getAnual: (ano) => api.get(`/api/dre/anual/${ano}`),
+  criarPlanoPadrao: () => api.post('/api/plano-contas/criar-padrao'),
 };
 
 // ============================================

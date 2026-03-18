@@ -1,0 +1,236 @@
+import requests
+import sys
+import json
+from datetime import datetime
+
+class FinanceAPITester:
+    def __init__(self, base_url="http://localhost:8001"):
+        self.base_url = base_url
+        self.token = None
+        self.user_id = None
+        self.tests_run = 0
+        self.tests_passed = 0
+        self.headers = {'Content-Type': 'application/json'}
+
+    def log(self, message):
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] {message}")
+
+    def run_test(self, name, method, endpoint, expected_status, data=None):
+        """Run a single API test"""
+        url = f"{self.base_url}/{endpoint.lstrip('/')}"
+        headers = self.headers.copy()
+        if self.token:
+            headers['Authorization'] = f'Bearer {self.token}'
+
+        self.tests_run += 1
+        self.log(f"🔍 Testing {name}...")
+        
+        try:
+            if method == 'GET':
+                response = requests.get(url, headers=headers, timeout=10)
+            elif method == 'POST':
+                response = requests.post(url, json=data, headers=headers, timeout=10)
+            elif method == 'PUT':
+                response = requests.put(url, json=data, headers=headers, timeout=10)
+            elif method == 'DELETE':
+                response = requests.delete(url, headers=headers, timeout=10)
+
+            success = response.status_code == expected_status
+            if success:
+                self.tests_passed += 1
+                self.log(f"✅ {name} - Status: {response.status_code}")
+                try:
+                    return True, response.json() if response.text else {}
+                except:
+                    return True, {"message": "No JSON response"}
+            else:
+                self.log(f"❌ {name} - Expected {expected_status}, got {response.status_code}")
+                try:
+                    error_data = response.json() if response.text else {}
+                    self.log(f"   Error: {error_data}")
+                except:
+                    self.log(f"   Raw response: {response.text}")
+                return False, {}
+
+        except requests.exceptions.Timeout:
+            self.log(f"❌ {name} - Timeout error")
+            return False, {}
+        except Exception as e:
+            self.log(f"❌ {name} - Error: {str(e)}")
+            return False, {}
+
+    def test_health(self):
+        """Test if backend is responding"""
+        return self.run_test("Health Check", "GET", "/health", 200)
+
+    def test_register_user(self):
+        """Register a test user"""
+        timestamp = datetime.now().strftime("%H%M%S")
+        test_data = {
+            "email": f"test_user_{timestamp}@test.com",
+            "password": "TestPass123!",
+            "nome": f"Test User {timestamp}"
+        }
+        success, response = self.run_test("User Registration", "POST", "/api/auth/register", 200, test_data)
+        
+        if success and 'access_token' in response:
+            self.token = response['access_token']
+            self.user_id = response['user']['id']
+            self.log(f"   Registered user: {response['user']['email']}")
+            return True, response
+        return False, {}
+
+    def test_login_user(self, email, password):
+        """Login with user credentials"""
+        login_data = {"email": email, "password": password}
+        success, response = self.run_test("User Login", "POST", "/api/auth/login", 200, login_data)
+        
+        if success and 'access_token' in response:
+            self.token = response['access_token']
+            self.user_id = response['user']['id']
+            self.log(f"   Logged in user: {response['user']['email']}")
+            return True, response
+        return False, {}
+
+    def test_me(self):
+        """Test getting current user"""
+        return self.run_test("Get Current User", "GET", "/api/auth/me", 200)
+
+    def test_create_standard_accounts(self):
+        """Test creating standard chart of accounts"""
+        return self.run_test("Create Standard Chart of Accounts", "POST", "/api/plano-contas/criar-padrao", 200)
+
+    def test_get_plano_contas(self):
+        """Test getting chart of accounts"""
+        return self.run_test("Get Chart of Accounts", "GET", "/api/plano-contas", 200)
+
+    def test_dre_anual(self, year=2024):
+        """Test DRE annual endpoint"""
+        return self.run_test(f"DRE Annual {year}", "GET", f"/api/dre/anual/{year}", 200)
+
+    def test_dre_mensal(self, month=1, year=2024):
+        """Test DRE monthly endpoint"""
+        return self.run_test(f"DRE Monthly {month}/{year}", "GET", f"/api/dre/{month}/{year}", 200)
+
+    def test_contas_bancarias(self):
+        """Test bank accounts endpoint"""
+        return self.run_test("Get Bank Accounts", "GET", "/api/contas-bancarias", 200)
+
+    def test_movimentacoes(self):
+        """Test transactions endpoint"""
+        return self.run_test("Get Transactions", "GET", "/api/movimentacoes", 200)
+
+    def create_sample_data(self):
+        """Create some sample data for testing"""
+        self.log("Creating sample data...")
+        
+        # Create a bank account
+        conta_data = {
+            "nome": "Conta Teste",
+            "saldo_inicial": 10000.0
+        }
+        success, response = self.run_test("Create Test Bank Account", "POST", "/api/contas-bancarias", 200, conta_data)
+        conta_id = response.get('id') if success else None
+        
+        # Create some transactions if we have a bank account
+        if conta_id and success:
+            # Get plano de contas
+            plano_success, plano_response = self.test_get_plano_contas()
+            if plano_success and plano_response:
+                planos = plano_response
+                if planos:
+                    # Create a revenue transaction
+                    receita_plano = next((p for p in planos if p['tipo'] == 'receita'), None)
+                    if receita_plano:
+                        mov_data = {
+                            "data": "2024-01-15",
+                            "tipo": "entrada", 
+                            "plano_contas_id": receita_plano['id'],
+                            "complemento": "Venda teste",
+                            "conta_bancaria_id": conta_id,
+                            "valor": 5000.0
+                        }
+                        self.run_test("Create Test Revenue Transaction", "POST", "/api/movimentacoes", 200, mov_data)
+                    
+                    # Create a cost transaction
+                    despesa_plano = next((p for p in planos if p['tipo'] == 'despesa'), None)
+                    if despesa_plano:
+                        mov_data = {
+                            "data": "2024-01-20",
+                            "tipo": "saida",
+                            "plano_contas_id": despesa_plano['id'],
+                            "complemento": "Custo teste",
+                            "conta_bancaria_id": conta_id,
+                            "valor": 2000.0
+                        }
+                        self.run_test("Create Test Cost Transaction", "POST", "/api/movimentacoes", 200, mov_data)
+
+def main():
+    """Main test function"""
+    tester = FinanceAPITester()
+    
+    print("="*60)
+    print("SISTEMA FINANCEIRO INDUSTRIAL - TESTE DE API")
+    print("="*60)
+    
+    # Test basic connectivity
+    tester.log("🌐 Testing basic connectivity...")
+    success, _ = tester.test_health()
+    if not success:
+        tester.log("❌ Backend is not responding. Stopping tests.")
+        return 1
+    
+    # Register and login
+    tester.log("🔐 Testing authentication...")
+    success, user_data = tester.test_register_user()
+    if not success:
+        tester.log("❌ User registration failed. Stopping tests.")
+        return 1
+    
+    # Test getting current user
+    tester.test_me()
+    
+    # Test DRE functionality
+    tester.log("📊 Testing DRE functionality...")
+    
+    # Create standard chart of accounts
+    tester.test_create_standard_accounts()
+    
+    # Get chart of accounts
+    plano_success, plano_data = tester.test_get_plano_contas()
+    
+    # Test DRE endpoints
+    tester.test_dre_anual(2024)
+    tester.test_dre_anual(2025) 
+    tester.test_dre_mensal(1, 2024)
+    
+    # Test other endpoints
+    tester.log("🏦 Testing bank accounts and transactions...")
+    tester.test_contas_bancarias()
+    tester.test_movimentacoes()
+    
+    # Create sample data and retest DRE
+    tester.create_sample_data()
+    
+    # Test DRE again with data
+    tester.log("📈 Testing DRE with sample data...")
+    tester.test_dre_anual(2024)
+    
+    # Final results
+    print("\n" + "="*60)
+    print("RESULTADOS DOS TESTES")
+    print("="*60)
+    tester.log(f"📊 Tests passed: {tester.tests_passed}/{tester.tests_run}")
+    
+    success_rate = (tester.tests_passed / tester.tests_run) * 100 if tester.tests_run > 0 else 0
+    tester.log(f"📈 Success rate: {success_rate:.1f}%")
+    
+    if success_rate >= 80:
+        tester.log("✅ Overall result: PASS")
+        return 0
+    else:
+        tester.log("❌ Overall result: FAIL")
+        return 1
+
+if __name__ == "__main__":
+    sys.exit(main())

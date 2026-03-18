@@ -426,6 +426,169 @@ async def get_dashboard_dados(
 # ROTAS DE DRE
 # ============================================
 
+# Estrutura padrão do DRE baseada na imagem do Excel
+DRE_ESTRUTURA = [
+    {"codigo": "1", "nome": "Receita com Vendas", "grupo": "receita_bruta", "tipo": "receita"},
+    {"codigo": "2", "nome": "Impostos Sobre Vendas", "grupo": "deducoes_vendas", "tipo": "despesa"},
+    {"codigo": "3", "nome": "Outras Deduções", "grupo": "deducoes_vendas", "tipo": "despesa"},
+    {"codigo": "4", "nome": "Custos com Fornecedores", "grupo": "custos_variaveis", "tipo": "despesa"},
+    {"codigo": "21", "nome": "Custos com Vendas", "grupo": "custos_variaveis", "tipo": "despesa"},
+    {"codigo": "22", "nome": "Custos com Produção", "grupo": "custos_variaveis", "tipo": "despesa"},
+    {"codigo": "5", "nome": "Gastos com Pessoal", "grupo": "custos_fixos", "tipo": "despesa"},
+    {"codigo": "6", "nome": "Gastos com Ocupação", "grupo": "custos_fixos", "tipo": "despesa"},
+    {"codigo": "7", "nome": "Gastos com Serviços de Terceiros", "grupo": "custos_fixos", "tipo": "despesa"},
+    {"codigo": "16", "nome": "Gastos Operacionais", "grupo": "custos_fixos", "tipo": "despesa"},
+    {"codigo": "17", "nome": "Gastos Financeiros", "grupo": "custos_fixos", "tipo": "despesa"},
+    {"codigo": "18", "nome": "Gastos com Veículos", "grupo": "custos_fixos", "tipo": "despesa"},
+    {"codigo": "19", "nome": "Despesas com Materiais e Equipamentos", "grupo": "custos_fixos", "tipo": "despesa"},
+    {"codigo": "20", "nome": "Gastos Administrativos", "grupo": "custos_fixos", "tipo": "despesa"},
+    {"codigo": "9", "nome": "Receitas não Operacionais", "grupo": "resultado_nao_operacional", "tipo": "receita"},
+    {"codigo": "10", "nome": "Gastos não Operacionais", "grupo": "resultado_nao_operacional", "tipo": "despesa"},
+    {"codigo": "12", "nome": "Investimentos", "grupo": "resultado_nao_operacional", "tipo": "despesa"},
+]
+
+@app.get("/api/dre/anual/{ano}")
+async def get_dre_anual(ano: int, user_id: str = Depends(get_current_user)):
+    """Retorna DRE anual completo no formato de planilha (Jan-Dez + Total)"""
+    supabase = get_supabase()
+    
+    # Buscar todas as movimentações do ano
+    data_inicio = f"{ano}-01-01"
+    data_fim = f"{ano + 1}-01-01"
+    
+    movimentacoes = supabase.table("movimentacoes").select("*, plano_contas(*)").eq("user_id", user_id).gte("data", data_inicio).lt("data", data_fim).execute().data
+    
+    # Buscar plano de contas do usuário
+    planos = supabase.table("plano_contas").select("*").eq("user_id", user_id).execute().data
+    
+    # Criar mapeamento de plano_contas_id para grupo DRE
+    plano_to_grupo = {}
+    for plano in planos:
+        categoria = plano.get("categoria", "")
+        if categoria:
+            plano_to_grupo[plano["id"]] = categoria
+    
+    # Inicializar estrutura de dados mensais
+    meses = ["janeiro", "fevereiro", "marco", "abril", "maio", "junho", 
+             "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"]
+    
+    # Estrutura para armazenar valores por grupo e mês
+    dados_por_grupo = {}
+    for item in DRE_ESTRUTURA:
+        dados_por_grupo[item["codigo"]] = {
+            "nome": item["nome"],
+            "grupo": item["grupo"],
+            "tipo": item["tipo"],
+            "meses": {m: 0.0 for m in meses},
+            "total": 0.0
+        }
+    
+    # Processar movimentações
+    for mov in movimentacoes:
+        plano_id = mov.get("plano_contas_id")
+        grupo_dre = plano_to_grupo.get(plano_id, "")
+        valor = mov["valor"]
+        data = mov["data"]
+        mes_idx = int(data.split("-")[1]) - 1
+        mes_nome = meses[mes_idx]
+        
+        # Encontrar o código correspondente baseado no grupo
+        for item in DRE_ESTRUTURA:
+            if item["codigo"] == grupo_dre or item["nome"].lower() in mov.get("plano_contas", {}).get("nome", "").lower():
+                dados_por_grupo[item["codigo"]]["meses"][mes_nome] += valor
+                dados_por_grupo[item["codigo"]]["total"] += valor
+                break
+        else:
+            # Se não encontrou, tentar mapear pelo tipo
+            if mov["tipo"] == "entrada":
+                dados_por_grupo["1"]["meses"][mes_nome] += valor
+                dados_por_grupo["1"]["total"] += valor
+            else:
+                # Distribuir despesas não mapeadas em custos variáveis
+                dados_por_grupo["4"]["meses"][mes_nome] += valor
+                dados_por_grupo["4"]["total"] += valor
+    
+    # Calcular totais por grupo para cada mês
+    def calcular_grupo(codigos, meses_dados):
+        resultado = {m: 0.0 for m in meses}
+        resultado["total"] = 0.0
+        for codigo in codigos:
+            for mes in meses:
+                resultado[mes] += dados_por_grupo[codigo]["meses"][mes]
+            resultado["total"] += dados_por_grupo[codigo]["total"]
+        return resultado
+    
+    # Receita Bruta
+    receita_bruta = calcular_grupo(["1"], meses)
+    
+    # Deduções
+    deducoes = calcular_grupo(["2", "3"], meses)
+    
+    # Receita Líquida
+    receita_liquida = {m: receita_bruta[m] - deducoes[m] for m in meses}
+    receita_liquida["total"] = receita_bruta["total"] - deducoes["total"]
+    
+    # Custos Variáveis
+    custos_variaveis = calcular_grupo(["4", "21", "22"], meses)
+    
+    # Margem de Contribuição
+    margem_contribuicao = {m: receita_liquida[m] - custos_variaveis[m] for m in meses}
+    margem_contribuicao["total"] = receita_liquida["total"] - custos_variaveis["total"]
+    
+    # % Margem de Contribuição
+    margem_contribuicao_pct = {}
+    for m in meses:
+        margem_contribuicao_pct[m] = (margem_contribuicao[m] / receita_liquida[m] * 100) if receita_liquida[m] > 0 else 0
+    margem_contribuicao_pct["total"] = (margem_contribuicao["total"] / receita_liquida["total"] * 100) if receita_liquida["total"] > 0 else 0
+    
+    # Custos Fixos
+    custos_fixos = calcular_grupo(["5", "6", "7", "16", "17", "18", "19", "20"], meses)
+    
+    # Resultado Operacional
+    resultado_operacional = {m: margem_contribuicao[m] - custos_fixos[m] for m in meses}
+    resultado_operacional["total"] = margem_contribuicao["total"] - custos_fixos["total"]
+    
+    # Receitas não Operacionais
+    receitas_nao_op = calcular_grupo(["9"], meses)
+    
+    # Gastos não Operacionais + Investimentos
+    gastos_nao_op = calcular_grupo(["10", "12"], meses)
+    
+    # Resultado Não Operacional
+    resultado_nao_operacional = {m: receitas_nao_op[m] - gastos_nao_op[m] for m in meses}
+    resultado_nao_operacional["total"] = receitas_nao_op["total"] - gastos_nao_op["total"]
+    
+    # Lucro Líquido
+    lucro_liquido = {m: resultado_operacional[m] + resultado_nao_operacional[m] for m in meses}
+    lucro_liquido["total"] = resultado_operacional["total"] + resultado_nao_operacional["total"]
+    
+    # % Margem Líquida
+    margem_liquida_pct = {}
+    for m in meses:
+        margem_liquida_pct[m] = (lucro_liquido[m] / receita_liquida[m] * 100) if receita_liquida[m] > 0 else 0
+    margem_liquida_pct["total"] = (lucro_liquido["total"] / receita_liquida["total"] * 100) if receita_liquida["total"] > 0 else 0
+    
+    return {
+        "ano": ano,
+        "meses": meses,
+        "linhas": dados_por_grupo,
+        "totais": {
+            "receita_bruta": receita_bruta,
+            "deducoes_vendas": deducoes,
+            "receita_liquida": receita_liquida,
+            "custos_variaveis": custos_variaveis,
+            "margem_contribuicao": margem_contribuicao,
+            "margem_contribuicao_pct": margem_contribuicao_pct,
+            "custos_fixos": custos_fixos,
+            "resultado_operacional": resultado_operacional,
+            "receitas_nao_operacionais": receitas_nao_op,
+            "gastos_nao_operacionais": gastos_nao_op,
+            "resultado_nao_operacional": resultado_nao_operacional,
+            "lucro_liquido": lucro_liquido,
+            "margem_liquida_pct": margem_liquida_pct
+        }
+    }
+
 @app.get("/api/dre/{mes}/{ano}")
 async def get_dre(mes: int, ano: int, user_id: str = Depends(get_current_user)):
     supabase = get_supabase()
@@ -465,6 +628,37 @@ async def get_dre(mes: int, ano: int, user_id: str = Depends(get_current_user)):
         "margem_bruta_pct": (lucro_bruto / receitas * 100) if receitas > 0 else 0,
         "margem_operacional_pct": (lucro_operacional / receitas * 100) if receitas > 0 else 0,
         "margem_liquida_pct": (lucro_liquido / receitas * 100) if receitas > 0 else 0
+    }
+
+@app.post("/api/plano-contas/criar-padrao")
+async def criar_plano_contas_padrao(user_id: str = Depends(get_current_user)):
+    """Cria o plano de contas padrão para DRE"""
+    supabase = get_supabase()
+    
+    # Verificar se já existe plano de contas
+    existing = supabase.table("plano_contas").select("id").eq("user_id", user_id).execute()
+    
+    planos_criados = []
+    
+    for item in DRE_ESTRUTURA:
+        # Verificar se já existe conta com mesmo código/categoria
+        existing_item = supabase.table("plano_contas").select("*").eq("user_id", user_id).eq("categoria", item["codigo"]).execute()
+        
+        if not existing_item.data:
+            novo_plano = {
+                "id": str(uuid.uuid4()),
+                "user_id": user_id,
+                "nome": item["nome"],
+                "tipo": item["tipo"],
+                "categoria": item["codigo"],  # Usando código como categoria para mapear no DRE
+                "created_at": datetime.utcnow().isoformat()
+            }
+            result = supabase.table("plano_contas").insert(novo_plano).execute()
+            planos_criados.append(result.data[0])
+    
+    return {
+        "message": f"Plano de contas padrão criado com sucesso. {len(planos_criados)} contas criadas.",
+        "planos_criados": planos_criados
     }
 
 # ============================================
