@@ -183,7 +183,7 @@ Este é um sistema financeiro completo desenvolvido para gestão industrial, com
 ### 1. Primeiro Acesso
 
 1. **Acesse a aplicação:**
-   - URL: https://004d5346-ed43-4354-9345-980800e2cb86.preview.emergentagent.com
+   - URL: https://relatorio-financeiro-2.preview.emergentagent.com
 
 2. **Crie sua conta:**
    - Clique em "Cadastro"
