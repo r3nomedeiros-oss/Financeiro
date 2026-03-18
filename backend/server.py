@@ -533,3 +533,7 @@ async def delete_planejamento(plan_id: str, user_id: str = Depends(get_current_u
 @app.get("/")
 async def root():
     return {"message": "Sistema Financeiro Industrial API", "status": "online"}
+
+@app.get("/health")
+async def health():
+    return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
