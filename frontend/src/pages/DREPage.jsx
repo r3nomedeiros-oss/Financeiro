@@ -1,110 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { dreAPI } from '../services/api';
+import { dreAPI, planoContasAPI } from '../services/api';
 
-// Estrutura do DRE conforme imagem Excel
-const DRE_ESTRUTURA = {
-  receita_bruta: {
-    label: "(+) Receita Bruta",
-    cor: "text-cyan-600 font-semibold",
-    bgCor: "bg-cyan-50",
-    itens: [
-      { codigo: "1", nome: "1 - Receita com Vendas" }
-    ]
-  },
-  deducoes_vendas: {
-    label: "(-) Deduções Sobre Vendas",
-    cor: "text-red-600 font-semibold",
-    bgCor: "bg-red-50",
-    itens: [
-      { codigo: "2", nome: "2 - Impostos Sobre Vendas" },
-      { codigo: "3", nome: "3 - Outras Deduções" }
-    ]
-  },
-  receita_liquida: {
-    label: "(=) Receita Líquida",
-    cor: "text-cyan-600 font-semibold",
-    bgCor: "bg-cyan-50",
-    isTotal: true
-  },
-  custos_variaveis: {
-    label: "(-) Custos Variáveis",
-    cor: "text-red-600 font-semibold",
-    bgCor: "bg-red-50",
-    itens: [
-      { codigo: "4", nome: "4 - Custos com Fornecedores" },
-      { codigo: "21", nome: "21 - Custos com Vendas" },
-      { codigo: "22", nome: "22 - Custos com Produção" }
-    ]
-  },
-  margem_contribuicao: {
-    label: "(=) Margem de Contribuição",
-    cor: "text-cyan-600 font-semibold",
-    bgCor: "bg-cyan-50",
-    isTotal: true
-  },
-  margem_contribuicao_pct: {
-    label: "(=) % Margem de Contribuição",
-    cor: "text-blue-600 font-semibold",
-    bgCor: "bg-blue-50",
-    isPercent: true
-  },
-  custos_fixos: {
-    label: "(-) Custos Fixos",
-    cor: "text-red-600 font-semibold",
-    bgCor: "bg-red-50",
-    itens: [
-      { codigo: "5", nome: "5 - Gastos com Pessoal" },
-      { codigo: "6", nome: "6 - Gastos com Ocupação" },
-      { codigo: "7", nome: "7 - Gastos com Serviços de Terceiros" },
-      { codigo: "16", nome: "16 - Gastos Operacionais" },
-      { codigo: "17", nome: "17 - Gastos Financeiros" },
-      { codigo: "18", nome: "18 - Gastos com Veículos" },
-      { codigo: "19", nome: "19 - Despesas com Materiais e Equipamentos" },
-      { codigo: "20", nome: "20 - Gastos Administrativos" }
-    ]
-  },
-  resultado_operacional: {
-    label: "(=) Resultado Operacional",
-    cor: "text-cyan-600 font-semibold",
-    bgCor: "bg-cyan-50",
-    isTotal: true
-  },
-  resultado_nao_operacional_header: {
-    label: "Resultado Não Operacional",
-    cor: "text-gray-800 font-semibold",
-    bgCor: "bg-gray-100",
-    isHeader: true
-  },
-  receitas_nao_operacionais: {
-    label: "",
-    cor: "",
-    bgCor: "",
-    itens: [
-      { codigo: "9", nome: "9 - Receitas não Operacionais" }
-    ]
-  },
-  gastos_nao_operacionais: {
-    label: "",
-    cor: "",
-    bgCor: "",
-    itens: [
-      { codigo: "10", nome: "10 - Gastos não Operacionais" },
-      { codigo: "12", nome: "12 - Investimentos" }
-    ]
-  },
-  lucro_liquido: {
-    label: "(=) Lucro Líquido",
-    cor: "text-green-600 font-bold",
-    bgCor: "bg-green-50",
-    isTotal: true
-  },
-  margem_liquida_pct: {
-    label: "(=) % Margem Líquida",
-    cor: "text-blue-600 font-semibold",
-    bgCor: "bg-blue-50",
-    isPercent: true
-  }
-};
+// Ícones
+const ChevronRight = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+  </svg>
+);
+
+const ChevronDown = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+  </svg>
+);
 
 const MESES_LABELS = {
   janeiro: "Jan",
@@ -121,21 +29,51 @@ const MESES_LABELS = {
   dezembro: "Dez"
 };
 
+// Estrutura de categorias fixas do DRE
+const CATEGORIAS_CONFIG = {
+  receita_bruta: { label: "(+) Receita Bruta", cor: "cyan", tipo: "positivo" },
+  deducoes_vendas: { label: "(-) Deduções Sobre Vendas", cor: "red", tipo: "negativo" },
+  receita_liquida: { label: "(=) Receita Líquida", cor: "cyan", tipo: "resultado", isTotal: true },
+  custos_variaveis: { label: "(-) Custos Variáveis", cor: "red", tipo: "negativo" },
+  margem_contribuicao: { label: "(=) Margem de Contribuição", cor: "cyan", tipo: "resultado", isTotal: true },
+  margem_contribuicao_pct: { label: "(=) % Margem de Contribuição", cor: "blue", tipo: "percentual", isTotal: true },
+  custos_fixos: { label: "(-) Custos Fixos", cor: "red", tipo: "negativo" },
+  resultado_operacional: { label: "(=) Resultado Operacional", cor: "cyan", tipo: "resultado", isTotal: true },
+  resultado_nao_operacional: { label: "Resultado Não Operacional", cor: "gray", tipo: "misto" },
+  lucro_liquido: { label: "(=) Lucro Líquido", cor: "green", tipo: "resultado", isTotal: true },
+  margem_liquida_pct: { label: "(=) % Margem Líquida", cor: "blue", tipo: "percentual", isTotal: true },
+};
+
 export default function DREPage() {
   const [dre, setDre] = useState(null);
+  const [hierarquia, setHierarquia] = useState(null);
   const [loading, setLoading] = useState(false);
   const [ano, setAno] = useState(new Date().getFullYear());
   const [criandoPlano, setCriandoPlano] = useState(false);
+  
+  // Estado de expansão: { categoria_id: { expanded: bool, subcategorias: { subcat_id: bool } } }
+  const [expandedState, setExpandedState] = useState({});
 
   useEffect(() => {
-    carregarDRE();
+    carregarDados();
   }, [ano]);
 
-  const carregarDRE = async () => {
+  const carregarDados = async () => {
     try {
       setLoading(true);
-      const response = await dreAPI.getAnual(ano);
-      setDre(response.data);
+      const [dreRes, hierarquiaRes] = await Promise.all([
+        dreAPI.getAnual(ano),
+        planoContasAPI.getHierarquico()
+      ]);
+      setDre(dreRes.data);
+      setHierarquia(hierarquiaRes.data);
+      
+      // Inicializar estado de expansão (todas categorias expandidas por padrão)
+      const initialExpanded = {};
+      Object.keys(hierarquiaRes.data || {}).forEach(catId => {
+        initialExpanded[catId] = { expanded: true, subcategorias: {} };
+      });
+      setExpandedState(initialExpanded);
     } catch (error) {
       console.error('Erro ao carregar DRE:', error);
     } finally {
@@ -148,13 +86,58 @@ export default function DREPage() {
       setCriandoPlano(true);
       await dreAPI.criarPlanoPadrao();
       alert('Plano de contas padrão criado com sucesso!');
-      carregarDRE();
+      carregarDados();
     } catch (error) {
       console.error('Erro ao criar plano de contas:', error);
       alert('Erro ao criar plano de contas padrão');
     } finally {
       setCriandoPlano(false);
     }
+  };
+
+  const toggleCategoria = (catId) => {
+    setExpandedState(prev => ({
+      ...prev,
+      [catId]: {
+        ...prev[catId],
+        expanded: !prev[catId]?.expanded
+      }
+    }));
+  };
+
+  const toggleSubcategoria = (catId, subcatId) => {
+    setExpandedState(prev => ({
+      ...prev,
+      [catId]: {
+        ...prev[catId],
+        subcategorias: {
+          ...prev[catId]?.subcategorias,
+          [subcatId]: !prev[catId]?.subcategorias?.[subcatId]
+        }
+      }
+    }));
+  };
+
+  const expandAll = () => {
+    const newState = {};
+    Object.keys(hierarquia || {}).forEach(catId => {
+      newState[catId] = { 
+        expanded: true, 
+        subcategorias: {} 
+      };
+      (hierarquia[catId]?.subcategorias || []).forEach(sub => {
+        newState[catId].subcategorias[sub.id] = true;
+      });
+    });
+    setExpandedState(newState);
+  };
+
+  const collapseAll = () => {
+    const newState = {};
+    Object.keys(hierarquia || {}).forEach(catId => {
+      newState[catId] = { expanded: false, subcategorias: {} };
+    });
+    setExpandedState(newState);
   };
 
   const formatCurrency = (value) => {
@@ -172,15 +155,20 @@ export default function DREPage() {
     return `${value.toFixed(0)}%`;
   };
 
-  const getValorClasse = (valor, isPercent = false) => {
-    if (valor === 0 || valor === null || valor === undefined) return 'text-gray-400';
-    if (isPercent) return valor < 0 ? 'text-red-600' : 'text-gray-800';
-    return valor < 0 ? 'text-red-600' : 'text-gray-800';
-  };
-
   const calcularAV = (valor, receitaBrutaTotal) => {
     if (!receitaBrutaTotal || receitaBrutaTotal === 0) return '0%';
     return `${((valor / receitaBrutaTotal) * 100).toFixed(0)}%`;
+  };
+
+  const getCorClasse = (cor, isHeader = false) => {
+    const cores = {
+      cyan: isHeader ? 'bg-cyan-50 text-cyan-700' : 'text-cyan-700',
+      red: isHeader ? 'bg-red-50 text-red-600' : 'text-red-600',
+      green: isHeader ? 'bg-green-50 text-green-700' : 'text-green-700',
+      blue: isHeader ? 'bg-blue-50 text-blue-600' : 'text-blue-600',
+      gray: isHeader ? 'bg-gray-100 text-gray-800' : 'text-gray-800',
+    };
+    return cores[cor] || '';
   };
 
   if (loading) {
@@ -193,8 +181,121 @@ export default function DREPage() {
 
   const meses = dre?.meses || [];
   const totais = dre?.totais || {};
-  const linhas = dre?.linhas || {};
   const receitaBrutaTotal = totais?.receita_bruta?.total || 0;
+
+  // Renderiza uma linha de valores
+  const renderValoresLinha = (valores, isPercent = false, cor = '') => (
+    <>
+      {meses.map((mes) => (
+        <td key={mes} className={`text-right p-2 border-r border-gray-200 ${cor}`}>
+          {isPercent ? formatPercent(valores?.[mes]) : formatCurrency(valores?.[mes])}
+        </td>
+      ))}
+      <td className={`text-right p-2 bg-gray-50 border-r border-gray-300 font-semibold ${cor}`}>
+        {isPercent ? formatPercent(valores?.total) : formatCurrency(valores?.total)}
+      </td>
+      <td className={`text-right p-2 bg-gray-50 ${cor}`}>
+        {isPercent ? formatPercent(valores?.total) : calcularAV(valores?.total, receitaBrutaTotal)}
+      </td>
+    </>
+  );
+
+  // Renderiza linha de total/resultado
+  const renderLinhaTotal = (key, config) => {
+    const valores = totais[key];
+    const isPercent = config.tipo === 'percentual';
+    
+    return (
+      <tr key={key} className={`${getCorClasse(config.cor, true)} border-b border-gray-200`}>
+        <td className={`p-2 sticky left-0 ${getCorClasse(config.cor, true)} font-semibold border-r border-gray-300`}>
+          {config.label}
+        </td>
+        {renderValoresLinha(valores, isPercent, `font-semibold ${getCorClasse(config.cor)}`)}
+      </tr>
+    );
+  };
+
+  // Renderiza categoria com subcategorias (Tree View)
+  const renderCategoriaHierarquica = (catId, catConfig) => {
+    const catData = hierarquia?.[catId];
+    const isExpanded = expandedState[catId]?.expanded;
+    const subcategorias = catData?.subcategorias || [];
+    
+    return (
+      <React.Fragment key={catId}>
+        {/* Linha da Categoria */}
+        <tr className={`${getCorClasse(catConfig.cor, true)} border-b border-gray-200 cursor-pointer hover:opacity-90`}
+            onClick={() => toggleCategoria(catId)}
+            data-testid={`categoria-${catId}`}>
+          <td className={`p-2 sticky left-0 ${getCorClasse(catConfig.cor, true)} font-semibold border-r border-gray-300`}>
+            <div className="flex items-center gap-2">
+              <span className="transition-transform duration-200">
+                {subcategorias.length > 0 && (isExpanded ? <ChevronDown /> : <ChevronRight />)}
+              </span>
+              {catConfig.label}
+            </div>
+          </td>
+          {renderValoresLinha(totais[catId], false, `font-semibold ${getCorClasse(catConfig.cor)}`)}
+        </tr>
+
+        {/* Subcategorias (Nível 2) */}
+        {isExpanded && subcategorias.map((subcat) => {
+          const isSubExpanded = expandedState[catId]?.subcategorias?.[subcat.id];
+          const itens = subcat.itens || [];
+          
+          return (
+            <React.Fragment key={subcat.id}>
+              {/* Linha da Subcategoria */}
+              <tr className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
+                  onClick={(e) => { e.stopPropagation(); toggleSubcategoria(catId, subcat.id); }}
+                  data-testid={`subcategoria-${subcat.id}`}>
+                <td className="p-2 pl-8 sticky left-0 bg-white hover:bg-gray-50 border-r border-gray-300">
+                  <div className="flex items-center gap-2">
+                    <span className="transition-transform duration-200">
+                      {itens.length > 0 && (isSubExpanded ? <ChevronDown /> : <ChevronRight />)}
+                    </span>
+                    {subcat.nome}
+                  </div>
+                </td>
+                {meses.map((mes) => (
+                  <td key={mes} className="text-right p-2 border-r border-gray-200">
+                    {formatCurrency(dre?.linhas?.[subcat.categoria]?.meses?.[mes] || 0)}
+                  </td>
+                ))}
+                <td className="text-right p-2 bg-gray-50 border-r border-gray-300">
+                  {formatCurrency(dre?.linhas?.[subcat.categoria]?.total || 0)}
+                </td>
+                <td className="text-right p-2 bg-gray-50">
+                  {calcularAV(dre?.linhas?.[subcat.categoria]?.total || 0, receitaBrutaTotal)}
+                </td>
+              </tr>
+
+              {/* Itens (Nível 3) */}
+              {isSubExpanded && itens.map((item) => (
+                <tr key={item.id} className="border-b border-gray-50 hover:bg-gray-50"
+                    data-testid={`item-${item.id}`}>
+                  <td className="p-2 pl-14 sticky left-0 bg-white hover:bg-gray-50 border-r border-gray-300 text-gray-600 text-sm">
+                    • {item.nome}
+                  </td>
+                  {meses.map((mes) => (
+                    <td key={mes} className="text-right p-2 border-r border-gray-200 text-gray-500 text-sm">
+                      -
+                    </td>
+                  ))}
+                  <td className="text-right p-2 bg-gray-50 border-r border-gray-300 text-gray-500 text-sm">
+                    -
+                  </td>
+                  <td className="text-right p-2 bg-gray-50 text-gray-500 text-sm">
+                    -
+                  </td>
+                </tr>
+              ))}
+            </React.Fragment>
+          );
+        })}
+      </React.Fragment>
+    );
+  };
 
   return (
     <div className="space-y-4" data-testid="dre-page">
@@ -202,10 +303,24 @@ export default function DREPage() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">DRE - Demonstrativo de Resultado</h1>
-          <p className="text-gray-600 text-sm">Visão anual consolidada</p>
+          <p className="text-gray-600 text-sm">Visão anual consolidada com estrutura hierárquica</p>
         </div>
 
         <div className="flex gap-3 items-center">
+          <button
+            onClick={expandAll}
+            className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg"
+            data-testid="expand-all-btn"
+          >
+            Expandir Tudo
+          </button>
+          <button
+            onClick={collapseAll}
+            className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg"
+            data-testid="collapse-all-btn"
+          >
+            Recolher Tudo
+          </button>
           <button
             onClick={criarPlanoPadrao}
             disabled={criandoPlano}
@@ -228,12 +343,12 @@ export default function DREPage() {
         </div>
       </div>
 
-      {/* Tabela DRE estilo Excel */}
+      {/* Tabela DRE com Tree View */}
       <div className="bg-white rounded-lg shadow overflow-x-auto">
         <table className="w-full text-sm border-collapse" data-testid="dre-table">
           <thead>
             <tr className="bg-gray-100 border-b-2 border-gray-300">
-              <th className="text-left p-2 sticky left-0 bg-gray-100 min-w-[280px] border-r border-gray-300">
+              <th className="text-left p-2 sticky left-0 bg-gray-100 min-w-[320px] border-r border-gray-300">
                 Descrição
               </th>
               {meses.map((mes) => (
@@ -250,312 +365,53 @@ export default function DREPage() {
             </tr>
           </thead>
           <tbody>
-            {/* (+) Receita Bruta */}
-            <tr className="bg-cyan-50 border-b border-gray-200">
-              <td className="p-2 sticky left-0 bg-cyan-50 text-cyan-700 font-semibold border-r border-gray-300">
-                (+) Receita Bruta
-              </td>
-              {meses.map((mes) => (
-                <td key={mes} className="text-right p-2 text-cyan-700 font-semibold border-r border-gray-200">
-                  {formatCurrency(totais.receita_bruta?.[mes])}
-                </td>
-              ))}
-              <td className="text-right p-2 bg-cyan-100 text-cyan-700 font-bold border-r border-gray-300">
-                {formatCurrency(totais.receita_bruta?.total)}
-              </td>
-              <td className="text-right p-2 bg-cyan-100 text-cyan-700 font-bold">
-                100%
-              </td>
-            </tr>
-
-            {/* 1 - Receita com Vendas */}
-            <tr className="border-b border-gray-100 hover:bg-gray-50">
-              <td className="p-2 pl-4 sticky left-0 bg-white hover:bg-gray-50 border-r border-gray-300">
-                1 - Receita com Vendas
-              </td>
-              {meses.map((mes) => (
-                <td key={mes} className="text-right p-2 border-r border-gray-200">
-                  {formatCurrency(linhas["1"]?.meses?.[mes])}
-                </td>
-              ))}
-              <td className="text-right p-2 bg-gray-50 border-r border-gray-300">
-                {formatCurrency(linhas["1"]?.total)}
-              </td>
-              <td className="text-right p-2 bg-gray-50">
-                {calcularAV(linhas["1"]?.total, receitaBrutaTotal)}
-              </td>
-            </tr>
-
-            {/* (-) Deduções Sobre Vendas */}
-            <tr className="bg-red-50 border-b border-gray-200">
-              <td className="p-2 sticky left-0 bg-red-50 text-red-600 font-semibold border-r border-gray-300">
-                (-) Deduções Sobre Vendas
-              </td>
-              {meses.map((mes) => (
-                <td key={mes} className="text-right p-2 text-red-600 font-semibold border-r border-gray-200">
-                  {formatCurrency(totais.deducoes_vendas?.[mes])}
-                </td>
-              ))}
-              <td className="text-right p-2 bg-red-100 text-red-600 font-bold border-r border-gray-300">
-                {formatCurrency(totais.deducoes_vendas?.total)}
-              </td>
-              <td className="text-right p-2 bg-red-100 text-red-600 font-bold">
-                {calcularAV(totais.deducoes_vendas?.total, receitaBrutaTotal)}
-              </td>
-            </tr>
-
-            {/* Itens de Deduções */}
-            {["2", "3"].map((codigo) => (
-              <tr key={codigo} className="border-b border-gray-100 hover:bg-gray-50">
-                <td className="p-2 pl-4 sticky left-0 bg-white hover:bg-gray-50 border-r border-gray-300">
-                  {codigo} - {linhas[codigo]?.nome || (codigo === "2" ? "Impostos Sobre Vendas" : "Outras Deduções")}
-                </td>
-                {meses.map((mes) => (
-                  <td key={mes} className="text-right p-2 border-r border-gray-200">
-                    {formatCurrency(linhas[codigo]?.meses?.[mes])}
-                  </td>
-                ))}
-                <td className="text-right p-2 bg-gray-50 border-r border-gray-300">
-                  {formatCurrency(linhas[codigo]?.total)}
-                </td>
-                <td className="text-right p-2 bg-gray-50">
-                  {calcularAV(linhas[codigo]?.total, receitaBrutaTotal)}
-                </td>
-              </tr>
-            ))}
-
-            {/* (=) Receita Líquida */}
-            <tr className="bg-cyan-50 border-b border-gray-200">
-              <td className="p-2 sticky left-0 bg-cyan-50 text-cyan-700 font-semibold border-r border-gray-300">
-                (=) Receita Líquida
-              </td>
-              {meses.map((mes) => (
-                <td key={mes} className="text-right p-2 text-cyan-700 font-semibold border-r border-gray-200">
-                  {formatCurrency(totais.receita_liquida?.[mes])}
-                </td>
-              ))}
-              <td className="text-right p-2 bg-cyan-100 text-cyan-700 font-bold border-r border-gray-300">
-                {formatCurrency(totais.receita_liquida?.total)}
-              </td>
-              <td className="text-right p-2 bg-cyan-100 text-cyan-700 font-bold">
-                {calcularAV(totais.receita_liquida?.total, receitaBrutaTotal)}
-              </td>
-            </tr>
-
-            {/* (-) Custos Variáveis */}
-            <tr className="bg-red-50 border-b border-gray-200">
-              <td className="p-2 sticky left-0 bg-red-50 text-red-600 font-semibold border-r border-gray-300">
-                (-) Custos Variáveis
-              </td>
-              {meses.map((mes) => (
-                <td key={mes} className="text-right p-2 text-red-600 font-semibold border-r border-gray-200">
-                  {formatCurrency(totais.custos_variaveis?.[mes])}
-                </td>
-              ))}
-              <td className="text-right p-2 bg-red-100 text-red-600 font-bold border-r border-gray-300">
-                {formatCurrency(totais.custos_variaveis?.total)}
-              </td>
-              <td className="text-right p-2 bg-red-100 text-red-600 font-bold">
-                {calcularAV(totais.custos_variaveis?.total, receitaBrutaTotal)}
-              </td>
-            </tr>
-
-            {/* Itens de Custos Variáveis */}
-            {["4", "21", "22"].map((codigo) => (
-              <tr key={codigo} className="border-b border-gray-100 hover:bg-gray-50">
-                <td className="p-2 pl-4 sticky left-0 bg-white hover:bg-gray-50 border-r border-gray-300">
-                  {codigo} - {linhas[codigo]?.nome || `Custo ${codigo}`}
-                </td>
-                {meses.map((mes) => (
-                  <td key={mes} className="text-right p-2 border-r border-gray-200">
-                    {formatCurrency(linhas[codigo]?.meses?.[mes])}
-                  </td>
-                ))}
-                <td className="text-right p-2 bg-gray-50 border-r border-gray-300">
-                  {formatCurrency(linhas[codigo]?.total)}
-                </td>
-                <td className="text-right p-2 bg-gray-50">
-                  {calcularAV(linhas[codigo]?.total, receitaBrutaTotal)}
-                </td>
-              </tr>
-            ))}
-
-            {/* (=) Margem de Contribuição */}
-            <tr className="bg-cyan-50 border-b border-gray-200">
-              <td className="p-2 sticky left-0 bg-cyan-50 text-cyan-700 font-semibold border-r border-gray-300">
-                (=) Margem de Contribuição
-              </td>
-              {meses.map((mes) => (
-                <td key={mes} className={`text-right p-2 font-semibold border-r border-gray-200 ${getValorClasse(totais.margem_contribuicao?.[mes])}`}>
-                  {formatCurrency(totais.margem_contribuicao?.[mes])}
-                </td>
-              ))}
-              <td className="text-right p-2 bg-cyan-100 text-cyan-700 font-bold border-r border-gray-300">
-                {formatCurrency(totais.margem_contribuicao?.total)}
-              </td>
-              <td className="text-right p-2 bg-cyan-100 text-cyan-700 font-bold">
-                {calcularAV(totais.margem_contribuicao?.total, receitaBrutaTotal)}
-              </td>
-            </tr>
-
-            {/* (=) % Margem de Contribuição */}
-            <tr className="bg-blue-50 border-b border-gray-200">
-              <td className="p-2 sticky left-0 bg-blue-50 text-blue-600 font-semibold border-r border-gray-300">
-                (=) % Margem de Contribuição
-              </td>
-              {meses.map((mes) => (
-                <td key={mes} className="text-right p-2 text-blue-600 font-semibold border-r border-gray-200">
-                  {formatPercent(totais.margem_contribuicao_pct?.[mes])}
-                </td>
-              ))}
-              <td className="text-right p-2 bg-blue-100 text-blue-700 font-bold border-r border-gray-300">
-                {formatPercent(totais.margem_contribuicao_pct?.total)}
-              </td>
-              <td className="text-right p-2 bg-blue-100 text-blue-700 font-bold">
-                {formatPercent(totais.margem_contribuicao_pct?.total)}
-              </td>
-            </tr>
-
-            {/* (-) Custos Fixos */}
-            <tr className="bg-red-50 border-b border-gray-200">
-              <td className="p-2 sticky left-0 bg-red-50 text-red-600 font-semibold border-r border-gray-300">
-                (-) Custos Fixos
-              </td>
-              {meses.map((mes) => (
-                <td key={mes} className="text-right p-2 text-red-600 font-semibold border-r border-gray-200">
-                  {formatCurrency(totais.custos_fixos?.[mes])}
-                </td>
-              ))}
-              <td className="text-right p-2 bg-red-100 text-red-600 font-bold border-r border-gray-300">
-                {formatCurrency(totais.custos_fixos?.total)}
-              </td>
-              <td className="text-right p-2 bg-red-100 text-red-600 font-bold">
-                {calcularAV(totais.custos_fixos?.total, receitaBrutaTotal)}
-              </td>
-            </tr>
-
-            {/* Itens de Custos Fixos */}
-            {["5", "6", "7", "16", "17", "18", "19", "20"].map((codigo) => (
-              <tr key={codigo} className="border-b border-gray-100 hover:bg-gray-50">
-                <td className="p-2 pl-4 sticky left-0 bg-white hover:bg-gray-50 border-r border-gray-300">
-                  {codigo} - {linhas[codigo]?.nome || `Gasto ${codigo}`}
-                </td>
-                {meses.map((mes) => (
-                  <td key={mes} className="text-right p-2 border-r border-gray-200">
-                    {formatCurrency(linhas[codigo]?.meses?.[mes])}
-                  </td>
-                ))}
-                <td className="text-right p-2 bg-gray-50 border-r border-gray-300">
-                  {formatCurrency(linhas[codigo]?.total)}
-                </td>
-                <td className="text-right p-2 bg-gray-50">
-                  {calcularAV(linhas[codigo]?.total, receitaBrutaTotal)}
-                </td>
-              </tr>
-            ))}
-
-            {/* (=) Resultado Operacional */}
-            <tr className="bg-cyan-50 border-b border-gray-200">
-              <td className="p-2 sticky left-0 bg-cyan-50 text-cyan-700 font-semibold border-r border-gray-300">
-                (=) Resultado Operacional
-              </td>
-              {meses.map((mes) => (
-                <td key={mes} className={`text-right p-2 font-semibold border-r border-gray-200 ${getValorClasse(totais.resultado_operacional?.[mes])}`}>
-                  {formatCurrency(totais.resultado_operacional?.[mes])}
-                </td>
-              ))}
-              <td className={`text-right p-2 bg-cyan-100 font-bold border-r border-gray-300 ${getValorClasse(totais.resultado_operacional?.total)}`}>
-                {formatCurrency(totais.resultado_operacional?.total)}
-              </td>
-              <td className="text-right p-2 bg-cyan-100 font-bold">
-                {calcularAV(totais.resultado_operacional?.total, receitaBrutaTotal)}
-              </td>
-            </tr>
-
-            {/* Resultado Não Operacional - Header */}
-            <tr className="bg-gray-100 border-b border-gray-200">
-              <td className="p-2 sticky left-0 bg-gray-100 text-gray-800 font-semibold border-r border-gray-300">
-                Resultado Não Operacional
-              </td>
-              {meses.map((mes) => (
-                <td key={mes} className={`text-right p-2 font-semibold border-r border-gray-200 ${getValorClasse(totais.resultado_nao_operacional?.[mes])}`}>
-                  {formatCurrency(totais.resultado_nao_operacional?.[mes])}
-                </td>
-              ))}
-              <td className={`text-right p-2 bg-gray-200 font-bold border-r border-gray-300 ${getValorClasse(totais.resultado_nao_operacional?.total)}`}>
-                {formatCurrency(totais.resultado_nao_operacional?.total)}
-              </td>
-              <td className="text-right p-2 bg-gray-200 font-bold">
-                {calcularAV(totais.resultado_nao_operacional?.total, receitaBrutaTotal)}
-              </td>
-            </tr>
-
-            {/* Itens Não Operacionais */}
-            {["9", "10", "12"].map((codigo) => (
-              <tr key={codigo} className="border-b border-gray-100 hover:bg-gray-50">
-                <td className="p-2 pl-4 sticky left-0 bg-white hover:bg-gray-50 border-r border-gray-300">
-                  {codigo} - {linhas[codigo]?.nome || `Item ${codigo}`}
-                </td>
-                {meses.map((mes) => (
-                  <td key={mes} className="text-right p-2 border-r border-gray-200">
-                    {formatCurrency(linhas[codigo]?.meses?.[mes])}
-                  </td>
-                ))}
-                <td className="text-right p-2 bg-gray-50 border-r border-gray-300">
-                  {formatCurrency(linhas[codigo]?.total)}
-                </td>
-                <td className="text-right p-2 bg-gray-50">
-                  {calcularAV(linhas[codigo]?.total, receitaBrutaTotal)}
-                </td>
-              </tr>
-            ))}
-
-            {/* (=) Lucro Líquido */}
-            <tr className="bg-green-50 border-b border-gray-200">
-              <td className="p-2 sticky left-0 bg-green-50 text-green-700 font-bold border-r border-gray-300">
-                (=) Lucro Líquido
-              </td>
-              {meses.map((mes) => (
-                <td key={mes} className={`text-right p-2 font-bold border-r border-gray-200 ${totais.lucro_liquido?.[mes] >= 0 ? 'text-green-700' : 'text-red-600'}`}>
-                  {formatCurrency(totais.lucro_liquido?.[mes])}
-                </td>
-              ))}
-              <td className={`text-right p-2 bg-green-100 font-bold border-r border-gray-300 ${totais.lucro_liquido?.total >= 0 ? 'text-green-700' : 'text-red-600'}`}>
-                {formatCurrency(totais.lucro_liquido?.total)}
-              </td>
-              <td className="text-right p-2 bg-green-100 font-bold">
-                {calcularAV(totais.lucro_liquido?.total, receitaBrutaTotal)}
-              </td>
-            </tr>
-
-            {/* (=) % Margem Líquida */}
-            <tr className="bg-blue-50">
-              <td className="p-2 sticky left-0 bg-blue-50 text-blue-600 font-semibold border-r border-gray-300">
-                (=) % Margem Líquida
-              </td>
-              {meses.map((mes) => (
-                <td key={mes} className={`text-right p-2 font-semibold border-r border-gray-200 ${totais.margem_liquida_pct?.[mes] >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
-                  {formatPercent(totais.margem_liquida_pct?.[mes])}
-                </td>
-              ))}
-              <td className={`text-right p-2 bg-blue-100 font-bold border-r border-gray-300 ${totais.margem_liquida_pct?.total >= 0 ? 'text-blue-700' : 'text-red-600'}`}>
-                {formatPercent(totais.margem_liquida_pct?.total)}
-              </td>
-              <td className="text-right p-2 bg-blue-100 font-bold">
-                {formatPercent(totais.margem_liquida_pct?.total)}
-              </td>
-            </tr>
+            {/* Receita Bruta */}
+            {renderCategoriaHierarquica('receita_bruta', CATEGORIAS_CONFIG.receita_bruta)}
+            
+            {/* Deduções */}
+            {renderCategoriaHierarquica('deducoes_vendas', CATEGORIAS_CONFIG.deducoes_vendas)}
+            
+            {/* Receita Líquida (Total) */}
+            {renderLinhaTotal('receita_liquida', CATEGORIAS_CONFIG.receita_liquida)}
+            
+            {/* Custos Variáveis */}
+            {renderCategoriaHierarquica('custos_variaveis', CATEGORIAS_CONFIG.custos_variaveis)}
+            
+            {/* Margem de Contribuição */}
+            {renderLinhaTotal('margem_contribuicao', CATEGORIAS_CONFIG.margem_contribuicao)}
+            {renderLinhaTotal('margem_contribuicao_pct', CATEGORIAS_CONFIG.margem_contribuicao_pct)}
+            
+            {/* Custos Fixos */}
+            {renderCategoriaHierarquica('custos_fixos', CATEGORIAS_CONFIG.custos_fixos)}
+            
+            {/* Resultado Operacional */}
+            {renderLinhaTotal('resultado_operacional', CATEGORIAS_CONFIG.resultado_operacional)}
+            
+            {/* Resultado Não Operacional */}
+            {renderCategoriaHierarquica('resultado_nao_operacional', CATEGORIAS_CONFIG.resultado_nao_operacional)}
+            
+            {/* Lucro Líquido */}
+            {renderLinhaTotal('lucro_liquido', CATEGORIAS_CONFIG.lucro_liquido)}
+            {renderLinhaTotal('margem_liquida_pct', CATEGORIAS_CONFIG.margem_liquida_pct)}
           </tbody>
         </table>
       </div>
 
       {/* Legenda */}
       <div className="bg-white rounded-lg shadow p-4">
-        <h3 className="font-semibold text-gray-700 mb-2">Legenda:</h3>
+        <h3 className="font-semibold text-gray-700 mb-2">Legenda e Navegação:</h3>
         <div className="flex flex-wrap gap-4 text-sm">
           <div className="flex items-center gap-2">
+            <ChevronRight />
+            <span>Clique para expandir</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <ChevronDown />
+            <span>Clique para recolher</span>
+          </div>
+          <div className="flex items-center gap-2">
             <span className="w-4 h-4 bg-cyan-100 border border-cyan-300 rounded"></span>
-            <span>Receitas / Totais</span>
+            <span>Receitas / Resultados</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="w-4 h-4 bg-red-100 border border-red-300 rounded"></span>
@@ -569,11 +425,11 @@ export default function DREPage() {
             <span className="w-4 h-4 bg-blue-100 border border-blue-300 rounded"></span>
             <span>Percentuais</span>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-gray-400">-</span>
-            <span>Sem movimento</span>
-          </div>
         </div>
+        <p className="text-xs text-gray-500 mt-3">
+          <strong>Estrutura:</strong> Categoria (fixa) → Subcategoria (editável) → Item/Conta (editável). 
+          Gerencie subcategorias e itens em <a href="/configuracoes" className="text-cyan-600 hover:underline">Configurações</a>.
+        </p>
       </div>
     </div>
   );

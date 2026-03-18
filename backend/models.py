@@ -27,16 +27,24 @@ class ContaBancariaUpdate(BaseModel):
     nome: Optional[str] = None
     saldo_atual: Optional[float] = None
 
-# Plano de Contas Models
+# Plano de Contas Models - Estrutura Hierárquica de 3 níveis
+# Nível 1: Categoria (fixa) - ex: Custos Fixos
+# Nível 2: Subcategoria (editável) - ex: Gastos com Pessoal
+# Nível 3: Item/Conta (editável) - ex: Folha Salarial
+
 class PlanoContasCreate(BaseModel):
     nome: str
     tipo: str  # 'receita' ou 'despesa'
-    categoria: Optional[str] = None
+    categoria: Optional[str] = None  # Código da categoria DRE (nível 1)
+    nivel: int = 2  # 1=categoria fixa, 2=subcategoria, 3=item
+    parent_id: Optional[str] = None  # ID do pai (para níveis 2 e 3)
 
 class PlanoContasUpdate(BaseModel):
     nome: Optional[str] = None
     tipo: Optional[str] = None
     categoria: Optional[str] = None
+    nivel: Optional[int] = None
+    parent_id: Optional[str] = None
 
 # Movimentação Models
 class MovimentacaoCreate(BaseModel):

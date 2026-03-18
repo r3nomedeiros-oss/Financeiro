@@ -63,6 +63,8 @@ export const contasAPI = {
 
 export const planoContasAPI = {
   getAll: () => api.get('/api/plano-contas'),
+  getHierarquico: () => api.get('/api/plano-contas/hierarquico'),
+  getCategoriasDRE: () => api.get('/api/categorias-dre'),
   create: (data) => api.post('/api/plano-contas', data),
   update: (id, data) => api.put(`/api/plano-contas/${id}`, data),
   delete: (id) => api.delete(`/api/plano-contas/${id}`),

@@ -170,25 +170,118 @@ async def delete_conta_bancaria(conta_id: str, user_id: str = Depends(get_curren
     return {"message": "Conta excluída com sucesso"}
 
 # ============================================
-# ROTAS DE PLANO DE CONTAS
+# ROTAS DE PLANO DE CONTAS - HIERÁRQUICO
 # ============================================
+
+# Estrutura fixa de Categorias DRE (Nível 1 - Imutável)
+CATEGORIAS_DRE = {
+    "receita_bruta": {"nome": "(+) Receita Bruta", "tipo": "receita", "cor": "cyan"},
+    "deducoes_vendas": {"nome": "(-) Deduções Sobre Vendas", "tipo": "despesa", "cor": "red"},
+    "custos_variaveis": {"nome": "(-) Custos Variáveis", "tipo": "despesa", "cor": "red"},
+    "custos_fixos": {"nome": "(-) Custos Fixos", "tipo": "despesa", "cor": "red"},
+    "resultado_nao_operacional": {"nome": "Resultado Não Operacional", "tipo": "misto", "cor": "gray"},
+}
+
+@app.get("/api/categorias-dre")
+async def get_categorias_dre():
+    """Retorna as categorias fixas do DRE (Nível 1)"""
+    return CATEGORIAS_DRE
 
 @app.get("/api/plano-contas")
 async def get_plano_contas(user_id: str = Depends(get_current_user)):
     supabase = get_supabase()
-    result = supabase.table("plano_contas").select("*").eq("user_id", user_id).order("tipo, nome").execute()
+    result = supabase.table("plano_contas").select("*").eq("user_id", user_id).order("categoria, nivel, nome").execute()
     return result.data
+
+@app.get("/api/plano-contas/hierarquico")
+async def get_plano_contas_hierarquico(user_id: str = Depends(get_current_user)):
+    """Retorna plano de contas em estrutura de árvore hierárquica"""
+    supabase = get_supabase()
+    result = supabase.table("plano_contas").select("*").eq("user_id", user_id).order("categoria, nome").execute()
+    planos = result.data
+    
+    # Construir árvore hierárquica
+    # Formato da categoria: "{categoria_dre}|{nivel}|{parent_id}"
+    # Nível 2: subcategoria (parent_id vazio)
+    # Nível 3: item (parent_id = id da subcategoria)
+    
+    arvore = {}
+    
+    # Inicializar com categorias fixas
+    for cat_id, cat_info in CATEGORIAS_DRE.items():
+        arvore[cat_id] = {
+            "id": cat_id,
+            "nome": cat_info["nome"],
+            "tipo": cat_info["tipo"],
+            "cor": cat_info["cor"],
+            "nivel": 1,
+            "is_categoria_fixa": True,
+            "subcategorias": []
+        }
+    
+    # Separar subcategorias (nível 2) e itens (nível 3)
+    subcategorias = {}
+    itens = []
+    
+    for p in planos:
+        categoria = p.get("categoria", "")
+        if not categoria:
+            continue
+            
+        partes = categoria.split("|")
+        if len(partes) >= 2:
+            cat_dre = partes[0]
+            nivel = partes[1]
+            parent_id = partes[2] if len(partes) > 2 else ""
+            
+            if nivel == "2":
+                # Subcategoria
+                subcategorias[p["id"]] = {
+                    **p,
+                    "categoria": cat_dre,
+                    "nivel": 2,
+                    "itens": []
+                }
+            elif nivel == "3":
+                # Item
+                itens.append({
+                    **p,
+                    "categoria": cat_dre,
+                    "nivel": 3,
+                    "parent_id": parent_id
+                })
+    
+    # Adicionar itens às subcategorias
+    for item in itens:
+        parent_id = item.get("parent_id", "")
+        if parent_id and parent_id in subcategorias:
+            subcategorias[parent_id]["itens"].append(item)
+    
+    # Adicionar subcategorias às categorias do DRE
+    for subcat_id, subcat in subcategorias.items():
+        cat_dre = subcat["categoria"]
+        if cat_dre in arvore:
+            arvore[cat_dre]["subcategorias"].append(subcat)
+    
+    return arvore
 
 @app.post("/api/plano-contas")
 async def create_plano_contas(plano: PlanoContasCreate, user_id: str = Depends(get_current_user)):
     supabase = get_supabase()
+    
+    # Construir categoria no formato: "{categoria_dre}|{nivel}|{parent_id}"
+    nivel = plano.nivel if plano.nivel else 2
+    parent_id = plano.parent_id if plano.parent_id else ""
+    categoria_dre = plano.categoria if plano.categoria else ""
+    
+    categoria_code = f"{categoria_dre}|{nivel}|{parent_id}"
     
     novo_plano = {
         "id": str(uuid.uuid4()),
         "user_id": user_id,
         "nome": plano.nome,
         "tipo": plano.tipo,
-        "categoria": plano.categoria,
+        "categoria": categoria_code,
         "created_at": datetime.utcnow().isoformat()
     }
     
@@ -216,6 +309,15 @@ async def delete_plano_contas(plano_id: str, user_id: str = Depends(get_current_
     result = supabase.table("plano_contas").select("*").eq("id", plano_id).eq("user_id", user_id).execute()
     if not result.data:
         raise HTTPException(status_code=404, detail="Plano de contas não encontrado")
+    
+    # Verificar se tem filhos (itens vinculados a esta subcategoria)
+    # Buscar todos que tem este id como parent no campo categoria
+    all_planos = supabase.table("plano_contas").select("id, categoria").eq("user_id", user_id).execute()
+    
+    for p in all_planos.data:
+        cat = p.get("categoria", "")
+        if f"|{plano_id}" in cat:  # Este plano é pai de outro
+            raise HTTPException(status_code=400, detail="Não é possível excluir. Existem itens vinculados a esta subcategoria.")
     
     supabase.table("plano_contas").delete().eq("id", plano_id).execute()
     return {"message": "Plano de contas excluído com sucesso"}
@@ -632,29 +734,114 @@ async def get_dre(mes: int, ano: int, user_id: str = Depends(get_current_user)):
 
 @app.post("/api/plano-contas/criar-padrao")
 async def criar_plano_contas_padrao(user_id: str = Depends(get_current_user)):
-    """Cria o plano de contas padrão para DRE"""
+    """Cria o plano de contas padrão para DRE com estrutura hierárquica"""
     supabase = get_supabase()
-    
-    # Verificar se já existe plano de contas
-    existing = supabase.table("plano_contas").select("id").eq("user_id", user_id).execute()
     
     planos_criados = []
     
-    for item in DRE_ESTRUTURA:
-        # Verificar se já existe conta com mesmo código/categoria
-        existing_item = supabase.table("plano_contas").select("*").eq("user_id", user_id).eq("categoria", item["codigo"]).execute()
-        
-        if not existing_item.data:
-            novo_plano = {
-                "id": str(uuid.uuid4()),
-                "user_id": user_id,
-                "nome": item["nome"],
-                "tipo": item["tipo"],
-                "categoria": item["codigo"],  # Usando código como categoria para mapear no DRE
-                "created_at": datetime.utcnow().isoformat()
-            }
-            result = supabase.table("plano_contas").insert(novo_plano).execute()
-            planos_criados.append(result.data[0])
+    # Estrutura hierárquica padrão
+    # categoria = "{categoria_dre}|{nivel}|{parent_id}"
+    # Ex: "custos_fixos|2|" para subcategoria
+    # Ex: "custos_fixos|3|{subcat_id}" para item
+    
+    estrutura_padrao = {
+        "receita_bruta": [
+            {"nome": "Receita com Vendas", "tipo": "receita", "itens": [
+                "Vendas de Produtos", "Prestação de Serviços"
+            ]}
+        ],
+        "deducoes_vendas": [
+            {"nome": "Impostos Sobre Vendas", "tipo": "despesa", "itens": [
+                "ICMS", "PIS/COFINS", "ISS"
+            ]},
+            {"nome": "Outras Deduções", "tipo": "despesa", "itens": [
+                "Devoluções", "Descontos Concedidos"
+            ]}
+        ],
+        "custos_variaveis": [
+            {"nome": "Custos com Fornecedores", "tipo": "despesa", "itens": [
+                "Matéria Prima", "Insumos"
+            ]},
+            {"nome": "Custos com Vendas", "tipo": "despesa", "itens": [
+                "Comissões", "Frete de Vendas"
+            ]},
+            {"nome": "Custos com Produção", "tipo": "despesa", "itens": [
+                "Mão de Obra Direta", "Energia Produção"
+            ]}
+        ],
+        "custos_fixos": [
+            {"nome": "Gastos com Pessoal", "tipo": "despesa", "itens": [
+                "Folha Salarial", "Encargos Sociais", "Benefícios"
+            ]},
+            {"nome": "Gastos com Ocupação", "tipo": "despesa", "itens": [
+                "Aluguel", "Condomínio", "IPTU"
+            ]},
+            {"nome": "Gastos com Serviços de Terceiros", "tipo": "despesa", "itens": [
+                "Contabilidade", "Advocacia", "TI/Sistemas"
+            ]},
+            {"nome": "Gastos Operacionais", "tipo": "despesa", "itens": [
+                "Material de Escritório", "Telefone/Internet"
+            ]},
+            {"nome": "Gastos Financeiros", "tipo": "despesa", "itens": [
+                "Juros Bancários", "Tarifas Bancárias", "IOF"
+            ]},
+            {"nome": "Gastos com Veículos", "tipo": "despesa", "itens": [
+                "Combustível", "Manutenção Veículos", "Seguro Veículos"
+            ]},
+            {"nome": "Despesas com Materiais e Equipamentos", "tipo": "despesa", "itens": [
+                "Manutenção de Equipamentos", "Depreciação"
+            ]},
+            {"nome": "Gastos Administrativos", "tipo": "despesa", "itens": [
+                "Viagens", "Representação"
+            ]}
+        ],
+        "resultado_nao_operacional": [
+            {"nome": "Receitas não Operacionais", "tipo": "receita", "itens": [
+                "Rendimentos Financeiros", "Outras Receitas"
+            ]},
+            {"nome": "Gastos não Operacionais", "tipo": "despesa", "itens": [
+                "Multas e Juros", "Perdas"
+            ]},
+            {"nome": "Investimentos", "tipo": "despesa", "itens": [
+                "Aquisição de Ativos", "Melhorias"
+            ]}
+        ]
+    }
+    
+    for categoria_id, subcategorias in estrutura_padrao.items():
+        for subcat in subcategorias:
+            # Verificar se subcategoria já existe
+            categoria_code = f"{categoria_id}|2|"
+            existing = supabase.table("plano_contas").select("*").eq("user_id", user_id).eq("nome", subcat["nome"]).eq("categoria", categoria_code).execute()
+            
+            if not existing.data:
+                # Criar subcategoria (nível 2)
+                subcat_id = str(uuid.uuid4())
+                novo_subcat = {
+                    "id": subcat_id,
+                    "user_id": user_id,
+                    "nome": subcat["nome"],
+                    "tipo": subcat["tipo"],
+                    "categoria": categoria_code,  # formato: "categoria_dre|nivel|parent_id"
+                    "created_at": datetime.utcnow().isoformat()
+                }
+                result = supabase.table("plano_contas").insert(novo_subcat).execute()
+                planos_criados.append(result.data[0])
+                
+                # Criar itens (nível 3)
+                for item_nome in subcat.get("itens", []):
+                    item_id = str(uuid.uuid4())
+                    item_categoria = f"{categoria_id}|3|{subcat_id}"
+                    novo_item = {
+                        "id": item_id,
+                        "user_id": user_id,
+                        "nome": item_nome,
+                        "tipo": subcat["tipo"],
+                        "categoria": item_categoria,
+                        "created_at": datetime.utcnow().isoformat()
+                    }
+                    result = supabase.table("plano_contas").insert(novo_item).execute()
+                    planos_criados.append(result.data[0])
     
     return {
         "message": f"Plano de contas padrão criado com sucesso. {len(planos_criados)} contas criadas.",

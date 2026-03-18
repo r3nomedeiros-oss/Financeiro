@@ -1,29 +1,37 @@
 import React, { useState, useEffect } from 'react';
 import { planoContasAPI, contasAPI, dreAPI } from '../services/api';
 
-const GRUPOS_DRE = [
-  { codigo: "1", nome: "Receita Bruta", tipo: "receita" },
-  { codigo: "2", nome: "Impostos Sobre Vendas", tipo: "despesa" },
-  { codigo: "3", nome: "Outras Deduções", tipo: "despesa" },
-  { codigo: "4", nome: "Custos com Fornecedores", tipo: "despesa" },
-  { codigo: "21", nome: "Custos com Vendas", tipo: "despesa" },
-  { codigo: "22", nome: "Custos com Produção", tipo: "despesa" },
-  { codigo: "5", nome: "Gastos com Pessoal", tipo: "despesa" },
-  { codigo: "6", nome: "Gastos com Ocupação", tipo: "despesa" },
-  { codigo: "7", nome: "Gastos com Serviços de Terceiros", tipo: "despesa" },
-  { codigo: "16", nome: "Gastos Operacionais", tipo: "despesa" },
-  { codigo: "17", nome: "Gastos Financeiros", tipo: "despesa" },
-  { codigo: "18", nome: "Gastos com Veículos", tipo: "despesa" },
-  { codigo: "19", nome: "Despesas com Materiais e Equipamentos", tipo: "despesa" },
-  { codigo: "20", nome: "Gastos Administrativos", tipo: "despesa" },
-  { codigo: "9", nome: "Receitas não Operacionais", tipo: "receita" },
-  { codigo: "10", nome: "Gastos não Operacionais", tipo: "despesa" },
-  { codigo: "12", nome: "Investimentos", tipo: "despesa" },
-];
+// Ícones
+const ChevronRight = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+  </svg>
+);
+
+const ChevronDown = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+  </svg>
+);
+
+const PlusIcon = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+  </svg>
+);
+
+// Categorias fixas do DRE
+const CATEGORIAS_DRE = {
+  receita_bruta: { nome: "(+) Receita Bruta", tipo: "receita", cor: "cyan" },
+  deducoes_vendas: { nome: "(-) Deduções Sobre Vendas", tipo: "despesa", cor: "red" },
+  custos_variaveis: { nome: "(-) Custos Variáveis", tipo: "despesa", cor: "red" },
+  custos_fixos: { nome: "(-) Custos Fixos", tipo: "despesa", cor: "red" },
+  resultado_nao_operacional: { nome: "Resultado Não Operacional", tipo: "misto", cor: "gray" },
+};
 
 export default function ConfiguracoesPage() {
   const [activeTab, setActiveTab] = useState('plano-contas');
-  const [planoContas, setPlanoContas] = useState([]);
+  const [hierarquia, setHierarquia] = useState({});
   const [contasBancarias, setContasBancarias] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -31,11 +39,15 @@ export default function ConfiguracoesPage() {
   const [editingItem, setEditingItem] = useState(null);
   const [editingConta, setEditingConta] = useState(null);
   const [criandoPlano, setCriandoPlano] = useState(false);
+  const [expandedCategories, setExpandedCategories] = useState({});
+  const [expandedSubcats, setExpandedSubcats] = useState({});
   
   const [formData, setFormData] = useState({
     nome: '',
     tipo: 'despesa',
-    categoria: ''
+    categoria: '',
+    nivel: 2,
+    parent_id: null
   });
 
   const [contaFormData, setContaFormData] = useState({
@@ -50,12 +62,19 @@ export default function ConfiguracoesPage() {
   const carregarDados = async () => {
     try {
       setLoading(true);
-      const [planoRes, contasRes] = await Promise.all([
-        planoContasAPI.getAll(),
+      const [hierarquiaRes, contasRes] = await Promise.all([
+        planoContasAPI.getHierarquico(),
         contasAPI.getAll()
       ]);
-      setPlanoContas(planoRes.data);
+      setHierarquia(hierarquiaRes.data);
       setContasBancarias(contasRes.data);
+      
+      // Expandir todas as categorias por padrão
+      const expanded = {};
+      Object.keys(hierarquiaRes.data || {}).forEach(catId => {
+        expanded[catId] = true;
+      });
+      setExpandedCategories(expanded);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
     } finally {
@@ -77,7 +96,52 @@ export default function ConfiguracoesPage() {
     }
   };
 
-  // Plano de Contas CRUD
+  const toggleCategoria = (catId) => {
+    setExpandedCategories(prev => ({ ...prev, [catId]: !prev[catId] }));
+  };
+
+  const toggleSubcat = (subcatId) => {
+    setExpandedSubcats(prev => ({ ...prev, [subcatId]: !prev[subcatId] }));
+  };
+
+  // CRUD Plano de Contas
+  const handleAddSubcategoria = (categoriaId) => {
+    const categoriaTipo = CATEGORIAS_DRE[categoriaId]?.tipo;
+    setEditingItem(null);
+    setFormData({
+      nome: '',
+      tipo: categoriaTipo === 'misto' ? 'despesa' : categoriaTipo,
+      categoria: categoriaId,
+      nivel: 2,
+      parent_id: null
+    });
+    setShowModal(true);
+  };
+
+  const handleAddItem = (subcategoria) => {
+    setEditingItem(null);
+    setFormData({
+      nome: '',
+      tipo: subcategoria.tipo,
+      categoria: subcategoria.categoria,
+      nivel: 3,
+      parent_id: subcategoria.id
+    });
+    setShowModal(true);
+  };
+
+  const handleEditItem = (item, nivel) => {
+    setEditingItem(item);
+    setFormData({
+      nome: item.nome,
+      tipo: item.tipo,
+      categoria: item.categoria,
+      nivel: nivel,
+      parent_id: item.parent_id
+    });
+    setShowModal(true);
+  };
+
   const handleSavePlano = async () => {
     try {
       if (editingItem) {
@@ -87,7 +151,6 @@ export default function ConfiguracoesPage() {
       }
       setShowModal(false);
       setEditingItem(null);
-      setFormData({ nome: '', tipo: 'despesa', categoria: '' });
       carregarDados();
     } catch (error) {
       console.error('Erro ao salvar:', error);
@@ -95,28 +158,18 @@ export default function ConfiguracoesPage() {
     }
   };
 
-  const handleEditPlano = (item) => {
-    setEditingItem(item);
-    setFormData({
-      nome: item.nome,
-      tipo: item.tipo,
-      categoria: item.categoria || ''
-    });
-    setShowModal(true);
-  };
-
-  const handleDeletePlano = async (id) => {
-    if (!confirm('Tem certeza que deseja excluir este plano de contas?')) return;
+  const handleDeletePlano = async (id, nome) => {
+    if (!confirm(`Tem certeza que deseja excluir "${nome}"?`)) return;
     try {
       await planoContasAPI.delete(id);
       carregarDados();
     } catch (error) {
       console.error('Erro ao excluir:', error);
-      alert('Erro ao excluir. Este plano pode estar vinculado a movimentações.');
+      alert(error.response?.data?.detail || 'Erro ao excluir. Este item pode ter dependências.');
     }
   };
 
-  // Contas Bancárias CRUD
+  // CRUD Contas Bancárias
   const handleSaveConta = async () => {
     try {
       if (editingConta) {
@@ -161,9 +214,13 @@ export default function ConfiguracoesPage() {
     }).format(value);
   };
 
-  const getGrupoDRENome = (codigo) => {
-    const grupo = GRUPOS_DRE.find(g => g.codigo === codigo);
-    return grupo ? `${codigo} - ${grupo.nome}` : codigo || 'Não definido';
+  const getCorClasse = (cor) => {
+    const cores = {
+      cyan: 'bg-cyan-50 border-cyan-200 text-cyan-700',
+      red: 'bg-red-50 border-red-200 text-red-700',
+      gray: 'bg-gray-50 border-gray-200 text-gray-700',
+    };
+    return cores[cor] || 'bg-gray-50 border-gray-200';
   };
 
   if (loading) {
@@ -179,7 +236,7 @@ export default function ConfiguracoesPage() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-800">Configurações</h1>
-        <p className="text-gray-600 text-sm">Gerencie plano de contas e contas bancárias</p>
+        <p className="text-gray-600 text-sm">Gerencie plano de contas hierárquico e contas bancárias</p>
       </div>
 
       {/* Tabs */}
@@ -210,90 +267,161 @@ export default function ConfiguracoesPage() {
         </nav>
       </div>
 
-      {/* Plano de Contas Tab */}
+      {/* Plano de Contas Tab - Tree View */}
       {activeTab === 'plano-contas' && (
         <div className="space-y-4">
           <div className="flex justify-between items-center">
-            <p className="text-sm text-gray-600">
-              Configure os planos de contas que serão usados nas movimentações e no DRE.
-              O campo "Categoria DRE" define em qual linha do DRE a conta aparecerá.
-            </p>
-            <div className="flex gap-2">
-              <button
-                onClick={criarPlanoPadrao}
-                disabled={criandoPlano}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm disabled:opacity-50"
-                data-testid="criar-plano-padrao-btn"
-              >
-                {criandoPlano ? 'Criando...' : 'Criar Plano Padrão DRE'}
-              </button>
-              <button
-                onClick={() => {
-                  setEditingItem(null);
-                  setFormData({ nome: '', tipo: 'despesa', categoria: '' });
-                  setShowModal(true);
-                }}
-                className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 text-sm"
-                data-testid="adicionar-plano-btn"
-              >
-                + Adicionar Conta
-              </button>
+            <div>
+              <p className="text-sm text-gray-600">
+                Estrutura hierárquica: <strong>Categoria (fixa)</strong> → <strong>Subcategoria</strong> → <strong>Item/Conta</strong>
+              </p>
+              <p className="text-xs text-gray-500">
+                Categorias são fixas. Você pode adicionar, editar e excluir subcategorias e itens.
+              </p>
             </div>
+            <button
+              onClick={criarPlanoPadrao}
+              disabled={criandoPlano}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm disabled:opacity-50"
+              data-testid="criar-plano-padrao-btn"
+            >
+              {criandoPlano ? 'Criando...' : 'Criar Plano Padrão DRE'}
+            </button>
           </div>
 
-          {/* Tabela Plano de Contas */}
+          {/* Tree View do Plano de Contas */}
           <div className="bg-white rounded-lg shadow overflow-hidden">
-            <table className="w-full" data-testid="plano-contas-table">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="text-left p-3 font-medium text-gray-700">Nome</th>
-                  <th className="text-left p-3 font-medium text-gray-700">Tipo</th>
-                  <th className="text-left p-3 font-medium text-gray-700">Categoria DRE</th>
-                  <th className="text-right p-3 font-medium text-gray-700">Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {planoContas.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="p-6 text-center text-gray-500">
-                      Nenhum plano de contas cadastrado. Clique em "Criar Plano Padrão DRE" para começar.
-                    </td>
-                  </tr>
-                ) : (
-                  planoContas.map((item) => (
-                    <tr key={item.id} className="border-t border-gray-100 hover:bg-gray-50">
-                      <td className="p-3">{item.nome}</td>
-                      <td className="p-3">
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${
-                          item.tipo === 'receita' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                        }`}>
-                          {item.tipo === 'receita' ? 'Receita' : 'Despesa'}
-                        </span>
-                      </td>
-                      <td className="p-3 text-sm text-gray-600">
-                        {getGrupoDRENome(item.categoria)}
-                      </td>
-                      <td className="p-3 text-right">
-                        <button
-                          onClick={() => handleEditPlano(item)}
-                          className="text-cyan-600 hover:text-cyan-800 mr-3 text-sm"
-                          data-testid={`edit-plano-${item.id}`}
-                        >
-                          Editar
-                        </button>
-                        <button
-                          onClick={() => handleDeletePlano(item.id)}
-                          className="text-red-600 hover:text-red-800 text-sm"
-                          data-testid={`delete-plano-${item.id}`}
-                        >
-                          Excluir
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+            {Object.entries(CATEGORIAS_DRE).map(([catId, catInfo]) => {
+              const catData = hierarquia[catId];
+              const isExpanded = expandedCategories[catId];
+              const subcategorias = catData?.subcategorias || [];
+
+              return (
+                <div key={catId} className="border-b border-gray-200 last:border-b-0">
+                  {/* Categoria (Nível 1 - Fixa) */}
+                  <div 
+                    className={`flex items-center justify-between p-3 ${getCorClasse(catInfo.cor)} cursor-pointer hover:opacity-90`}
+                    onClick={() => toggleCategoria(catId)}
+                    data-testid={`categoria-${catId}`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="transition-transform duration-200">
+                        {isExpanded ? <ChevronDown /> : <ChevronRight />}
+                      </span>
+                      <span className="font-semibold">{catInfo.nome}</span>
+                      <span className="text-xs bg-white/50 px-2 py-0.5 rounded">
+                        {subcategorias.length} subcategorias
+                      </span>
+                    </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleAddSubcategoria(catId); }}
+                      className="flex items-center gap-1 px-2 py-1 text-xs bg-white/70 hover:bg-white rounded transition-colors"
+                      data-testid={`add-subcat-${catId}`}
+                    >
+                      <PlusIcon /> Subcategoria
+                    </button>
+                  </div>
+
+                  {/* Subcategorias (Nível 2) */}
+                  {isExpanded && (
+                    <div className="bg-white">
+                      {subcategorias.length === 0 ? (
+                        <div className="p-4 pl-10 text-sm text-gray-500 italic">
+                          Nenhuma subcategoria cadastrada
+                        </div>
+                      ) : (
+                        subcategorias.map((subcat) => {
+                          const isSubExpanded = expandedSubcats[subcat.id];
+                          const itens = subcat.itens || [];
+
+                          return (
+                            <div key={subcat.id} className="border-t border-gray-100">
+                              {/* Subcategoria */}
+                              <div 
+                                className="flex items-center justify-between p-3 pl-8 hover:bg-gray-50 cursor-pointer"
+                                onClick={() => toggleSubcat(subcat.id)}
+                                data-testid={`subcategoria-${subcat.id}`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span className="transition-transform duration-200">
+                                    {itens.length > 0 && (isSubExpanded ? <ChevronDown /> : <ChevronRight />)}
+                                    {itens.length === 0 && <span className="w-4"></span>}
+                                  </span>
+                                  <span className="font-medium text-gray-700">{subcat.nome}</span>
+                                  <span className={`text-xs px-2 py-0.5 rounded ${
+                                    subcat.tipo === 'receita' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                  }`}>
+                                    {subcat.tipo}
+                                  </span>
+                                  {itens.length > 0 && (
+                                    <span className="text-xs text-gray-400">
+                                      ({itens.length} itens)
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                  <button
+                                    onClick={() => handleAddItem(subcat)}
+                                    className="text-xs text-cyan-600 hover:text-cyan-800 flex items-center gap-1"
+                                    data-testid={`add-item-${subcat.id}`}
+                                  >
+                                    <PlusIcon /> Item
+                                  </button>
+                                  <button
+                                    onClick={() => handleEditItem(subcat, 2)}
+                                    className="text-xs text-gray-600 hover:text-gray-800"
+                                  >
+                                    Editar
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeletePlano(subcat.id, subcat.nome)}
+                                    className="text-xs text-red-600 hover:text-red-800"
+                                  >
+                                    Excluir
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Itens (Nível 3) */}
+                              {isSubExpanded && itens.length > 0 && (
+                                <div className="bg-gray-50">
+                                  {itens.map((item) => (
+                                    <div 
+                                      key={item.id}
+                                      className="flex items-center justify-between p-2 pl-16 border-t border-gray-100 hover:bg-gray-100"
+                                      data-testid={`item-${item.id}`}
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-gray-400">•</span>
+                                        <span className="text-sm text-gray-600">{item.nome}</span>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <button
+                                          onClick={() => handleEditItem(item, 3)}
+                                          className="text-xs text-gray-500 hover:text-gray-700"
+                                        >
+                                          Editar
+                                        </button>
+                                        <button
+                                          onClick={() => handleDeletePlano(item.id, item.nome)}
+                                          className="text-xs text-red-500 hover:text-red-700"
+                                        >
+                                          Excluir
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -318,7 +446,6 @@ export default function ConfiguracoesPage() {
             </button>
           </div>
 
-          {/* Tabela Contas Bancárias */}
           <div className="bg-white rounded-lg shadow overflow-hidden">
             <table className="w-full" data-testid="contas-bancarias-table">
               <thead className="bg-gray-50">
@@ -350,14 +477,12 @@ export default function ConfiguracoesPage() {
                         <button
                           onClick={() => handleEditConta(conta)}
                           className="text-cyan-600 hover:text-cyan-800 mr-3 text-sm"
-                          data-testid={`edit-conta-${conta.id}`}
                         >
                           Editar
                         </button>
                         <button
                           onClick={() => handleDeleteConta(conta.id)}
                           className="text-red-600 hover:text-red-800 text-sm"
-                          data-testid={`delete-conta-${conta.id}`}
                         >
                           Excluir
                         </button>
@@ -376,7 +501,7 @@ export default function ConfiguracoesPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md" data-testid="plano-contas-modal">
             <h2 className="text-xl font-bold text-gray-800 mb-4">
-              {editingItem ? 'Editar Plano de Contas' : 'Novo Plano de Contas'}
+              {editingItem ? 'Editar' : 'Adicionar'} {formData.nivel === 2 ? 'Subcategoria' : 'Item'}
             </h2>
             
             <div className="space-y-4">
@@ -387,51 +512,36 @@ export default function ConfiguracoesPage() {
                   value={formData.nome}
                   onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500"
-                  placeholder="Ex: Vendas de Produtos"
+                  placeholder={formData.nivel === 2 ? "Ex: Gastos com Pessoal" : "Ex: Folha Salarial"}
                   data-testid="plano-nome-input"
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
-                <select
-                  value={formData.tipo}
-                  onChange={(e) => setFormData({ ...formData, tipo: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500"
-                  data-testid="plano-tipo-select"
-                >
-                  <option value="receita">Receita (Entrada)</option>
-                  <option value="despesa">Despesa (Saída)</option>
-                </select>
-              </div>
+              {formData.nivel === 2 && CATEGORIAS_DRE[formData.categoria]?.tipo === 'misto' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
+                  <select
+                    value={formData.tipo}
+                    onChange={(e) => setFormData({ ...formData, tipo: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500"
+                    data-testid="plano-tipo-select"
+                  >
+                    <option value="receita">Receita (Entrada)</option>
+                    <option value="despesa">Despesa (Saída)</option>
+                  </select>
+                </div>
+              )}
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Categoria DRE</label>
-                <select
-                  value={formData.categoria}
-                  onChange={(e) => setFormData({ ...formData, categoria: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500"
-                  data-testid="plano-categoria-select"
-                >
-                  <option value="">Selecione a linha do DRE</option>
-                  {GRUPOS_DRE.filter(g => g.tipo === formData.tipo).map((grupo) => (
-                    <option key={grupo.codigo} value={grupo.codigo}>
-                      {grupo.codigo} - {grupo.nome}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-xs text-gray-500 mt-1">
-                  Define em qual linha do DRE este plano de contas aparecerá
-                </p>
+              <div className="p-3 bg-gray-50 rounded-lg text-sm">
+                <p><strong>Categoria:</strong> {CATEGORIAS_DRE[formData.categoria]?.nome}</p>
+                <p><strong>Nível:</strong> {formData.nivel === 2 ? 'Subcategoria' : 'Item/Conta'}</p>
+                <p><strong>Tipo:</strong> {formData.tipo === 'receita' ? 'Receita' : 'Despesa'}</p>
               </div>
             </div>
 
             <div className="flex justify-end gap-3 mt-6">
               <button
-                onClick={() => {
-                  setShowModal(false);
-                  setEditingItem(null);
-                }}
+                onClick={() => { setShowModal(false); setEditingItem(null); }}
                 className="px-4 py-2 text-gray-600 hover:text-gray-800"
                 data-testid="cancelar-plano-btn"
               >
@@ -439,7 +549,8 @@ export default function ConfiguracoesPage() {
               </button>
               <button
                 onClick={handleSavePlano}
-                className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700"
+                disabled={!formData.nome.trim()}
+                className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 disabled:opacity-50"
                 data-testid="salvar-plano-btn"
               >
                 Salvar
@@ -486,10 +597,7 @@ export default function ConfiguracoesPage() {
 
             <div className="flex justify-end gap-3 mt-6">
               <button
-                onClick={() => {
-                  setShowContaModal(false);
-                  setEditingConta(null);
-                }}
+                onClick={() => { setShowContaModal(false); setEditingConta(null); }}
                 className="px-4 py-2 text-gray-600 hover:text-gray-800"
                 data-testid="cancelar-conta-btn"
               >
