@@ -22,7 +22,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "start": "http-server dist -p 3000 -a 0.0.0.0 --cors -c-1 --proxy http://localhost:3000?",
+    "start": "http-server dist -p 3000 -a 0.0.0.0 --cors -c-1 --proxy http://localhost:3000? -P http://localhost:8001",
     "start-dev": "vite",
     "build": "vite build",
     "preview": "vite preview"
