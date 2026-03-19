@@ -1,90 +1,85 @@
 # Sistema Financeiro Industrial - PRD
 
 ## Problema Original
-Sistema financeiro industrial conectado ao Supabase. Usuário solicitou que a aba de DRE (Demonstrativo de Resultado do Exercício) seguisse a estrutura de uma planilha Excel com:
-- Visualização anual (Jan-Dez) com consolidado
-- Dados vindos de movimentações reais
-- Estrutura hierárquica de 3 níveis: Categoria (fixa) > Subcategoria > Item/Conta
-- Formatação com cores (receitas em ciano, despesas em vermelho, margens em azul)
-- Funcionalidade de expand/collapse (Tree View)
+Sistema financeiro industrial conectado ao Supabase. Múltiplas melhorias solicitadas:
+- DRE com estrutura hierárquica de 3 níveis (Categoria > Subcategoria > Item)
+- Exportação em PDF e Excel
+- Menu lateral minimizável
+- Nova aba Fluxo de Caixa Diário
+- Relatórios Comparativos com análise vertical e horizontal
+- Planejamento usando estrutura do DRE
 
 ## Arquitetura
-- **Frontend**: React + Vite + TailwindCSS
+- **Frontend**: React + Vite + TailwindCSS + Lucide Icons
 - **Backend**: FastAPI (Python)
 - **Banco de Dados**: Supabase (PostgreSQL)
 - **Autenticação**: JWT
 
-## Personas de Usuário
-1. **Gestor Financeiro**: Visualiza DRE anual, analisa margens e resultados, expande/recolhe níveis
-2. **Contador**: Configura plano de contas hierárquico, categoriza movimentações
-3. **Administrador**: Gerencia usuários e configurações gerais
+## Implementado (19/03/2026)
 
-## Requisitos Core (Estáticos)
-- Login/Registro de usuários
-- Dashboard financeiro
-- Movimentações financeiras
-- DRE gerencial com estrutura hierárquica
-- Planejamento orçamentário
-- Configurações de plano de contas
+### 1. DRE - Demonstrativo de Resultado
+- [x] Removido botão "Criar Plano Padrão" (agora apenas em Configurações)
+- [x] Botões de exportação: Excel (CSV) e PDF
+- [x] Campo ano mostra apenas anos com lançamentos
+- [x] Estrutura hierárquica de 3 níveis com expand/collapse
+- [x] Valores agregam: Item → Subcategoria → Categoria
 
-## Implementado (18/03/2026)
+### 2. Menu Lateral Minimizável
+- [x] Sidebar pode ser minimizado/expandido
+- [x] Quando minimizado: apenas ícones
+- [x] Botão de toggle com animação suave
+- [x] Logo compacto ("SF") quando minimizado
 
-### DRE Anual com Estrutura Hierárquica
-- [x] Visualização anual (Jan-Dez + Total + AV%)
-- [x] **3 níveis hierárquicos**:
-  - Nível 1: Categorias fixas (5 categorias imutáveis)
-  - Nível 2: Subcategorias (editáveis pelo usuário)
-  - Nível 3: Itens/Contas (editáveis pelo usuário)
-- [x] Expand/Collapse com botões "Expandir Tudo" e "Recolher Tudo"
-- [x] Clique em categorias e subcategorias para expandir/recolher
-- [x] Formatação com cores conforme tipo (ciano, vermelho, verde, azul)
+### 3. Fluxo de Caixa Diário (NOVA ABA)
+- [x] Visualização dia a dia do mês inteiro
+- [x] Colunas: Dia, Dia Semana, Entradas, Saídas, Saldo
+- [x] Cards de resumo: Saldo Inicial, Total Entradas, Total Saídas, Saldo Final
+- [x] Filtro por conta bancária
+- [x] Navegação entre meses
+- [x] Destaque para finais de semana
 
-### Categorias Fixas do DRE
-1. (+) Receita Bruta (ciano)
-2. (-) Deduções Sobre Vendas (vermelho)
-3. (-) Custos Variáveis (vermelho)
-4. (-) Custos Fixos (vermelho)
-5. Resultado Não Operacional (cinza)
+### 4. Movimentações Financeiras
+- [x] Campo Item/Conta mostra apenas itens (nível 3) do plano de contas
+- [x] Campo Valor formatado como moeda brasileira (R$ 0,00)
+- [x] Dropdown organizado por subcategoria
 
-### Configurações - Plano de Contas Hierárquico
-- [x] Tree View com expand/collapse
-- [x] Botão "Criar Plano Padrão DRE" - cria 57 contas (17 subcategorias + 40 itens)
-- [x] Adicionar subcategoria em qualquer categoria
-- [x] Adicionar item em qualquer subcategoria
-- [x] Editar e excluir subcategorias e itens
-- [x] Validação: não permite excluir subcategoria com itens vinculados
+### 5. Planejamento Orçamentário
+- [x] Usa mesmo plano de contas do DRE
+- [x] Agrupado por categorias fixas do DRE
+- [x] Cada categoria expandível com itens planejados
+- [x] Total por categoria
 
-### Backend APIs
-- [x] GET /api/categorias-dre - Categorias fixas
-- [x] GET /api/plano-contas/hierarquico - Estrutura em árvore
-- [x] POST /api/plano-contas/criar-padrao - Criar plano padrão
-- [x] CRUD /api/plano-contas - Gestão de subcategorias e itens
+### 6. Relatórios Comparativos (NOVA FUNCIONALIDADE)
+- [x] Dois períodos configuráveis (Data Início/Fim)
+- [x] Filtros flexíveis: dia, semana, mês, trimestre
+- [x] Análise Vertical (AV%) - % sobre receita total
+- [x] Análise Horizontal (AH%) - variação entre períodos
+- [x] Toggles para mostrar/ocultar AV% e AH%
+- [x] Tabela comparativa com formatação condicional
 
-### Estrutura de Dados
-Formato da categoria: `{categoria_dre}|{nivel}|{parent_id}`
-- Ex: `custos_fixos|2|` para subcategoria
-- Ex: `custos_fixos|3|abc123` para item filho da subcategoria abc123
+## Estrutura do Menu
+1. Dashboard
+2. Movimentação Financeira
+3. Demonstrativo de Resultado (DRE)
+4. Fluxo de Caixa Diário
+5. Planejamento Orçamentário
+6. Relatórios Comparativos
+7. Configurações
 
-## Testes Realizados
-- Backend: 85% (endpoint hierárquico 100%)
-- Frontend: 100%
-- Integração: 100%
+## Testes
+- Frontend: 95% passou
+- Backend: funcionando
+- Todas as novas funcionalidades validadas visualmente
 
-## Backlog Priorizado
-### P0 (Crítico)
-- [ ] Vincular movimentações aos itens do plano de contas para cálculo real do DRE
+## Backlog
+### P0
+- [ ] Vincular movimentações aos itens para cálculo real no DRE
 
-### P1 (Alta Prioridade)
-- [ ] Importação de movimentações via CSV/Excel
-- [ ] Relatórios em PDF
-- [ ] Comparativo ano a ano no DRE
+### P1
+- [ ] Gráficos no Fluxo de Caixa
+- [ ] Comparativo Orçado x Realizado
+- [ ] Alertas de orçamento
 
-### P2 (Média Prioridade)
-- [ ] Gráficos de evolução mensal
+### P2
 - [ ] Dashboard customizável
-- [ ] Alertas de orçamento excedido
-
-## Próximos Passos
-1. Cadastrar movimentações vinculadas ao plano de contas para popular o DRE
-2. Implementar importação de dados CSV
-3. Adicionar relatórios exportáveis
+- [ ] Integração bancária
