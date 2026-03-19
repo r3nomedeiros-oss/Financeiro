@@ -190,7 +190,7 @@ async def get_categorias_dre():
 @app.get("/api/plano-contas")
 async def get_plano_contas(user_id: str = Depends(get_current_user)):
     supabase = get_supabase()
-    result = supabase.table("plano_contas").select("*").eq("user_id", user_id).order("categoria, nivel, nome").execute()
+    result = supabase.table("plano_contas").select("*").eq("user_id", user_id).order("categoria, nome").execute()
     return result.data
 
 @app.get("/api/plano-contas/hierarquico")
