@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { movimentacoesAPI, planoContasAPI, contasAPI } from '../services/api';
 import { Plus, Edit2, Trash2, X } from 'lucide-react';
 
 export default function MovimentacoesPage() {
   const [movimentacoes, setMovimentacoes] = useState([]);
-  const [planoContas, setPlanoContas] = useState([]);
+  const [hierarquia, setHierarquia] = useState({});
   const [contas, setContas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -17,6 +17,7 @@ export default function MovimentacoesPage() {
     complemento: '',
     conta_bancaria_id: '',
     valor: '',
+    valorFormatado: ''
   });
 
   useEffect(() => {
@@ -26,14 +27,14 @@ export default function MovimentacoesPage() {
   const carregarDados = async () => {
     try {
       setLoading(true);
-      const [movRes, planoRes, contasRes] = await Promise.all([
+      const [movRes, hierRes, contasRes] = await Promise.all([
         movimentacoesAPI.getAll(),
-        planoContasAPI.getAll(),
+        planoContasAPI.getHierarquico(),
         contasAPI.getAll(),
       ]);
       
       setMovimentacoes(movRes.data);
-      setPlanoContas(planoRes.data);
+      setHierarquia(hierRes.data);
       setContas(contasRes.data);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
@@ -43,12 +44,81 @@ export default function MovimentacoesPage() {
     }
   };
 
+  // Extrair apenas itens (nível 3) do plano de contas
+  const getItensPlanoContas = (tipo) => {
+    const tipoFiltro = tipo === 'entrada' ? 'receita' : 'despesa';
+    const itens = [];
+    
+    Object.entries(hierarquia).forEach(([catId, categoria]) => {
+      (categoria.subcategorias || []).forEach(subcat => {
+        // Se a subcategoria tem o tipo correto ou categoria é mista
+        if (subcat.tipo === tipoFiltro || categoria.tipo === 'misto') {
+          (subcat.itens || []).forEach(item => {
+            if (item.tipo === tipoFiltro) {
+              itens.push({
+                id: item.id,
+                nome: item.nome,
+                subcategoria: subcat.nome,
+                categoria: categoria.nome
+              });
+            }
+          });
+          
+          // Se não tem itens, usar a própria subcategoria
+          if (!subcat.itens || subcat.itens.length === 0) {
+            if (subcat.tipo === tipoFiltro) {
+              itens.push({
+                id: subcat.id,
+                nome: subcat.nome,
+                subcategoria: '',
+                categoria: categoria.nome
+              });
+            }
+          }
+        }
+      });
+    });
+
+    return itens;
+  };
+
+  // Formatar valor como moeda brasileira
+  const formatarValorInput = (valor) => {
+    // Remove tudo que não é número
+    const numeros = valor.replace(/\D/g, '');
+    
+    // Converte para decimal
+    const decimal = (parseInt(numeros) / 100).toFixed(2);
+    
+    // Formata como moeda
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(decimal);
+  };
+
+  const handleValorChange = (e) => {
+    const inputValue = e.target.value;
+    const numeros = inputValue.replace(/\D/g, '');
+    const valorNumerico = parseInt(numeros) / 100 || 0;
+    
+    setFormData({
+      ...formData,
+      valor: valorNumerico.toString(),
+      valorFormatado: numeros ? formatarValorInput(inputValue) : ''
+    });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
     try {
       const data = {
-        ...formData,
+        data: formData.data,
+        tipo: formData.tipo,
+        plano_contas_id: formData.plano_contas_id,
+        complemento: formData.complemento,
+        conta_bancaria_id: formData.conta_bancaria_id,
         valor: parseFloat(formData.valor),
       };
 
@@ -69,6 +139,11 @@ export default function MovimentacoesPage() {
 
   const handleEdit = (mov) => {
     setEditingId(mov.id);
+    const valorFormatado = new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(mov.valor);
+    
     setFormData({
       data: mov.data,
       tipo: mov.tipo,
@@ -76,6 +151,7 @@ export default function MovimentacoesPage() {
       complemento: mov.complemento || '',
       conta_bancaria_id: mov.conta_bancaria_id,
       valor: mov.valor.toString(),
+      valorFormatado: valorFormatado
     });
     setShowModal(true);
   };
@@ -100,6 +176,7 @@ export default function MovimentacoesPage() {
       complemento: '',
       conta_bancaria_id: '',
       valor: '',
+      valorFormatado: ''
     });
     setEditingId(null);
   };
@@ -123,13 +200,15 @@ export default function MovimentacoesPage() {
     );
   }
 
+  const itensDisponiveis = getItensPlanoContas(formData.tipo);
+
   return (
     <div className="space-y-6" data-testid="movimentacoes-page">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">Movimentação Financeira</h1>
-          <p className="text-gray-600 mt-1">Registre todas as suas transações</p>
+          <h1 className="text-2xl font-bold text-gray-800">Movimentação Financeira</h1>
+          <p className="text-gray-600 text-sm">Registre todas as suas transações</p>
         </div>
         
         <button
@@ -153,7 +232,7 @@ export default function MovimentacoesPage() {
               <tr>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Data</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Tipo</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Plano de Contas</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Item/Conta</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Complemento</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Banco</th>
                 <th className="px-6 py-4 text-right text-sm font-semibold text-gray-700">Valor</th>
@@ -262,7 +341,7 @@ export default function MovimentacoesPage() {
                   </label>
                   <select
                     value={formData.tipo}
-                    onChange={(e) => setFormData({ ...formData, tipo: e.target.value })}
+                    onChange={(e) => setFormData({ ...formData, tipo: e.target.value, plano_contas_id: '' })}
                     required
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
@@ -274,23 +353,27 @@ export default function MovimentacoesPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Plano de Contas *
+                  Item/Conta *
                 </label>
                 <select
                   value={formData.plano_contas_id}
                   onChange={(e) => setFormData({ ...formData, plano_contas_id: e.target.value })}
                   required
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  data-testid="item-conta-select"
                 >
-                  <option value="">Selecione...</option>
-                  {planoContas
-                    .filter((p) => p.tipo === (formData.tipo === 'entrada' ? 'receita' : 'despesa'))
-                    .map((plano) => (
-                      <option key={plano.id} value={plano.id}>
-                        {plano.nome}
-                      </option>
-                    ))}
+                  <option value="">Selecione um item...</option>
+                  {itensDisponiveis.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.subcategoria ? `${item.subcategoria} → ${item.nome}` : item.nome}
+                    </option>
+                  ))}
                 </select>
+                {itensDisponiveis.length === 0 && (
+                  <p className="text-xs text-amber-600 mt-1">
+                    Nenhum item cadastrado. Vá em Configurações para criar o plano de contas.
+                  </p>
+                )}
               </div>
 
               <div>
@@ -317,13 +400,13 @@ export default function MovimentacoesPage() {
                   Valor *
                 </label>
                 <input
-                  type="number"
-                  step="0.01"
-                  value={formData.valor}
-                  onChange={(e) => setFormData({ ...formData, valor: e.target.value })}
+                  type="text"
+                  value={formData.valorFormatado}
+                  onChange={handleValorChange}
                   required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="0.00"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg font-semibold"
+                  placeholder="R$ 0,00"
+                  data-testid="valor-input"
                 />
               </div>
 

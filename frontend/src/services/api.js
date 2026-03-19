@@ -82,6 +82,14 @@ export const movimentacoesAPI = {
 };
 
 // ============================================
+// FLUXO DE CAIXA
+// ============================================
+
+export const fluxoCaixaAPI = {
+  getDiario: (params) => api.get('/api/fluxo-caixa/diario', { params }),
+};
+
+// ============================================
 // DASHBOARD
 // ============================================
 

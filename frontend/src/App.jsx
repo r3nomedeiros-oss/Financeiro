@@ -5,6 +5,7 @@ import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import MovimentacoesPage from './pages/MovimentacoesPage';
 import DREPage from './pages/DREPage';
+import FluxoCaixaPage from './pages/FluxoCaixaPage';
 import PlanejamentoPage from './pages/PlanejamentoPage';
 import RelatoriosPage from './pages/RelatoriosPage';
 import ConfiguracoesPage from './pages/ConfiguracoesPage';
@@ -61,6 +62,7 @@ function App() {
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/movimentacoes" element={<MovimentacoesPage />} />
           <Route path="/dre" element={<DREPage />} />
+          <Route path="/fluxo-caixa" element={<FluxoCaixaPage />} />
           <Route path="/planejamento" element={<PlanejamentoPage />} />
           <Route path="/relatorios" element={<RelatoriosPage />} />
           <Route path="/configuracoes" element={<ConfiguracoesPage />} />

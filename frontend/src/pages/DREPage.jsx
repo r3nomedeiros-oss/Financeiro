@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { dreAPI, planoContasAPI } from '../services/api';
+import React, { useState, useEffect, useRef } from 'react';
+import { dreAPI, planoContasAPI, movimentacoesAPI } from '../services/api';
+import { Download, FileSpreadsheet } from 'lucide-react';
 
 // Ícones
 const ChevronRight = () => (
@@ -49,14 +50,42 @@ export default function DREPage() {
   const [hierarquia, setHierarquia] = useState(null);
   const [loading, setLoading] = useState(false);
   const [ano, setAno] = useState(new Date().getFullYear());
-  const [criandoPlano, setCriandoPlano] = useState(false);
+  const [anosDisponiveis, setAnosDisponiveis] = useState([]);
+  const tableRef = useRef(null);
   
-  // Estado de expansão: { categoria_id: { expanded: bool, subcategorias: { subcat_id: bool } } }
+  // Estado de expansão
   const [expandedState, setExpandedState] = useState({});
 
   useEffect(() => {
-    carregarDados();
+    carregarAnosDisponiveis();
+  }, []);
+
+  useEffect(() => {
+    if (ano) {
+      carregarDados();
+    }
   }, [ano]);
+
+  const carregarAnosDisponiveis = async () => {
+    try {
+      const res = await movimentacoesAPI.getAll();
+      const anos = new Set();
+      res.data.forEach(mov => {
+        const anoMov = new Date(mov.data).getFullYear();
+        anos.add(anoMov);
+      });
+      
+      const anosArray = Array.from(anos).sort((a, b) => b - a);
+      setAnosDisponiveis(anosArray.length > 0 ? anosArray : [new Date().getFullYear()]);
+      
+      if (anosArray.length > 0 && !anosArray.includes(ano)) {
+        setAno(anosArray[0]);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar anos:', error);
+      setAnosDisponiveis([new Date().getFullYear()]);
+    }
+  };
 
   const carregarDados = async () => {
     try {
@@ -68,7 +97,7 @@ export default function DREPage() {
       setDre(dreRes.data);
       setHierarquia(hierarquiaRes.data);
       
-      // Inicializar estado de expansão (todas categorias expandidas por padrão)
+      // Inicializar estado de expansão
       const initialExpanded = {};
       Object.keys(hierarquiaRes.data || {}).forEach(catId => {
         initialExpanded[catId] = { expanded: true, subcategorias: {} };
@@ -78,20 +107,6 @@ export default function DREPage() {
       console.error('Erro ao carregar DRE:', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const criarPlanoPadrao = async () => {
-    try {
-      setCriandoPlano(true);
-      await dreAPI.criarPlanoPadrao();
-      alert('Plano de contas padrão criado com sucesso!');
-      carregarDados();
-    } catch (error) {
-      console.error('Erro ao criar plano de contas:', error);
-      alert('Erro ao criar plano de contas padrão');
-    } finally {
-      setCriandoPlano(false);
     }
   };
 
@@ -140,6 +155,78 @@ export default function DREPage() {
     setExpandedState(newState);
   };
 
+  // Exportar para Excel (CSV)
+  const exportToExcel = () => {
+    if (!tableRef.current) return;
+    
+    const rows = [];
+    const table = tableRef.current;
+    const tableRows = table.querySelectorAll('tr');
+    
+    tableRows.forEach(row => {
+      const cells = row.querySelectorAll('th, td');
+      const rowData = [];
+      cells.forEach(cell => {
+        // Pegar texto limpo
+        let text = cell.innerText.replace(/[\n\r]/g, ' ').trim();
+        // Escapar aspas
+        text = text.replace(/"/g, '""');
+        rowData.push(`"${text}"`);
+      });
+      rows.push(rowData.join(';'));
+    });
+    
+    const csvContent = '\uFEFF' + rows.join('\n'); // BOM para Excel reconhecer UTF-8
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `DRE_${ano}.csv`;
+    link.click();
+  };
+
+  // Exportar para PDF
+  const exportToPDF = () => {
+    const printContent = tableRef.current?.outerHTML || '';
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>DRE - ${ano}</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          table { width: 100%; border-collapse: collapse; font-size: 10px; }
+          th, td { border: 1px solid #ddd; padding: 4px; text-align: right; }
+          th { background: #f5f5f5; }
+          td:first-child, th:first-child { text-align: left; min-width: 200px; }
+          .text-cyan-700 { color: #0e7490; }
+          .text-red-600 { color: #dc2626; }
+          .text-green-700 { color: #15803d; }
+          .text-blue-600 { color: #2563eb; }
+          .bg-cyan-50 { background: #ecfeff; }
+          .bg-red-50 { background: #fef2f2; }
+          .bg-green-50 { background: #f0fdf4; }
+          .bg-blue-50 { background: #eff6ff; }
+          .bg-gray-100 { background: #f3f4f6; }
+          .font-semibold { font-weight: 600; }
+          .font-bold { font-weight: 700; }
+          h1 { text-align: center; margin-bottom: 20px; }
+          @media print {
+            body { margin: 0; }
+            @page { size: landscape; margin: 10mm; }
+          }
+        </style>
+      </head>
+      <body>
+        <h1>Demonstrativo de Resultado do Exercício - ${ano}</h1>
+        ${printContent}
+        <script>window.print(); window.close();</script>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   const formatCurrency = (value) => {
     if (value === null || value === undefined || value === 0) return '-';
     const isNegative = value < 0;
@@ -183,7 +270,7 @@ export default function DREPage() {
   const totais = dre?.totais || {};
   const receitaBrutaTotal = totais?.receita_bruta?.total || 0;
 
-  // Renderiza uma linha de valores
+  // Renderiza valores por linha
   const renderValoresLinha = (valores, isPercent = false, cor = '') => (
     <>
       {meses.map((mes) => (
@@ -200,7 +287,7 @@ export default function DREPage() {
     </>
   );
 
-  // Renderiza linha de total/resultado
+  // Renderiza linha de total
   const renderLinhaTotal = (key, config) => {
     const valores = totais[key];
     const isPercent = config.tipo === 'percentual';
@@ -215,12 +302,23 @@ export default function DREPage() {
     );
   };
 
-  // Renderiza categoria com subcategorias (Tree View)
+  // Renderiza categoria hierárquica
   const renderCategoriaHierarquica = (catId, catConfig) => {
     const catData = hierarquia?.[catId];
     const isExpanded = expandedState[catId]?.expanded;
     const subcategorias = catData?.subcategorias || [];
     
+    // Calcular total da categoria somando subcategorias
+    const calcularTotalCategoria = (mes) => {
+      return subcategorias.reduce((acc, sub) => {
+        const subValor = dre?.valores_por_plano?.[sub.id]?.[mes] || 0;
+        const itensValor = (sub.itens || []).reduce((a, item) => {
+          return a + (dre?.valores_por_plano?.[item.id]?.[mes] || 0);
+        }, 0);
+        return acc + subValor + itensValor;
+      }, 0);
+    };
+
     return (
       <React.Fragment key={catId}>
         {/* Linha da Categoria */}
@@ -243,6 +341,15 @@ export default function DREPage() {
           const isSubExpanded = expandedState[catId]?.subcategorias?.[subcat.id];
           const itens = subcat.itens || [];
           
+          // Calcular total da subcategoria
+          const subcatTotal = (mes) => {
+            const subValor = dre?.valores_por_plano?.[subcat.id]?.[mes] || 0;
+            const itensValor = itens.reduce((a, item) => {
+              return a + (dre?.valores_por_plano?.[item.id]?.[mes] || 0);
+            }, 0);
+            return subValor + itensValor;
+          };
+
           return (
             <React.Fragment key={subcat.id}>
               {/* Linha da Subcategoria */}
@@ -259,14 +366,14 @@ export default function DREPage() {
                 </td>
                 {meses.map((mes) => (
                   <td key={mes} className="text-right p-2 border-r border-gray-200">
-                    {formatCurrency(dre?.linhas?.[subcat.categoria]?.meses?.[mes] || 0)}
+                    {formatCurrency(subcatTotal(mes))}
                   </td>
                 ))}
                 <td className="text-right p-2 bg-gray-50 border-r border-gray-300">
-                  {formatCurrency(dre?.linhas?.[subcat.categoria]?.total || 0)}
+                  {formatCurrency(meses.reduce((a, m) => a + subcatTotal(m), 0))}
                 </td>
                 <td className="text-right p-2 bg-gray-50">
-                  {calcularAV(dre?.linhas?.[subcat.categoria]?.total || 0, receitaBrutaTotal)}
+                  {calcularAV(meses.reduce((a, m) => a + subcatTotal(m), 0), receitaBrutaTotal)}
                 </td>
               </tr>
 
@@ -278,15 +385,15 @@ export default function DREPage() {
                     • {item.nome}
                   </td>
                   {meses.map((mes) => (
-                    <td key={mes} className="text-right p-2 border-r border-gray-200 text-gray-500 text-sm">
-                      -
+                    <td key={mes} className="text-right p-2 border-r border-gray-200 text-gray-600 text-sm">
+                      {formatCurrency(dre?.valores_por_plano?.[item.id]?.[mes] || 0)}
                     </td>
                   ))}
-                  <td className="text-right p-2 bg-gray-50 border-r border-gray-300 text-gray-500 text-sm">
-                    -
+                  <td className="text-right p-2 bg-gray-50 border-r border-gray-300 text-gray-600 text-sm">
+                    {formatCurrency(meses.reduce((a, m) => a + (dre?.valores_por_plano?.[item.id]?.[m] || 0), 0))}
                   </td>
-                  <td className="text-right p-2 bg-gray-50 text-gray-500 text-sm">
-                    -
+                  <td className="text-right p-2 bg-gray-50 text-gray-600 text-sm">
+                    {calcularAV(meses.reduce((a, m) => a + (dre?.valores_por_plano?.[item.id]?.[m] || 0), 0), receitaBrutaTotal)}
                   </td>
                 </tr>
               ))}
@@ -321,13 +428,23 @@ export default function DREPage() {
           >
             Recolher Tudo
           </button>
+          
+          {/* Botões de Exportação */}
           <button
-            onClick={criarPlanoPadrao}
-            disabled={criandoPlano}
-            className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
-            data-testid="criar-plano-btn"
+            onClick={exportToExcel}
+            className="flex items-center gap-2 px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700"
+            data-testid="export-excel-btn"
           >
-            {criandoPlano ? 'Criando...' : 'Criar Plano Padrão'}
+            <FileSpreadsheet size={16} />
+            Excel
+          </button>
+          <button
+            onClick={exportToPDF}
+            className="flex items-center gap-2 px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700"
+            data-testid="export-pdf-btn"
+          >
+            <Download size={16} />
+            PDF
           </button>
           
           <select
@@ -336,7 +453,7 @@ export default function DREPage() {
             className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500"
             data-testid="ano-select"
           >
-            {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i + 1).map((a) => (
+            {anosDisponiveis.map((a) => (
               <option key={a} value={a}>{a}</option>
             ))}
           </select>
@@ -345,7 +462,7 @@ export default function DREPage() {
 
       {/* Tabela DRE com Tree View */}
       <div className="bg-white rounded-lg shadow overflow-x-auto">
-        <table className="w-full text-sm border-collapse" data-testid="dre-table">
+        <table ref={tableRef} className="w-full text-sm border-collapse" data-testid="dre-table">
           <thead>
             <tr className="bg-gray-100 border-b-2 border-gray-300">
               <th className="text-left p-2 sticky left-0 bg-gray-100 min-w-[320px] border-r border-gray-300">
@@ -426,10 +543,6 @@ export default function DREPage() {
             <span>Percentuais</span>
           </div>
         </div>
-        <p className="text-xs text-gray-500 mt-3">
-          <strong>Estrutura:</strong> Categoria (fixa) → Subcategoria (editável) → Item/Conta (editável). 
-          Gerencie subcategorias e itens em <a href="/configuracoes" className="text-cyan-600 hover:underline">Configurações</a>.
-        </p>
       </div>
     </div>
   );

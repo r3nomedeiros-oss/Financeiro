@@ -585,28 +585,61 @@ async def get_dre_anual(ano: int, user_id: str = Depends(get_current_user)):
             "total": 0.0
         }
     
-    # Processar movimentações
+    # Processar movimentações - agora também por plano_contas_id individual
+    valores_por_plano = {}  # {plano_id: {mes: valor}}
+    
     for mov in movimentacoes:
         plano_id = mov.get("plano_contas_id")
-        grupo_dre = plano_to_grupo.get(plano_id, "")
         valor = mov["valor"]
         data = mov["data"]
         mes_idx = int(data.split("-")[1]) - 1
         mes_nome = meses[mes_idx]
         
-        # Encontrar o código correspondente baseado no grupo
-        for item in DRE_ESTRUTURA:
-            if item["codigo"] == grupo_dre or item["nome"].lower() in mov.get("plano_contas", {}).get("nome", "").lower():
-                dados_por_grupo[item["codigo"]]["meses"][mes_nome] += valor
-                dados_por_grupo[item["codigo"]]["total"] += valor
-                break
+        # Armazenar valor por plano_contas_id individual
+        if plano_id:
+            if plano_id not in valores_por_plano:
+                valores_por_plano[plano_id] = {m: 0.0 for m in meses}
+            valores_por_plano[plano_id][mes_nome] += valor
+        
+        # Mapear para categoria DRE baseado no formato da categoria do plano
+        plano_info = mov.get("plano_contas", {})
+        categoria_raw = plano_info.get("categoria", "")
+        
+        if categoria_raw:
+            partes = categoria_raw.split("|")
+            if len(partes) >= 2:
+                cat_dre = partes[0]  # Ex: "custos_fixos", "receita_bruta"
+                
+                # Somar no grupo correspondente
+                if cat_dre == "receita_bruta":
+                    dados_por_grupo["1"]["meses"][mes_nome] += valor
+                    dados_por_grupo["1"]["total"] += valor
+                elif cat_dre == "deducoes_vendas":
+                    if "imposto" in plano_info.get("nome", "").lower():
+                        dados_por_grupo["2"]["meses"][mes_nome] += valor
+                        dados_por_grupo["2"]["total"] += valor
+                    else:
+                        dados_por_grupo["3"]["meses"][mes_nome] += valor
+                        dados_por_grupo["3"]["total"] += valor
+                elif cat_dre == "custos_variaveis":
+                    dados_por_grupo["4"]["meses"][mes_nome] += valor
+                    dados_por_grupo["4"]["total"] += valor
+                elif cat_dre == "custos_fixos":
+                    dados_por_grupo["5"]["meses"][mes_nome] += valor
+                    dados_por_grupo["5"]["total"] += valor
+                elif cat_dre == "resultado_nao_operacional":
+                    if mov["tipo"] == "entrada":
+                        dados_por_grupo["9"]["meses"][mes_nome] += valor
+                        dados_por_grupo["9"]["total"] += valor
+                    else:
+                        dados_por_grupo["10"]["meses"][mes_nome] += valor
+                        dados_por_grupo["10"]["total"] += valor
         else:
-            # Se não encontrou, tentar mapear pelo tipo
+            # Fallback se não tem categoria definida
             if mov["tipo"] == "entrada":
                 dados_por_grupo["1"]["meses"][mes_nome] += valor
                 dados_por_grupo["1"]["total"] += valor
             else:
-                # Distribuir despesas não mapeadas em custos variáveis
                 dados_por_grupo["4"]["meses"][mes_nome] += valor
                 dados_por_grupo["4"]["total"] += valor
     
@@ -674,6 +707,7 @@ async def get_dre_anual(ano: int, user_id: str = Depends(get_current_user)):
         "ano": ano,
         "meses": meses,
         "linhas": dados_por_grupo,
+        "valores_por_plano": valores_por_plano,  # Novo: valores individuais por plano_contas_id
         "totais": {
             "receita_bruta": receita_bruta,
             "deducoes_vendas": deducoes,

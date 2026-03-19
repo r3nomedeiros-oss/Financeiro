@@ -1,19 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { planejamentoAPI, planoContasAPI } from '../services/api';
-import { Plus, Edit2, Trash2, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, X, ChevronDown, ChevronRight } from 'lucide-react';
+
+// Categorias fixas do DRE
+const CATEGORIAS_DRE = {
+  receita_bruta: { nome: "(+) Receita Bruta", cor: "cyan" },
+  deducoes_vendas: { nome: "(-) Deduções Sobre Vendas", cor: "red" },
+  custos_variaveis: { nome: "(-) Custos Variáveis", cor: "red" },
+  custos_fixos: { nome: "(-) Custos Fixos", cor: "red" },
+  resultado_nao_operacional: { nome: "Resultado Não Operacional", cor: "gray" },
+};
 
 export default function PlanejamentoPage() {
   const [planejamentos, setPlanejamentos] = useState([]);
-  const [planoContas, setPlanoContas] = useState([]);
+  const [hierarquia, setHierarquia] = useState({});
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [expandedCategories, setExpandedCategories] = useState({});
   
   const [formData, setFormData] = useState({
     mes: new Date().getMonth() + 1,
     ano: new Date().getFullYear(),
     plano_contas_id: '',
     valor_planejado: '',
+    valorFormatado: ''
   });
 
   useEffect(() => {
@@ -23,13 +34,20 @@ export default function PlanejamentoPage() {
   const carregarDados = async () => {
     try {
       setLoading(true);
-      const [planRes, planoRes] = await Promise.all([
+      const [planRes, hierRes] = await Promise.all([
         planejamentoAPI.getAll(),
-        planoContasAPI.getAll(),
+        planoContasAPI.getHierarquico(),
       ]);
       
       setPlanejamentos(planRes.data);
-      setPlanoContas(planoRes.data);
+      setHierarquia(hierRes.data);
+      
+      // Expandir todas categorias
+      const expanded = {};
+      Object.keys(hierRes.data || {}).forEach(catId => {
+        expanded[catId] = true;
+      });
+      setExpandedCategories(expanded);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
     } finally {
@@ -37,12 +55,67 @@ export default function PlanejamentoPage() {
     }
   };
 
+  // Extrair itens (nível 3) do plano de contas
+  const getItensPlanoContas = () => {
+    const itens = [];
+    
+    Object.entries(hierarquia).forEach(([catId, categoria]) => {
+      (categoria.subcategorias || []).forEach(subcat => {
+        (subcat.itens || []).forEach(item => {
+          itens.push({
+            id: item.id,
+            nome: item.nome,
+            subcategoria: subcat.nome,
+            categoria: categoria.nome,
+            categoriaId: catId
+          });
+        });
+        
+        // Se subcategoria não tem itens, usar ela mesma
+        if (!subcat.itens || subcat.itens.length === 0) {
+          itens.push({
+            id: subcat.id,
+            nome: subcat.nome,
+            subcategoria: '',
+            categoria: categoria.nome,
+            categoriaId: catId
+          });
+        }
+      });
+    });
+
+    return itens;
+  };
+
+  const formatarValorInput = (valor) => {
+    const numeros = valor.replace(/\D/g, '');
+    const decimal = (parseInt(numeros) / 100).toFixed(2);
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(decimal);
+  };
+
+  const handleValorChange = (e) => {
+    const inputValue = e.target.value;
+    const numeros = inputValue.replace(/\D/g, '');
+    const valorNumerico = parseInt(numeros) / 100 || 0;
+    
+    setFormData({
+      ...formData,
+      valor_planejado: valorNumerico.toString(),
+      valorFormatado: numeros ? formatarValorInput(inputValue) : ''
+    });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
     try {
       const data = {
-        ...formData,
+        mes: formData.mes,
+        ano: formData.ano,
+        plano_contas_id: formData.plano_contas_id,
         valor_planejado: parseFloat(formData.valor_planejado),
       };
 
@@ -63,11 +136,17 @@ export default function PlanejamentoPage() {
 
   const handleEdit = (plan) => {
     setEditingId(plan.id);
+    const valorFormatado = new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(plan.valor_planejado);
+    
     setFormData({
       mes: plan.mes,
       ano: plan.ano,
       plano_contas_id: plan.plano_contas_id,
       valor_planejado: plan.valor_planejado.toString(),
+      valorFormatado: valorFormatado
     });
     setShowModal(true);
   };
@@ -89,6 +168,7 @@ export default function PlanejamentoPage() {
       ano: new Date().getFullYear(),
       plano_contas_id: '',
       valor_planejado: '',
+      valorFormatado: ''
     });
     setEditingId(null);
   };
@@ -100,6 +180,44 @@ export default function PlanejamentoPage() {
     }).format(value);
   };
 
+  const toggleCategoria = (catId) => {
+    setExpandedCategories(prev => ({
+      ...prev,
+      [catId]: !prev[catId]
+    }));
+  };
+
+  const getCorClasse = (cor) => {
+    const cores = {
+      cyan: 'bg-cyan-50 border-cyan-200 text-cyan-700',
+      red: 'bg-red-50 border-red-200 text-red-700',
+      gray: 'bg-gray-50 border-gray-200 text-gray-700',
+    };
+    return cores[cor] || 'bg-gray-50 border-gray-200';
+  };
+
+  // Agrupar planejamentos por categoria DRE
+  const planejamentosPorCategoria = () => {
+    const agrupado = {};
+    const itens = getItensPlanoContas();
+    
+    planejamentos.forEach(plan => {
+      const item = itens.find(i => i.id === plan.plano_contas_id);
+      if (item) {
+        if (!agrupado[item.categoriaId]) {
+          agrupado[item.categoriaId] = [];
+        }
+        agrupado[item.categoriaId].push({
+          ...plan,
+          itemNome: item.nome,
+          subcategoria: item.subcategoria
+        });
+      }
+    });
+    
+    return agrupado;
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -108,12 +226,15 @@ export default function PlanejamentoPage() {
     );
   }
 
+  const itensDisponiveis = getItensPlanoContas();
+  const planejamentosAgrupados = planejamentosPorCategoria();
+
   return (
     <div className="space-y-6" data-testid="planejamento-page">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">Planejamento Orçamentário</h1>
-          <p className="text-gray-600 mt-1">Defina metas para cada plano de contas</p>
+          <h1 className="text-2xl font-bold text-gray-800">Planejamento Orçamentário</h1>
+          <p className="text-gray-600 text-sm">Defina metas seguindo a estrutura do DRE</p>
         </div>
         
         <button
@@ -122,67 +243,99 @@ export default function PlanejamentoPage() {
             setShowModal(true);
           }}
           className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition shadow-md"
+          data-testid="novo-planejamento-btn"
         >
           <Plus size={20} />
           Novo Planejamento
         </button>
       </div>
 
-      <div className="bg-white rounded-xl shadow-md overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Período</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Plano de Contas</th>
-                <th className="px-6 py-4 text-right text-sm font-semibold text-gray-700">Valor Planejado</th>
-                <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {planejamentos.length > 0 ? (
-                planejamentos.map((plan) => (
-                  <tr key={plan.id} className="hover:bg-gray-50 transition">
-                    <td className="px-6 py-4 text-sm text-gray-800">
-                      {new Date(plan.ano, plan.mes - 1).toLocaleDateString('pt-BR', {
-                        month: 'long',
-                        year: 'numeric',
-                      })}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-800">
-                      {plan.plano_contas?.nome || '-'}
-                    </td>
-                    <td className="px-6 py-4 text-sm font-semibold text-right text-blue-600">
-                      {formatCurrency(plan.valor_planejado)}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex justify-center gap-2">
-                        <button
-                          onClick={() => handleEdit(plan)}
-                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                        >
-                          <Edit2 size={18} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(plan.id)}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="4" className="px-6 py-12 text-center text-gray-500">
-                    Nenhum planejamento cadastrado
-                  </td>
-                </tr>
+      {/* Visualização por Categoria DRE */}
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        {Object.entries(CATEGORIAS_DRE).map(([catId, catInfo]) => {
+          const isExpanded = expandedCategories[catId];
+          const planejamentosCat = planejamentosAgrupados[catId] || [];
+
+          return (
+            <div key={catId} className="border-b border-gray-200 last:border-b-0">
+              {/* Header da Categoria */}
+              <div 
+                className={`flex items-center justify-between p-4 ${getCorClasse(catInfo.cor)} cursor-pointer hover:opacity-90`}
+                onClick={() => toggleCategoria(catId)}
+              >
+                <div className="flex items-center gap-2">
+                  {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                  <span className="font-semibold">{catInfo.nome}</span>
+                  <span className="text-xs bg-white/50 px-2 py-0.5 rounded">
+                    {planejamentosCat.length} itens planejados
+                  </span>
+                </div>
+                <span className="font-bold">
+                  {formatCurrency(planejamentosCat.reduce((a, p) => a + p.valor_planejado, 0))}
+                </span>
+              </div>
+
+              {/* Itens da Categoria */}
+              {isExpanded && (
+                <div className="bg-white">
+                  {planejamentosCat.length === 0 ? (
+                    <div className="p-4 pl-10 text-sm text-gray-500 italic">
+                      Nenhum planejamento cadastrado para esta categoria
+                    </div>
+                  ) : (
+                    <table className="w-full">
+                      <thead className="bg-gray-50 text-xs text-gray-500">
+                        <tr>
+                          <th className="text-left p-3 pl-10">Item</th>
+                          <th className="text-left p-3">Período</th>
+                          <th className="text-right p-3">Valor Planejado</th>
+                          <th className="text-center p-3">Ações</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {planejamentosCat.map(plan => (
+                          <tr key={plan.id} className="border-t border-gray-100 hover:bg-gray-50">
+                            <td className="p-3 pl-10">
+                              <span className="font-medium">{plan.itemNome}</span>
+                              {plan.subcategoria && (
+                                <span className="text-xs text-gray-500 block">{plan.subcategoria}</span>
+                              )}
+                            </td>
+                            <td className="p-3 text-sm">
+                              {new Date(plan.ano, plan.mes - 1).toLocaleDateString('pt-BR', {
+                                month: 'long',
+                                year: 'numeric',
+                              })}
+                            </td>
+                            <td className="p-3 text-right font-semibold text-blue-600">
+                              {formatCurrency(plan.valor_planejado)}
+                            </td>
+                            <td className="p-3">
+                              <div className="flex justify-center gap-2">
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleEdit(plan); }}
+                                  className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                                >
+                                  <Edit2 size={16} />
+                                </button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleDelete(plan.id); }}
+                                  className="p-1 text-red-600 hover:bg-red-50 rounded"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
               )}
-            </tbody>
-          </table>
-        </div>
+            </div>
+          );
+        })}
       </div>
 
       {/* Modal */}
@@ -190,7 +343,7 @@ export default function PlanejamentoPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg">
             <div className="flex justify-between items-center p-6 border-b">
-              <h2 className="text-2xl font-bold text-gray-800">
+              <h2 className="text-xl font-bold text-gray-800">
                 {editingId ? 'Editar Planejamento' : 'Novo Planejamento'}
               </h2>
               <button onClick={() => { setShowModal(false); resetForm(); }} className="text-gray-400 hover:text-gray-600">
@@ -234,18 +387,25 @@ export default function PlanejamentoPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Plano de Contas *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Item/Conta *</label>
                 <select
                   value={formData.plano_contas_id}
                   onChange={(e) => setFormData({ ...formData, plano_contas_id: e.target.value })}
                   required
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  data-testid="item-select"
                 >
                   <option value="">Selecione...</option>
-                  {planoContas.map((plano) => (
-                    <option key={plano.id} value={plano.id}>
-                      {plano.nome} ({plano.tipo})
-                    </option>
+                  {Object.entries(CATEGORIAS_DRE).map(([catId, catInfo]) => (
+                    <optgroup key={catId} label={catInfo.nome}>
+                      {itensDisponiveis
+                        .filter(item => item.categoriaId === catId)
+                        .map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.subcategoria ? `${item.subcategoria} → ${item.nome}` : item.nome}
+                          </option>
+                        ))}
+                    </optgroup>
                   ))}
                 </select>
               </div>
@@ -253,13 +413,12 @@ export default function PlanejamentoPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Valor Planejado *</label>
                 <input
-                  type="number"
-                  step="0.01"
-                  value={formData.valor_planejado}
-                  onChange={(e) => setFormData({ ...formData, valor_planejado: e.target.value })}
+                  type="text"
+                  value={formData.valorFormatado}
+                  onChange={handleValorChange}
                   required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="0.00"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-lg font-semibold"
+                  placeholder="R$ 0,00"
                 />
               </div>
 
