@@ -7,6 +7,7 @@ import MovimentacoesPage from './pages/MovimentacoesPage';
 import DREPage from './pages/DREPage';
 import FluxoCaixaPage from './pages/FluxoCaixaPage';
 import PlanejamentoPage from './pages/PlanejamentoPage';
+import ComparativoPage from './pages/ComparativoPage';
 import RelatoriosPage from './pages/RelatoriosPage';
 import ConfiguracoesPage from './pages/ConfiguracoesPage';
 
@@ -64,6 +65,7 @@ function App() {
           <Route path="/dre" element={<DREPage />} />
           <Route path="/fluxo-caixa" element={<FluxoCaixaPage />} />
           <Route path="/planejamento" element={<PlanejamentoPage />} />
+          <Route path="/comparativo" element={<ComparativoPage />} />
           <Route path="/relatorios" element={<RelatoriosPage />} />
           <Route path="/configuracoes" element={<ConfiguracoesPage />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />

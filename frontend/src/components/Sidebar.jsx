@@ -10,7 +10,8 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
-  Wallet
+  Wallet,
+  GitCompare
 } from 'lucide-react';
 
 const menuItems = [
@@ -19,6 +20,7 @@ const menuItems = [
   { path: '/dre', icon: FileText, label: 'Demonstrativo de Resultado' },
   { path: '/fluxo-caixa', icon: Wallet, label: 'Fluxo de Caixa Diário' },
   { path: '/planejamento', icon: Target, label: 'Planejamento Orçamentário' },
+  { path: '/comparativo', icon: GitCompare, label: 'Orçado x Realizado' },
   { path: '/relatorios', icon: BarChart3, label: 'Relatórios Comparativos' },
   { path: '/configuracoes', icon: Settings, label: 'Configurações' },
 ];
