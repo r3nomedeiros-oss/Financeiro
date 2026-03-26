@@ -1,85 +1,78 @@
 # Sistema Financeiro Industrial - PRD
 
-## Problema Original
-Sistema financeiro industrial conectado ao Supabase. Múltiplas melhorias solicitadas:
-- DRE com estrutura hierárquica de 3 níveis (Categoria > Subcategoria > Item)
-- Exportação em PDF e Excel
-- Menu lateral minimizável
-- Nova aba Fluxo de Caixa Diário
-- Relatórios Comparativos com análise vertical e horizontal
-- Planejamento usando estrutura do DRE
+## Problem Statement Original
+Aplicativo de controle financeiro com os seguintes problemas a corrigir:
+1. DRE em PDF está errado - corrigir exportação
+2. Colocar filtro por período no Fluxo de Caixa
+3. Quero baixar o Planejamento Orçamentário (PDF e Excel)
+4. Relatórios Comparativos não funcionam - período 1 e 2 mostram dados iguais
 
 ## Arquitetura
-- **Frontend**: React + Vite + TailwindCSS + Lucide Icons
+- **Frontend**: React + Vite + TailwindCSS
 - **Backend**: FastAPI (Python)
-- **Banco de Dados**: Supabase (PostgreSQL)
+- **Database**: Supabase (PostgreSQL)
 - **Autenticação**: JWT
 
-## Implementado (19/03/2026)
+## User Personas
+- Gestores financeiros de empresas industriais
+- Controllers e analistas financeiros
+- Proprietários de pequenas empresas
 
-### 1. DRE - Demonstrativo de Resultado
-- [x] Removido botão "Criar Plano Padrão" (agora apenas em Configurações)
-- [x] Botões de exportação: Excel (CSV) e PDF
-- [x] Campo ano mostra apenas anos com lançamentos
-- [x] Estrutura hierárquica de 3 níveis com expand/collapse
-- [x] Valores agregam: Item → Subcategoria → Categoria
+## Core Requirements (Static)
+- Dashboard com indicadores financeiros
+- DRE (Demonstrativo de Resultado) anual com estrutura hierárquica
+- Fluxo de Caixa diário
+- Planejamento Orçamentário
+- Relatórios Comparativos (AV% e AH%)
+- Gestão de Contas Bancárias
+- Plano de Contas hierárquico
 
-### 2. Menu Lateral Minimizável
-- [x] Sidebar pode ser minimizado/expandido
-- [x] Quando minimizado: apenas ícones
-- [x] Botão de toggle com animação suave
-- [x] Logo compacto ("SF") quando minimizado
+## What's Been Implemented - 2026-03-26
 
-### 3. Fluxo de Caixa Diário (NOVA ABA)
-- [x] Visualização dia a dia do mês inteiro
-- [x] Colunas: Dia, Dia Semana, Entradas, Saídas, Saldo
-- [x] Cards de resumo: Saldo Inicial, Total Entradas, Total Saídas, Saldo Final
-- [x] Filtro por conta bancária
-- [x] Navegação entre meses
-- [x] Destaque para finais de semana
+### Correções Aplicadas:
+1. **DRE PDF/Excel** - Corrigida exportação
+   - PDF: Tabela gerada com dados corretos dos totais
+   - Excel: CSV com dados estruturados corretamente
+   
+2. **Fluxo de Caixa - Filtro por Período**
+   - Toggle para alternar entre "Filtro por Mês" e "Filtro por Período"
+   - Campos de data início e fim
+   - Exportação PDF e Excel adicionados
 
-### 4. Movimentações Financeiras
-- [x] Campo Item/Conta mostra apenas itens (nível 3) do plano de contas
-- [x] Campo Valor formatado como moeda brasileira (R$ 0,00)
-- [x] Dropdown organizado por subcategoria
+3. **Planejamento Orçamentário - Download**
+   - Botões de exportação Excel e PDF implementados
+   - Relatório com estrutura por categoria DRE
 
-### 5. Planejamento Orçamentário
-- [x] Usa mesmo plano de contas do DRE
-- [x] Agrupado por categorias fixas do DRE
-- [x] Cada categoria expandível com itens planejados
-- [x] Total por categoria
+4. **Relatórios Comparativos - Período 1 e 2**
+   - Backend atualizado: API /api/movimentacoes agora suporta `data_inicio` e `data_fim`
+   - Frontend já consumia esses parâmetros
+   - Mensagem de orientação quando não há dados
 
-### 6. Relatórios Comparativos (NOVA FUNCIONALIDADE)
-- [x] Dois períodos configuráveis (Data Início/Fim)
-- [x] Filtros flexíveis: dia, semana, mês, trimestre
-- [x] Análise Vertical (AV%) - % sobre receita total
-- [x] Análise Horizontal (AH%) - variação entre períodos
-- [x] Toggles para mostrar/ocultar AV% e AH%
-- [x] Tabela comparativa com formatação condicional
+### Arquivos Modificados:
+- `/app/backend/server.py` - Suporte a data_inicio/data_fim
+- `/app/frontend/src/pages/DREPage.jsx` - Exportação PDF/Excel corrigida
+- `/app/frontend/src/pages/FluxoCaixaPage.jsx` - Filtro por período + exportação
+- `/app/frontend/src/pages/PlanejamentoPage.jsx` - Exportação PDF/Excel
+- `/app/frontend/src/pages/RelatoriosPage.jsx` - Mensagem de orientação
 
-## Estrutura do Menu
-1. Dashboard
-2. Movimentação Financeira
-3. Demonstrativo de Resultado (DRE)
-4. Fluxo de Caixa Diário
-5. Planejamento Orçamentário
-6. Relatórios Comparativos
-7. Configurações
+## Prioritized Backlog
 
-## Testes
-- Frontend: 95% passou
-- Backend: funcionando
-- Todas as novas funcionalidades validadas visualmente
+### P0 - Crítico
+- [x] Correção DRE PDF
+- [x] Filtro período Fluxo de Caixa
+- [x] Download Planejamento
+- [x] Correção Relatórios Comparativos
 
-## Backlog
-### P0
-- [ ] Vincular movimentações aos itens para cálculo real no DRE
+### P1 - Importante
+- [ ] Adicionar gráficos ao Dashboard
+- [ ] Exportação de todos relatórios em batch
 
-### P1
-- [ ] Gráficos no Fluxo de Caixa
-- [ ] Comparativo Orçado x Realizado
-- [ ] Alertas de orçamento
+### P2 - Nice to Have
+- [ ] Dark mode
+- [ ] Notificações de orçamento excedido
+- [ ] Integração com bancos (Open Finance)
 
-### P2
-- [ ] Dashboard customizável
-- [ ] Integração bancária
+## Next Tasks
+- Testar em produção com dados reais
+- Validar formatação dos PDFs em impressoras
+- Coletar feedback do usuário sobre UX das exportações

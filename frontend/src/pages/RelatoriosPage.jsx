@@ -247,7 +247,11 @@ export default function RelatoriosPage() {
       </div>
 
       {/* Tabela Comparativa */}
-      {(dadosPeriodo1.length > 0 || dadosPeriodo2.length > 0) && (
+      {loading ? (
+        <div className="flex items-center justify-center h-48 bg-white rounded-lg shadow">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+      ) : (dadosPeriodo1.length > 0 || dadosPeriodo2.length > 0) ? (
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm" data-testid="tabela-comparativa">
@@ -372,6 +376,11 @@ export default function RelatoriosPage() {
               </tbody>
             </table>
           </div>
+        </div>
+      ) : (
+        <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500" data-testid="sem-dados-msg">
+          <p className="text-lg">Clique em "Comparar Períodos" para visualizar o relatório comparativo</p>
+          <p className="text-sm mt-2">Configure os períodos desejados nos filtros acima</p>
         </div>
       )}
 
