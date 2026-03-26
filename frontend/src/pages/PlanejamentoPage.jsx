@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { planejamentoAPI, planoContasAPI } from '../services/api';
-import { Plus, Edit2, Trash2, X, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, Edit2, Trash2, X, ChevronDown, ChevronRight, Download, FileSpreadsheet } from 'lucide-react';
 
 // Categorias fixas do DRE
 const CATEGORIAS_DRE = {
@@ -229,6 +229,108 @@ export default function PlanejamentoPage() {
   const itensDisponiveis = getItensPlanoContas();
   const planejamentosAgrupados = planejamentosPorCategoria();
 
+  // Exportar para Excel
+  const exportToExcel = () => {
+    const rows = [['Categoria', 'Item', 'Período', 'Valor Planejado'].join(';')];
+    
+    Object.entries(CATEGORIAS_DRE).forEach(([catId, catInfo]) => {
+      const planejamentosCat = planejamentosAgrupados[catId] || [];
+      planejamentosCat.forEach(plan => {
+        rows.push([
+          catInfo.nome,
+          plan.subcategoria ? `${plan.subcategoria} → ${plan.itemNome}` : plan.itemNome,
+          new Date(plan.ano, plan.mes - 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }),
+          plan.valor_planejado.toFixed(2).replace('.', ',')
+        ].join(';'));
+      });
+    });
+    
+    // Total geral
+    const totalGeral = planejamentos.reduce((a, p) => a + p.valor_planejado, 0);
+    rows.push(['', '', 'TOTAL GERAL', totalGeral.toFixed(2).replace('.', ',')].join(';'));
+    
+    const csvContent = '\uFEFF' + rows.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `PlanejamentoOrcamentario_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+  };
+
+  // Exportar para PDF
+  const exportToPDF = () => {
+    let tableRows = '';
+    
+    Object.entries(CATEGORIAS_DRE).forEach(([catId, catInfo]) => {
+      const planejamentosCat = planejamentosAgrupados[catId] || [];
+      const totalCat = planejamentosCat.reduce((a, p) => a + p.valor_planejado, 0);
+      
+      // Header da categoria
+      const bgColor = catInfo.cor === 'cyan' ? '#e0f7fa' : catInfo.cor === 'red' ? '#ffebee' : '#f5f5f5';
+      const textColor = catInfo.cor === 'cyan' ? '#0e7490' : catInfo.cor === 'red' ? '#dc2626' : '#374151';
+      
+      tableRows += `
+        <tr style="background:${bgColor};font-weight:600;">
+          <td colspan="3" style="padding:8px;border:1px solid #ddd;color:${textColor};">${catInfo.nome}</td>
+          <td style="padding:8px;border:1px solid #ddd;text-align:right;color:${textColor};">${formatCurrency(totalCat)}</td>
+        </tr>
+      `;
+      
+      // Itens da categoria
+      planejamentosCat.forEach(plan => {
+        tableRows += `
+          <tr>
+            <td style="padding:6px 6px 6px 20px;border:1px solid #ddd;">${plan.subcategoria ? `${plan.subcategoria} → ${plan.itemNome}` : plan.itemNome}</td>
+            <td style="padding:6px;border:1px solid #ddd;">${new Date(plan.ano, plan.mes - 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</td>
+            <td style="padding:6px;border:1px solid #ddd;"></td>
+            <td style="padding:6px;border:1px solid #ddd;text-align:right;color:#2563eb;">${formatCurrency(plan.valor_planejado)}</td>
+          </tr>
+        `;
+      });
+    });
+    
+    const totalGeral = planejamentos.reduce((a, p) => a + p.valor_planejado, 0);
+    tableRows += `
+      <tr style="background:#d5d5d5;font-weight:bold;">
+        <td colspan="3" style="padding:8px;border:1px solid #ddd;">TOTAL GERAL</td>
+        <td style="padding:8px;border:1px solid #ddd;text-align:right;">${formatCurrency(totalGeral)}</td>
+      </tr>
+    `;
+    
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Planejamento Orçamentário</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; font-size: 12px; }
+          h1 { text-align: center; margin-bottom: 20px; font-size: 18px; }
+          table { width: 100%; border-collapse: collapse; }
+          th { background: #e5e5e5; padding: 8px; border: 1px solid #ddd; text-align: left; }
+          @media print { @page { margin: 10mm; } }
+        </style>
+      </head>
+      <body>
+        <h1>Planejamento Orçamentário</h1>
+        <table>
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>Período</th>
+              <th></th>
+              <th style="text-align:right;">Valor Planejado</th>
+            </tr>
+          </thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+        <script>setTimeout(() => { window.print(); window.close(); }, 500);</script>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   return (
     <div className="space-y-6" data-testid="planejamento-page">
       <div className="flex justify-between items-center">
@@ -237,17 +339,37 @@ export default function PlanejamentoPage() {
           <p className="text-gray-600 text-sm">Defina metas seguindo a estrutura do DRE</p>
         </div>
         
-        <button
-          onClick={() => {
-            resetForm();
-            setShowModal(true);
-          }}
-          className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition shadow-md"
-          data-testid="novo-planejamento-btn"
-        >
-          <Plus size={20} />
-          Novo Planejamento
-        </button>
+        <div className="flex items-center gap-3">
+          {/* Botões de Exportação */}
+          <button
+            onClick={exportToExcel}
+            className="flex items-center gap-2 px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700"
+            data-testid="export-excel-btn"
+          >
+            <FileSpreadsheet size={16} />
+            Excel
+          </button>
+          <button
+            onClick={exportToPDF}
+            className="flex items-center gap-2 px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700"
+            data-testid="export-pdf-btn"
+          >
+            <Download size={16} />
+            PDF
+          </button>
+          
+          <button
+            onClick={() => {
+              resetForm();
+              setShowModal(true);
+            }}
+            className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition shadow-md"
+            data-testid="novo-planejamento-btn"
+          >
+            <Plus size={20} />
+            Novo Planejamento
+          </button>
+        </div>
       </div>
 
       {/* Visualização por Categoria DRE */}

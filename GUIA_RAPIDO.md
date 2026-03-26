@@ -9,7 +9,7 @@
 - ✅ **Supabase**: Conectado
 
 ### Acesso ao Sistema:
-🌐 **URL Principal**: https://relatorio-financeiro-2.preview.emergentagent.com
+🌐 **URL Principal**: https://finance-reports-fix.preview.emergentagent.com
 
 ---
 
@@ -43,7 +43,7 @@ ORDER BY table_name;
 ## 📋 Passo a Passo Inicial
 
 ### Passo 1: Acessar o Sistema
-1. Abra: https://relatorio-financeiro-2.preview.emergentagent.com
+1. Abra: https://finance-reports-fix.preview.emergentagent.com
 2. Você verá a tela de login
 
 ### Passo 2: Criar sua Conta

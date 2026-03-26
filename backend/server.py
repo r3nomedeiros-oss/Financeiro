@@ -330,21 +330,29 @@ async def delete_plano_contas(plano_id: str, user_id: str = Depends(get_current_
 async def get_movimentacoes(
     mes: Optional[int] = None,
     ano: Optional[int] = None,
+    data_inicio: Optional[str] = None,
+    data_fim: Optional[str] = None,
     user_id: str = Depends(get_current_user)
 ):
     supabase = get_supabase()
     query = supabase.table("movimentacoes").select("*, plano_contas(*), contas_bancarias:conta_bancaria_id(*)").eq("user_id", user_id)
     
-    # Aplicar filtros se fornecidos
-    if mes and ano:
-        # Filtrar por mês e ano
-        data_inicio = f"{ano}-{mes:02d}-01"
+    # Filtro por data_inicio e data_fim (prioridade)
+    if data_inicio and data_fim:
+        query = query.gte("data", data_inicio).lte("data", data_fim)
+    elif data_inicio:
+        query = query.gte("data", data_inicio)
+    elif data_fim:
+        query = query.lte("data", data_fim)
+    # Fallback para filtro por mês e ano
+    elif mes and ano:
+        data_inicio_calc = f"{ano}-{mes:02d}-01"
         if mes == 12:
-            data_fim = f"{ano + 1}-01-01"
+            data_fim_calc = f"{ano + 1}-01-01"
         else:
-            data_fim = f"{ano}-{mes + 1:02d}-01"
+            data_fim_calc = f"{ano}-{mes + 1:02d}-01"
         
-        query = query.gte("data", data_inicio).lt("data", data_fim)
+        query = query.gte("data", data_inicio_calc).lt("data", data_fim_calc)
     elif ano:
         query = query.gte("data", f"{ano}-01-01").lt("data", f"{ano + 1}-01-01")
     

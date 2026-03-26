@@ -157,26 +157,107 @@ export default function DREPage() {
 
   // Exportar para Excel (CSV)
   const exportToExcel = () => {
-    if (!tableRef.current) return;
+    if (!dre || !totais) return;
     
     const rows = [];
-    const table = tableRef.current;
-    const tableRows = table.querySelectorAll('tr');
     
-    tableRows.forEach(row => {
-      const cells = row.querySelectorAll('th, td');
-      const rowData = [];
-      cells.forEach(cell => {
-        // Pegar texto limpo
-        let text = cell.innerText.replace(/[\n\r]/g, ' ').trim();
-        // Escapar aspas
-        text = text.replace(/"/g, '""');
-        rowData.push(`"${text}"`);
-      });
-      rows.push(rowData.join(';'));
-    });
+    // Header
+    const header = ['Descrição', ...meses.map(m => MESES_LABELS[m]), ano.toString(), 'AV%'];
+    rows.push(header.join(';'));
     
-    const csvContent = '\uFEFF' + rows.join('\n'); // BOM para Excel reconhecer UTF-8
+    // Helper para formatar valores
+    const formatVal = (v) => v ? v.toFixed(2).replace('.', ',') : '0,00';
+    const formatPct = (v) => v ? v.toFixed(0) + '%' : '0%';
+    
+    // Receita Bruta
+    rows.push([
+      'Receita Bruta',
+      ...meses.map(m => formatVal(totais.receita_bruta?.[m])),
+      formatVal(totais.receita_bruta?.total),
+      '100%'
+    ].join(';'));
+    
+    // Deduções
+    rows.push([
+      'Deduções Sobre Vendas',
+      ...meses.map(m => formatVal(totais.deducoes_vendas?.[m])),
+      formatVal(totais.deducoes_vendas?.total),
+      formatPct((totais.deducoes_vendas?.total / receitaBrutaTotal) * 100)
+    ].join(';'));
+    
+    // Receita Líquida
+    rows.push([
+      'Receita Líquida',
+      ...meses.map(m => formatVal(totais.receita_liquida?.[m])),
+      formatVal(totais.receita_liquida?.total),
+      formatPct((totais.receita_liquida?.total / receitaBrutaTotal) * 100)
+    ].join(';'));
+    
+    // Custos Variáveis
+    rows.push([
+      'Custos Variáveis',
+      ...meses.map(m => formatVal(totais.custos_variaveis?.[m])),
+      formatVal(totais.custos_variaveis?.total),
+      formatPct((totais.custos_variaveis?.total / receitaBrutaTotal) * 100)
+    ].join(';'));
+    
+    // Margem de Contribuição
+    rows.push([
+      'Margem de Contribuição',
+      ...meses.map(m => formatVal(totais.margem_contribuicao?.[m])),
+      formatVal(totais.margem_contribuicao?.total),
+      formatPct((totais.margem_contribuicao?.total / receitaBrutaTotal) * 100)
+    ].join(';'));
+    
+    // % Margem de Contribuição
+    rows.push([
+      '% Margem de Contribuição',
+      ...meses.map(m => formatPct(totais.margem_contribuicao_pct?.[m])),
+      formatPct(totais.margem_contribuicao_pct?.total),
+      '-'
+    ].join(';'));
+    
+    // Custos Fixos
+    rows.push([
+      'Custos Fixos',
+      ...meses.map(m => formatVal(totais.custos_fixos?.[m])),
+      formatVal(totais.custos_fixos?.total),
+      formatPct((totais.custos_fixos?.total / receitaBrutaTotal) * 100)
+    ].join(';'));
+    
+    // Resultado Operacional
+    rows.push([
+      'Resultado Operacional',
+      ...meses.map(m => formatVal(totais.resultado_operacional?.[m])),
+      formatVal(totais.resultado_operacional?.total),
+      formatPct((totais.resultado_operacional?.total / receitaBrutaTotal) * 100)
+    ].join(';'));
+    
+    // Resultado Não Operacional
+    rows.push([
+      'Resultado Não Operacional',
+      ...meses.map(m => formatVal(totais.resultado_nao_operacional?.[m])),
+      formatVal(totais.resultado_nao_operacional?.total),
+      formatPct((totais.resultado_nao_operacional?.total / receitaBrutaTotal) * 100)
+    ].join(';'));
+    
+    // Lucro Líquido
+    rows.push([
+      'Lucro Líquido',
+      ...meses.map(m => formatVal(totais.lucro_liquido?.[m])),
+      formatVal(totais.lucro_liquido?.total),
+      formatPct((totais.lucro_liquido?.total / receitaBrutaTotal) * 100)
+    ].join(';'));
+    
+    // % Margem Líquida
+    rows.push([
+      '% Margem Líquida',
+      ...meses.map(m => formatPct(totais.margem_liquida_pct?.[m])),
+      formatPct(totais.margem_liquida_pct?.total),
+      '-'
+    ].join(';'));
+    
+    const csvContent = '\uFEFF' + rows.join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -186,7 +267,60 @@ export default function DREPage() {
 
   // Exportar para PDF
   const exportToPDF = () => {
-    const printContent = tableRef.current?.outerHTML || '';
+    if (!dre || !totais) return;
+    
+    // Helper para formatar valores
+    const formatVal = (v) => {
+      if (v === null || v === undefined || v === 0) return '-';
+      return new Intl.NumberFormat('pt-BR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(v);
+    };
+    const formatPct = (v) => v ? `${v.toFixed(0)}%` : '0%';
+    
+    // Construir tabela HTML manualmente com dados corretos
+    const buildRow = (label, valores, isPercent = false, bgColor = '', textColor = '') => {
+      const cells = meses.map(m => `<td style="text-align:right;padding:4px;border:1px solid #ddd;${textColor}">${isPercent ? formatPct(valores?.[m]) : formatVal(valores?.[m])}</td>`).join('');
+      const totalVal = isPercent ? formatPct(valores?.total) : formatVal(valores?.total);
+      const avVal = isPercent ? '-' : (receitaBrutaTotal > 0 ? `${((valores?.total || 0) / receitaBrutaTotal * 100).toFixed(0)}%` : '0%');
+      
+      return `<tr style="${bgColor}">
+        <td style="text-align:left;padding:4px;border:1px solid #ddd;font-weight:600;${textColor}">${label}</td>
+        ${cells}
+        <td style="text-align:right;padding:4px;border:1px solid #ddd;font-weight:bold;background:#f5f5f5;${textColor}">${totalVal}</td>
+        <td style="text-align:right;padding:4px;border:1px solid #ddd;background:#f5f5f5;${textColor}">${avVal}</td>
+      </tr>`;
+    };
+    
+    const headerCells = meses.map(m => `<th style="text-align:right;padding:4px;border:1px solid #ddd;background:#e5e5e5;">${MESES_LABELS[m]}</th>`).join('');
+    
+    const tableHTML = `
+      <table style="width:100%;border-collapse:collapse;font-size:10px;font-family:Arial,sans-serif;">
+        <thead>
+          <tr>
+            <th style="text-align:left;padding:4px;border:1px solid #ddd;background:#e5e5e5;min-width:180px;">Descrição</th>
+            ${headerCells}
+            <th style="text-align:right;padding:4px;border:1px solid #ddd;background:#d5d5d5;font-weight:bold;">${ano}</th>
+            <th style="text-align:right;padding:4px;border:1px solid #ddd;background:#d5d5d5;">AV%</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${buildRow('(+) Receita Bruta', totais.receita_bruta, false, 'background:#e0f7fa;', 'color:#0e7490;')}
+          ${buildRow('(-) Deduções Sobre Vendas', totais.deducoes_vendas, false, 'background:#ffebee;', 'color:#dc2626;')}
+          ${buildRow('(=) Receita Líquida', totais.receita_liquida, false, 'background:#e0f7fa;', 'color:#0e7490;')}
+          ${buildRow('(-) Custos Variáveis', totais.custos_variaveis, false, 'background:#ffebee;', 'color:#dc2626;')}
+          ${buildRow('(=) Margem de Contribuição', totais.margem_contribuicao, false, 'background:#e0f7fa;', 'color:#0e7490;')}
+          ${buildRow('(=) % Margem de Contribuição', totais.margem_contribuicao_pct, true, 'background:#e3f2fd;', 'color:#2563eb;')}
+          ${buildRow('(-) Custos Fixos', totais.custos_fixos, false, 'background:#ffebee;', 'color:#dc2626;')}
+          ${buildRow('(=) Resultado Operacional', totais.resultado_operacional, false, 'background:#e0f7fa;', 'color:#0e7490;')}
+          ${buildRow('Resultado Não Operacional', totais.resultado_nao_operacional, false, 'background:#f5f5f5;', 'color:#374151;')}
+          ${buildRow('(=) Lucro Líquido', totais.lucro_liquido, false, 'background:#e8f5e9;', 'color:#15803d;')}
+          ${buildRow('(=) % Margem Líquida', totais.margem_liquida_pct, true, 'background:#e3f2fd;', 'color:#2563eb;')}
+        </tbody>
+      </table>
+    `;
+    
     const printWindow = window.open('', '_blank');
     printWindow.document.write(`
       <!DOCTYPE html>
@@ -195,22 +329,7 @@ export default function DREPage() {
         <title>DRE - ${ano}</title>
         <style>
           body { font-family: Arial, sans-serif; margin: 20px; }
-          table { width: 100%; border-collapse: collapse; font-size: 10px; }
-          th, td { border: 1px solid #ddd; padding: 4px; text-align: right; }
-          th { background: #f5f5f5; }
-          td:first-child, th:first-child { text-align: left; min-width: 200px; }
-          .text-cyan-700 { color: #0e7490; }
-          .text-red-600 { color: #dc2626; }
-          .text-green-700 { color: #15803d; }
-          .text-blue-600 { color: #2563eb; }
-          .bg-cyan-50 { background: #ecfeff; }
-          .bg-red-50 { background: #fef2f2; }
-          .bg-green-50 { background: #f0fdf4; }
-          .bg-blue-50 { background: #eff6ff; }
-          .bg-gray-100 { background: #f3f4f6; }
-          .font-semibold { font-weight: 600; }
-          .font-bold { font-weight: 700; }
-          h1 { text-align: center; margin-bottom: 20px; }
+          h1 { text-align: center; margin-bottom: 20px; font-size: 18px; }
           @media print {
             body { margin: 0; }
             @page { size: landscape; margin: 10mm; }
@@ -219,8 +338,10 @@ export default function DREPage() {
       </head>
       <body>
         <h1>Demonstrativo de Resultado do Exercício - ${ano}</h1>
-        ${printContent}
-        <script>window.print(); window.close();</script>
+        ${tableHTML}
+        <script>
+          setTimeout(() => { window.print(); window.close(); }, 500);
+        </script>
       </body>
       </html>
     `);

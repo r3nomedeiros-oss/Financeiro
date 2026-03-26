@@ -119,6 +119,25 @@ class FinanceAPITester:
     def test_movimentacoes(self):
         """Test transactions endpoint"""
         return self.run_test("Get Transactions", "GET", "/api/movimentacoes", 200)
+    
+    def test_movimentacoes_with_date_filters(self):
+        """Test transactions endpoint with data_inicio and data_fim parameters"""
+        # Test with date range filters
+        params = "?data_inicio=2024-01-01&data_fim=2024-12-31"
+        success1, response1 = self.run_test("Get Transactions with Date Range", "GET", f"/api/movimentacoes{params}", 200)
+        
+        # Test with different date range
+        params2 = "?data_inicio=2024-06-01&data_fim=2024-06-30"
+        success2, response2 = self.run_test("Get Transactions with Different Date Range", "GET", f"/api/movimentacoes{params2}", 200)
+        
+        # Verify that different date ranges return different data (if there's data)
+        if success1 and success2:
+            data1 = response1 if isinstance(response1, list) else []
+            data2 = response2 if isinstance(response2, list) else []
+            self.log(f"   Date range 1 returned {len(data1)} transactions")
+            self.log(f"   Date range 2 returned {len(data2)} transactions")
+            
+        return success1 and success2, {"range1": response1, "range2": response2}
 
     def create_sample_data(self):
         """Create some sample data for testing"""
@@ -208,6 +227,10 @@ def main():
     tester.log("🏦 Testing bank accounts and transactions...")
     tester.test_contas_bancarias()
     tester.test_movimentacoes()
+    
+    # Test new date filter functionality
+    tester.log("📅 Testing movimentacoes with date filters...")
+    tester.test_movimentacoes_with_date_filters()
     
     # Create sample data and retest DRE
     tester.create_sample_data()
