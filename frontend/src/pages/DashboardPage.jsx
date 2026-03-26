@@ -206,7 +206,14 @@ export default function DashboardPage() {
               <XAxis dataKey="name" />
               <YAxis />
               <Tooltip formatter={(value) => formatCurrency(value)} />
-              <Bar dataKey="valor" fill="#2563eb" />
+              <Bar dataKey="valor">
+                {entradasVsSaidas.map((entry, index) => (
+                  <Cell 
+                    key={`cell-${index}`} 
+                    fill={entry.name === 'Entradas' ? '#16a34a' : '#dc2626'} 
+                  />
+                ))}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -221,16 +228,30 @@ export default function DashboardPage() {
                 cx="50%"
                 cy="50%"
                 labelLine={false}
-                label={({ nome, percent }) => `${nome}: ${(percent * 100).toFixed(0)}%`}
-                outerRadius={80}
+                label={({ nome, percent }) => {
+                  const nomeAbreviado = nome.length > 12 ? nome.substring(0, 12) + '...' : nome;
+                  return `${nomeAbreviado}: ${(percent * 100).toFixed(0)}%`;
+                }}
+                outerRadius={70}
+                innerRadius={30}
                 fill="#8884d8"
                 dataKey="valor"
+                paddingAngle={2}
               >
                 {saidasPorPlano.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
               <Tooltip formatter={(value) => formatCurrency(value)} />
+              <Legend 
+                layout="vertical" 
+                align="right" 
+                verticalAlign="middle"
+                formatter={(value, entry) => {
+                  const nome = entry.payload.nome;
+                  return nome.length > 15 ? nome.substring(0, 15) + '...' : nome;
+                }}
+              />
             </PieChart>
           </ResponsiveContainer>
         </div>
@@ -244,7 +265,11 @@ export default function DashboardPage() {
               <XAxis dataKey="nome" />
               <YAxis />
               <Tooltip formatter={(value) => formatCurrency(value)} />
-              <Bar dataKey="valor" fill="#10b981" />
+              <Bar dataKey="valor">
+                {entradasPorPlano.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                ))}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>

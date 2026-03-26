@@ -52,6 +52,8 @@ export default function DREPage() {
   const [ano, setAno] = useState(new Date().getFullYear());
   const [anosDisponiveis, setAnosDisponiveis] = useState([]);
   const tableRef = useRef(null);
+  const scrollContainerRef = useRef(null);
+  const topScrollRef = useRef(null);
   
   // Estado de expansão
   const [expandedState, setExpandedState] = useState({});
@@ -155,107 +157,140 @@ export default function DREPage() {
     setExpandedState(newState);
   };
 
-  // Exportar para Excel (CSV)
+  // Sincronizar scroll horizontal entre topo e tabela
+  const handleTopScroll = (e) => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollLeft = e.target.scrollLeft;
+    }
+  };
+
+  const handleTableScroll = (e) => {
+    if (topScrollRef.current) {
+      topScrollRef.current.scrollLeft = e.target.scrollLeft;
+    }
+  };
+
+  // Gerar dados para exportação baseado no estado de expansão atual
+  const gerarDadosExportacao = () => {
+    const rows = [];
+    const formatVal = (v) => v ? v.toFixed(2).replace('.', ',') : '0,00';
+    const formatPct = (v) => v ? v.toFixed(0) + '%' : '0%';
+    
+    const addCategoriaRows = (catId, catConfig) => {
+      const catData = hierarquia?.[catId];
+      const isExpanded = expandedState[catId]?.expanded;
+      const subcategorias = catData?.subcategorias || [];
+      
+      // Linha da categoria principal
+      rows.push({
+        nivel: 0,
+        descricao: catConfig.label,
+        valores: totais[catId],
+        isPercent: false,
+        cor: catConfig.cor
+      });
+      
+      // Se expandido, adicionar subcategorias
+      if (isExpanded) {
+        subcategorias.forEach(subcat => {
+          const isSubExpanded = expandedState[catId]?.subcategorias?.[subcat.id];
+          const itens = subcat.itens || [];
+          
+          // Calcular total da subcategoria
+          const subcatValores = {};
+          meses.forEach(mes => {
+            const subValor = dre?.valores_por_plano?.[subcat.id]?.[mes] || 0;
+            const itensValor = itens.reduce((a, item) => a + (dre?.valores_por_plano?.[item.id]?.[mes] || 0), 0);
+            subcatValores[mes] = subValor + itensValor;
+          });
+          subcatValores.total = meses.reduce((a, m) => a + (subcatValores[m] || 0), 0);
+          
+          rows.push({
+            nivel: 1,
+            descricao: subcat.nome,
+            valores: subcatValores,
+            isPercent: false,
+            cor: ''
+          });
+          
+          // Se subcategoria expandida, adicionar itens
+          if (isSubExpanded) {
+            itens.forEach(item => {
+              const itemValores = {};
+              meses.forEach(mes => {
+                itemValores[mes] = dre?.valores_por_plano?.[item.id]?.[mes] || 0;
+              });
+              itemValores.total = meses.reduce((a, m) => a + (itemValores[m] || 0), 0);
+              
+              rows.push({
+                nivel: 2,
+                descricao: item.nome,
+                valores: itemValores,
+                isPercent: false,
+                cor: ''
+              });
+            });
+          }
+        });
+      }
+    };
+    
+    const addTotalRow = (key, config) => {
+      rows.push({
+        nivel: 0,
+        descricao: config.label,
+        valores: totais[key],
+        isPercent: config.tipo === 'percentual',
+        cor: config.cor,
+        isTotal: true
+      });
+    };
+    
+    // Construir estrutura
+    addCategoriaRows('receita_bruta', CATEGORIAS_CONFIG.receita_bruta);
+    addCategoriaRows('deducoes_vendas', CATEGORIAS_CONFIG.deducoes_vendas);
+    addTotalRow('receita_liquida', CATEGORIAS_CONFIG.receita_liquida);
+    addCategoriaRows('custos_variaveis', CATEGORIAS_CONFIG.custos_variaveis);
+    addTotalRow('margem_contribuicao', CATEGORIAS_CONFIG.margem_contribuicao);
+    addTotalRow('margem_contribuicao_pct', CATEGORIAS_CONFIG.margem_contribuicao_pct);
+    addCategoriaRows('custos_fixos', CATEGORIAS_CONFIG.custos_fixos);
+    addTotalRow('resultado_operacional', CATEGORIAS_CONFIG.resultado_operacional);
+    addCategoriaRows('resultado_nao_operacional', CATEGORIAS_CONFIG.resultado_nao_operacional);
+    addTotalRow('lucro_liquido', CATEGORIAS_CONFIG.lucro_liquido);
+    addTotalRow('margem_liquida_pct', CATEGORIAS_CONFIG.margem_liquida_pct);
+    
+    return rows;
+  };
+
+  // Exportar para Excel (CSV) - respeitando estado de expansão
   const exportToExcel = () => {
     if (!dre || !totais) return;
     
     const rows = [];
+    const formatVal = (v) => v ? v.toFixed(2).replace('.', ',') : '0,00';
+    const formatPct = (v) => v ? v.toFixed(0) + '%' : '0%';
     
     // Header
     const header = ['Descrição', ...meses.map(m => MESES_LABELS[m]), ano.toString(), 'AV%'];
     rows.push(header.join(';'));
     
-    // Helper para formatar valores
-    const formatVal = (v) => v ? v.toFixed(2).replace('.', ',') : '0,00';
-    const formatPct = (v) => v ? v.toFixed(0) + '%' : '0%';
+    // Gerar dados com base no estado de expansão
+    const dadosExportacao = gerarDadosExportacao();
     
-    // Receita Bruta
-    rows.push([
-      'Receita Bruta',
-      ...meses.map(m => formatVal(totais.receita_bruta?.[m])),
-      formatVal(totais.receita_bruta?.total),
-      '100%'
-    ].join(';'));
-    
-    // Deduções
-    rows.push([
-      'Deduções Sobre Vendas',
-      ...meses.map(m => formatVal(totais.deducoes_vendas?.[m])),
-      formatVal(totais.deducoes_vendas?.total),
-      formatPct((totais.deducoes_vendas?.total / receitaBrutaTotal) * 100)
-    ].join(';'));
-    
-    // Receita Líquida
-    rows.push([
-      'Receita Líquida',
-      ...meses.map(m => formatVal(totais.receita_liquida?.[m])),
-      formatVal(totais.receita_liquida?.total),
-      formatPct((totais.receita_liquida?.total / receitaBrutaTotal) * 100)
-    ].join(';'));
-    
-    // Custos Variáveis
-    rows.push([
-      'Custos Variáveis',
-      ...meses.map(m => formatVal(totais.custos_variaveis?.[m])),
-      formatVal(totais.custos_variaveis?.total),
-      formatPct((totais.custos_variaveis?.total / receitaBrutaTotal) * 100)
-    ].join(';'));
-    
-    // Margem de Contribuição
-    rows.push([
-      'Margem de Contribuição',
-      ...meses.map(m => formatVal(totais.margem_contribuicao?.[m])),
-      formatVal(totais.margem_contribuicao?.total),
-      formatPct((totais.margem_contribuicao?.total / receitaBrutaTotal) * 100)
-    ].join(';'));
-    
-    // % Margem de Contribuição
-    rows.push([
-      '% Margem de Contribuição',
-      ...meses.map(m => formatPct(totais.margem_contribuicao_pct?.[m])),
-      formatPct(totais.margem_contribuicao_pct?.total),
-      '-'
-    ].join(';'));
-    
-    // Custos Fixos
-    rows.push([
-      'Custos Fixos',
-      ...meses.map(m => formatVal(totais.custos_fixos?.[m])),
-      formatVal(totais.custos_fixos?.total),
-      formatPct((totais.custos_fixos?.total / receitaBrutaTotal) * 100)
-    ].join(';'));
-    
-    // Resultado Operacional
-    rows.push([
-      'Resultado Operacional',
-      ...meses.map(m => formatVal(totais.resultado_operacional?.[m])),
-      formatVal(totais.resultado_operacional?.total),
-      formatPct((totais.resultado_operacional?.total / receitaBrutaTotal) * 100)
-    ].join(';'));
-    
-    // Resultado Não Operacional
-    rows.push([
-      'Resultado Não Operacional',
-      ...meses.map(m => formatVal(totais.resultado_nao_operacional?.[m])),
-      formatVal(totais.resultado_nao_operacional?.total),
-      formatPct((totais.resultado_nao_operacional?.total / receitaBrutaTotal) * 100)
-    ].join(';'));
-    
-    // Lucro Líquido
-    rows.push([
-      'Lucro Líquido',
-      ...meses.map(m => formatVal(totais.lucro_liquido?.[m])),
-      formatVal(totais.lucro_liquido?.total),
-      formatPct((totais.lucro_liquido?.total / receitaBrutaTotal) * 100)
-    ].join(';'));
-    
-    // % Margem Líquida
-    rows.push([
-      '% Margem Líquida',
-      ...meses.map(m => formatPct(totais.margem_liquida_pct?.[m])),
-      formatPct(totais.margem_liquida_pct?.total),
-      '-'
-    ].join(';'));
+    dadosExportacao.forEach(item => {
+      const indent = '  '.repeat(item.nivel);
+      const prefix = item.nivel === 2 ? '• ' : '';
+      const descricao = indent + prefix + item.descricao;
+      
+      const av = item.isPercent ? '-' : (receitaBrutaTotal > 0 ? formatPct((item.valores?.total || 0) / receitaBrutaTotal * 100) : '0%');
+      
+      rows.push([
+        descricao,
+        ...meses.map(m => item.isPercent ? formatPct(item.valores?.[m]) : formatVal(item.valores?.[m])),
+        item.isPercent ? formatPct(item.valores?.total) : formatVal(item.valores?.total),
+        av
+      ].join(';'));
+    });
     
     const csvContent = '\uFEFF' + rows.join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -265,11 +300,10 @@ export default function DREPage() {
     link.click();
   };
 
-  // Exportar para PDF
+  // Exportar para PDF - respeitando estado de expansão
   const exportToPDF = () => {
     if (!dre || !totais) return;
     
-    // Helper para formatar valores
     const formatVal = (v) => {
       if (v === null || v === undefined || v === 0) return '-';
       return new Intl.NumberFormat('pt-BR', {
@@ -279,47 +313,50 @@ export default function DREPage() {
     };
     const formatPct = (v) => v ? `${v.toFixed(0)}%` : '0%';
     
-    // Construir tabela HTML manualmente com dados corretos
-    const buildRow = (label, valores, isPercent = false, bgColor = '', textColor = '') => {
-      const cells = meses.map(m => `<td style="text-align:right;padding:4px;border:1px solid #ddd;${textColor}">${isPercent ? formatPct(valores?.[m]) : formatVal(valores?.[m])}</td>`).join('');
-      const totalVal = isPercent ? formatPct(valores?.total) : formatVal(valores?.total);
-      const avVal = isPercent ? '-' : (receitaBrutaTotal > 0 ? `${((valores?.total || 0) / receitaBrutaTotal * 100).toFixed(0)}%` : '0%');
-      
-      return `<tr style="${bgColor}">
-        <td style="text-align:left;padding:4px;border:1px solid #ddd;font-weight:600;${textColor}">${label}</td>
-        ${cells}
-        <td style="text-align:right;padding:4px;border:1px solid #ddd;font-weight:bold;background:#f5f5f5;${textColor}">${totalVal}</td>
-        <td style="text-align:right;padding:4px;border:1px solid #ddd;background:#f5f5f5;${textColor}">${avVal}</td>
-      </tr>`;
+    const getCorStyles = (cor, isTotal) => {
+      const cores = {
+        cyan: { bg: '#e0f7fa', text: '#0e7490' },
+        red: { bg: '#ffebee', text: '#dc2626' },
+        green: { bg: '#e8f5e9', text: '#15803d' },
+        blue: { bg: '#e3f2fd', text: '#2563eb' },
+        gray: { bg: '#f5f5f5', text: '#374151' },
+      };
+      return cores[cor] || { bg: '#ffffff', text: '#374151' };
     };
     
-    const headerCells = meses.map(m => `<th style="text-align:right;padding:4px;border:1px solid #ddd;background:#e5e5e5;">${MESES_LABELS[m]}</th>`).join('');
+    const dadosExportacao = gerarDadosExportacao();
     
-    const tableHTML = `
-      <table style="width:100%;border-collapse:collapse;font-size:10px;font-family:Arial,sans-serif;">
-        <thead>
-          <tr>
-            <th style="text-align:left;padding:4px;border:1px solid #ddd;background:#e5e5e5;min-width:180px;">Descrição</th>
-            ${headerCells}
-            <th style="text-align:right;padding:4px;border:1px solid #ddd;background:#d5d5d5;font-weight:bold;">${ano}</th>
-            <th style="text-align:right;padding:4px;border:1px solid #ddd;background:#d5d5d5;">AV%</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${buildRow('(+) Receita Bruta', totais.receita_bruta, false, 'background:#e0f7fa;', 'color:#0e7490;')}
-          ${buildRow('(-) Deduções Sobre Vendas', totais.deducoes_vendas, false, 'background:#ffebee;', 'color:#dc2626;')}
-          ${buildRow('(=) Receita Líquida', totais.receita_liquida, false, 'background:#e0f7fa;', 'color:#0e7490;')}
-          ${buildRow('(-) Custos Variáveis', totais.custos_variaveis, false, 'background:#ffebee;', 'color:#dc2626;')}
-          ${buildRow('(=) Margem de Contribuição', totais.margem_contribuicao, false, 'background:#e0f7fa;', 'color:#0e7490;')}
-          ${buildRow('(=) % Margem de Contribuição', totais.margem_contribuicao_pct, true, 'background:#e3f2fd;', 'color:#2563eb;')}
-          ${buildRow('(-) Custos Fixos', totais.custos_fixos, false, 'background:#ffebee;', 'color:#dc2626;')}
-          ${buildRow('(=) Resultado Operacional', totais.resultado_operacional, false, 'background:#e0f7fa;', 'color:#0e7490;')}
-          ${buildRow('Resultado Não Operacional', totais.resultado_nao_operacional, false, 'background:#f5f5f5;', 'color:#374151;')}
-          ${buildRow('(=) Lucro Líquido', totais.lucro_liquido, false, 'background:#e8f5e9;', 'color:#15803d;')}
-          ${buildRow('(=) % Margem Líquida', totais.margem_liquida_pct, true, 'background:#e3f2fd;', 'color:#2563eb;')}
-        </tbody>
-      </table>
-    `;
+    const tableRows = dadosExportacao.map(item => {
+      const cores = getCorStyles(item.cor, item.isTotal);
+      const paddingLeft = 4 + (item.nivel * 16);
+      const fontWeight = item.nivel === 0 ? '600' : '400';
+      const fontSize = item.nivel === 2 ? '9px' : '10px';
+      const bgColor = item.nivel === 0 ? cores.bg : '#ffffff';
+      const textColor = item.nivel === 0 ? cores.text : '#374151';
+      
+      const cells = meses.map(m => 
+        `<td style="text-align:right;padding:4px;border:1px solid #ddd;color:${textColor};font-size:${fontSize};">
+          ${item.isPercent ? formatPct(item.valores?.[m]) : formatVal(item.valores?.[m])}
+        </td>`
+      ).join('');
+      
+      const av = item.isPercent ? '-' : (receitaBrutaTotal > 0 ? `${((item.valores?.total || 0) / receitaBrutaTotal * 100).toFixed(0)}%` : '0%');
+      
+      return `<tr style="background:${bgColor};">
+        <td style="text-align:left;padding:4px 4px 4px ${paddingLeft}px;border:1px solid #ddd;font-weight:${fontWeight};color:${textColor};font-size:${fontSize};">
+          ${item.nivel === 2 ? '• ' : ''}${item.descricao}
+        </td>
+        ${cells}
+        <td style="text-align:right;padding:4px;border:1px solid #ddd;font-weight:bold;background:#f5f5f5;color:${textColor};font-size:${fontSize};">
+          ${item.isPercent ? formatPct(item.valores?.total) : formatVal(item.valores?.total)}
+        </td>
+        <td style="text-align:right;padding:4px;border:1px solid #ddd;background:#f5f5f5;color:${textColor};font-size:${fontSize};">
+          ${av}
+        </td>
+      </tr>`;
+    }).join('');
+    
+    const headerCells = meses.map(m => `<th style="text-align:right;padding:4px;border:1px solid #ddd;background:#e5e5e5;">${MESES_LABELS[m]}</th>`).join('');
     
     const printWindow = window.open('', '_blank');
     printWindow.document.write(`
@@ -330,6 +367,7 @@ export default function DREPage() {
         <style>
           body { font-family: Arial, sans-serif; margin: 20px; }
           h1 { text-align: center; margin-bottom: 20px; font-size: 18px; }
+          table { width: 100%; border-collapse: collapse; font-size: 10px; }
           @media print {
             body { margin: 0; }
             @page { size: landscape; margin: 10mm; }
@@ -338,7 +376,17 @@ export default function DREPage() {
       </head>
       <body>
         <h1>Demonstrativo de Resultado do Exercício - ${ano}</h1>
-        ${tableHTML}
+        <table>
+          <thead>
+            <tr>
+              <th style="text-align:left;padding:4px;border:1px solid #ddd;background:#e5e5e5;min-width:180px;">Descrição</th>
+              ${headerCells}
+              <th style="text-align:right;padding:4px;border:1px solid #ddd;background:#d5d5d5;font-weight:bold;">${ano}</th>
+              <th style="text-align:right;padding:4px;border:1px solid #ddd;background:#d5d5d5;">AV%</th>
+            </tr>
+          </thead>
+          <tbody>${tableRows}</tbody>
+        </table>
         <script>
           setTimeout(() => { window.print(); window.close(); }, 500);
         </script>
@@ -582,8 +630,23 @@ export default function DREPage() {
       </div>
 
       {/* Tabela DRE com Tree View */}
-      <div className="bg-white rounded-lg shadow overflow-x-auto">
-        <table ref={tableRef} className="w-full text-sm border-collapse" data-testid="dre-table">
+      <div className="bg-white rounded-lg shadow">
+        {/* Barra de scroll superior sincronizada */}
+        <div 
+          ref={topScrollRef}
+          className="overflow-x-auto"
+          style={{ overflowY: 'hidden', height: '16px' }}
+          onScroll={handleTopScroll}
+        >
+          <div style={{ width: tableRef.current?.scrollWidth || '100%', height: '1px' }}></div>
+        </div>
+        
+        <div 
+          ref={scrollContainerRef}
+          className="overflow-x-auto"
+          onScroll={handleTableScroll}
+        >
+          <table ref={tableRef} className="w-full text-sm border-collapse" data-testid="dre-table">
           <thead>
             <tr className="bg-gray-100 border-b-2 border-gray-300">
               <th className="text-left p-2 sticky left-0 bg-gray-100 min-w-[320px] border-r border-gray-300">
@@ -633,6 +696,7 @@ export default function DREPage() {
             {renderLinhaTotal('margem_liquida_pct', CATEGORIAS_CONFIG.margem_liquida_pct)}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* Legenda */}
