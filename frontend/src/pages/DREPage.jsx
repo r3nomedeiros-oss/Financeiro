@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { dreAPI, planoContasAPI, movimentacoesAPI } from '../services/api';
 import { Download, FileSpreadsheet } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 // Ícones
 const ChevronRight = () => (
@@ -300,7 +302,7 @@ export default function DREPage() {
     link.click();
   };
 
-  // Exportar para PDF - respeitando estado de expansão
+  // Exportar para PDF - download automático usando jsPDF
   const exportToPDF = () => {
     if (!dre || !totais) return;
     
@@ -313,87 +315,75 @@ export default function DREPage() {
     };
     const formatPct = (v) => v ? `${v.toFixed(0)}%` : '0%';
     
-    const getCorStyles = (cor, isTotal) => {
-      const cores = {
-        cyan: { bg: '#e0f7fa', text: '#0e7490' },
-        red: { bg: '#ffebee', text: '#dc2626' },
-        green: { bg: '#e8f5e9', text: '#15803d' },
-        blue: { bg: '#e3f2fd', text: '#2563eb' },
-        gray: { bg: '#f5f5f5', text: '#374151' },
-      };
-      return cores[cor] || { bg: '#ffffff', text: '#374151' };
-    };
-    
     const dadosExportacao = gerarDadosExportacao();
     
-    const tableRows = dadosExportacao.map(item => {
-      const cores = getCorStyles(item.cor, item.isTotal);
-      const paddingLeft = 4 + (item.nivel * 16);
-      const fontWeight = item.nivel === 0 ? '600' : '400';
-      const fontSize = item.nivel === 2 ? '9px' : '10px';
-      const bgColor = item.nivel === 0 ? cores.bg : '#ffffff';
-      const textColor = item.nivel === 0 ? cores.text : '#374151';
-      
-      const cells = meses.map(m => 
-        `<td style="text-align:right;padding:4px;border:1px solid #ddd;color:${textColor};font-size:${fontSize};">
-          ${item.isPercent ? formatPct(item.valores?.[m]) : formatVal(item.valores?.[m])}
-        </td>`
-      ).join('');
-      
-      const av = item.isPercent ? '-' : (receitaBrutaTotal > 0 ? `${((item.valores?.total || 0) / receitaBrutaTotal * 100).toFixed(0)}%` : '0%');
-      
-      return `<tr style="background:${bgColor};">
-        <td style="text-align:left;padding:4px 4px 4px ${paddingLeft}px;border:1px solid #ddd;font-weight:${fontWeight};color:${textColor};font-size:${fontSize};">
-          ${item.nivel === 2 ? '• ' : ''}${item.descricao}
-        </td>
-        ${cells}
-        <td style="text-align:right;padding:4px;border:1px solid #ddd;font-weight:bold;background:#f5f5f5;color:${textColor};font-size:${fontSize};">
-          ${item.isPercent ? formatPct(item.valores?.total) : formatVal(item.valores?.total)}
-        </td>
-        <td style="text-align:right;padding:4px;border:1px solid #ddd;background:#f5f5f5;color:${textColor};font-size:${fontSize};">
-          ${av}
-        </td>
-      </tr>`;
-    }).join('');
+    // Criar PDF em landscape
+    const doc = new jsPDF('landscape', 'mm', 'a4');
     
-    const headerCells = meses.map(m => `<th style="text-align:right;padding:4px;border:1px solid #ddd;background:#e5e5e5;">${MESES_LABELS[m]}</th>`).join('');
+    // Título
+    doc.setFontSize(16);
+    doc.text(`Demonstrativo de Resultado do Exercício - ${ano}`, doc.internal.pageSize.width / 2, 15, { align: 'center' });
     
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>DRE - ${ano}</title>
-        <style>
-          body { font-family: Arial, sans-serif; margin: 20px; }
-          h1 { text-align: center; margin-bottom: 20px; font-size: 18px; }
-          table { width: 100%; border-collapse: collapse; font-size: 10px; }
-          @media print {
-            body { margin: 0; }
-            @page { size: landscape; margin: 10mm; }
+    // Preparar dados para a tabela
+    const headers = ['Descrição', ...meses.map(m => MESES_LABELS[m]), ano.toString(), 'AV%'];
+    
+    const body = dadosExportacao.map(item => {
+      const indent = '  '.repeat(item.nivel);
+      const prefix = item.nivel === 2 ? '• ' : '';
+      const descricao = indent + prefix + item.descricao;
+      const av = item.isPercent ? '-' : (receitaBrutaTotal > 0 ? formatPct((item.valores?.total || 0) / receitaBrutaTotal * 100) : '0%');
+      
+      return [
+        descricao,
+        ...meses.map(m => item.isPercent ? formatPct(item.valores?.[m]) : formatVal(item.valores?.[m])),
+        item.isPercent ? formatPct(item.valores?.total) : formatVal(item.valores?.total),
+        av
+      ];
+    });
+    
+    // Gerar tabela com autoTable
+    autoTable(doc, {
+      head: [headers],
+      body: body,
+      startY: 22,
+      styles: {
+        fontSize: 7,
+        cellPadding: 1.5,
+      },
+      headStyles: {
+        fillColor: [229, 229, 229],
+        textColor: [0, 0, 0],
+        fontStyle: 'bold',
+      },
+      columnStyles: {
+        0: { cellWidth: 50 },
+      },
+      didParseCell: function(data) {
+        // Colorir linhas baseado no nível
+        if (data.section === 'body') {
+          const rowData = dadosExportacao[data.row.index];
+          if (rowData && rowData.nivel === 0) {
+            if (rowData.cor === 'cyan') {
+              data.cell.styles.fillColor = [224, 247, 250];
+              data.cell.styles.textColor = [14, 116, 144];
+            } else if (rowData.cor === 'red') {
+              data.cell.styles.fillColor = [255, 235, 238];
+              data.cell.styles.textColor = [220, 38, 38];
+            } else if (rowData.cor === 'green') {
+              data.cell.styles.fillColor = [232, 245, 233];
+              data.cell.styles.textColor = [21, 128, 61];
+            } else if (rowData.cor === 'blue') {
+              data.cell.styles.fillColor = [227, 242, 253];
+              data.cell.styles.textColor = [37, 99, 235];
+            }
+            data.cell.styles.fontStyle = 'bold';
           }
-        </style>
-      </head>
-      <body>
-        <h1>Demonstrativo de Resultado do Exercício - ${ano}</h1>
-        <table>
-          <thead>
-            <tr>
-              <th style="text-align:left;padding:4px;border:1px solid #ddd;background:#e5e5e5;min-width:180px;">Descrição</th>
-              ${headerCells}
-              <th style="text-align:right;padding:4px;border:1px solid #ddd;background:#d5d5d5;font-weight:bold;">${ano}</th>
-              <th style="text-align:right;padding:4px;border:1px solid #ddd;background:#d5d5d5;">AV%</th>
-            </tr>
-          </thead>
-          <tbody>${tableRows}</tbody>
-        </table>
-        <script>
-          setTimeout(() => { window.print(); window.close(); }, 500);
-        </script>
-      </body>
-      </html>
-    `);
-    printWindow.document.close();
+        }
+      }
+    });
+    
+    // Download automático
+    doc.save(`DRE_${ano}.pdf`);
   };
 
   const formatCurrency = (value) => {

@@ -225,15 +225,10 @@ export default function DashboardPage() {
             <PieChart>
               <Pie
                 data={saidasPorPlano}
-                cx="50%"
+                cx="35%"
                 cy="50%"
-                labelLine={false}
-                label={({ nome, percent }) => {
-                  const nomeAbreviado = nome.length > 12 ? nome.substring(0, 12) + '...' : nome;
-                  return `${nomeAbreviado}: ${(percent * 100).toFixed(0)}%`;
-                }}
-                outerRadius={70}
-                innerRadius={30}
+                outerRadius={80}
+                innerRadius={40}
                 fill="#8884d8"
                 dataKey="valor"
                 paddingAngle={2}
@@ -242,14 +237,19 @@ export default function DashboardPage() {
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
-              <Tooltip formatter={(value) => formatCurrency(value)} />
+              <Tooltip 
+                formatter={(value, name, props) => [formatCurrency(value), props.payload.nome]}
+              />
               <Legend 
                 layout="vertical" 
                 align="right" 
                 verticalAlign="middle"
+                wrapperStyle={{ paddingLeft: '20px', maxWidth: '45%' }}
                 formatter={(value, entry) => {
                   const nome = entry.payload.nome;
-                  return nome.length > 15 ? nome.substring(0, 15) + '...' : nome;
+                  const percent = entry.payload.percent ? `${(entry.payload.percent * 100).toFixed(0)}%` : '';
+                  const nomeDisplay = nome.length > 18 ? nome.substring(0, 18) + '...' : nome;
+                  return <span style={{ fontSize: '12px' }}>{nomeDisplay}</span>;
                 }}
               />
             </PieChart>

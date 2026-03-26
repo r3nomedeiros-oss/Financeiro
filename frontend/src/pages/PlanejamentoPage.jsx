@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { planejamentoAPI, planoContasAPI } from '../services/api';
 import { Plus, Edit2, Trash2, X, ChevronDown, ChevronRight, Download, FileSpreadsheet } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 // Categorias fixas do DRE
 const CATEGORIAS_DRE = {
@@ -257,78 +259,50 @@ export default function PlanejamentoPage() {
     link.click();
   };
 
-  // Exportar para PDF
+  // Exportar para PDF - download automático
   const exportToPDF = () => {
-    let tableRows = '';
+    const doc = new jsPDF('portrait', 'mm', 'a4');
+    
+    doc.setFontSize(16);
+    doc.text('Planejamento Orçamentário', doc.internal.pageSize.width / 2, 15, { align: 'center' });
+    
+    const body = [];
     
     Object.entries(CATEGORIAS_DRE).forEach(([catId, catInfo]) => {
       const planejamentosCat = planejamentosAgrupados[catId] || [];
       const totalCat = planejamentosCat.reduce((a, p) => a + p.valor_planejado, 0);
       
       // Header da categoria
-      const bgColor = catInfo.cor === 'cyan' ? '#e0f7fa' : catInfo.cor === 'red' ? '#ffebee' : '#f5f5f5';
-      const textColor = catInfo.cor === 'cyan' ? '#0e7490' : catInfo.cor === 'red' ? '#dc2626' : '#374151';
-      
-      tableRows += `
-        <tr style="background:${bgColor};font-weight:600;">
-          <td colspan="3" style="padding:8px;border:1px solid #ddd;color:${textColor};">${catInfo.nome}</td>
-          <td style="padding:8px;border:1px solid #ddd;text-align:right;color:${textColor};">${formatCurrency(totalCat)}</td>
-        </tr>
-      `;
+      body.push([
+        { content: catInfo.nome, colSpan: 2, styles: { fontStyle: 'bold', fillColor: catInfo.cor === 'cyan' ? [224, 247, 250] : catInfo.cor === 'red' ? [255, 235, 238] : [245, 245, 245] } },
+        { content: formatCurrency(totalCat), styles: { fontStyle: 'bold', halign: 'right', fillColor: catInfo.cor === 'cyan' ? [224, 247, 250] : catInfo.cor === 'red' ? [255, 235, 238] : [245, 245, 245] } }
+      ]);
       
       // Itens da categoria
       planejamentosCat.forEach(plan => {
-        tableRows += `
-          <tr>
-            <td style="padding:6px 6px 6px 20px;border:1px solid #ddd;">${plan.subcategoria ? `${plan.subcategoria} → ${plan.itemNome}` : plan.itemNome}</td>
-            <td style="padding:6px;border:1px solid #ddd;">${new Date(plan.ano, plan.mes - 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</td>
-            <td style="padding:6px;border:1px solid #ddd;"></td>
-            <td style="padding:6px;border:1px solid #ddd;text-align:right;color:#2563eb;">${formatCurrency(plan.valor_planejado)}</td>
-          </tr>
-        `;
+        body.push([
+          '    ' + (plan.subcategoria ? `${plan.subcategoria} → ${plan.itemNome}` : plan.itemNome),
+          new Date(plan.ano, plan.mes - 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }),
+          { content: formatCurrency(plan.valor_planejado), styles: { halign: 'right' } }
+        ]);
       });
     });
     
     const totalGeral = planejamentos.reduce((a, p) => a + p.valor_planejado, 0);
-    tableRows += `
-      <tr style="background:#d5d5d5;font-weight:bold;">
-        <td colspan="3" style="padding:8px;border:1px solid #ddd;">TOTAL GERAL</td>
-        <td style="padding:8px;border:1px solid #ddd;text-align:right;">${formatCurrency(totalGeral)}</td>
-      </tr>
-    `;
+    body.push([
+      { content: 'TOTAL GERAL', colSpan: 2, styles: { fontStyle: 'bold', fillColor: [200, 200, 200] } },
+      { content: formatCurrency(totalGeral), styles: { fontStyle: 'bold', halign: 'right', fillColor: [200, 200, 200] } }
+    ]);
     
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Planejamento Orçamentário</title>
-        <style>
-          body { font-family: Arial, sans-serif; margin: 20px; font-size: 12px; }
-          h1 { text-align: center; margin-bottom: 20px; font-size: 18px; }
-          table { width: 100%; border-collapse: collapse; }
-          th { background: #e5e5e5; padding: 8px; border: 1px solid #ddd; text-align: left; }
-          @media print { @page { margin: 10mm; } }
-        </style>
-      </head>
-      <body>
-        <h1>Planejamento Orçamentário</h1>
-        <table>
-          <thead>
-            <tr>
-              <th>Item</th>
-              <th>Período</th>
-              <th></th>
-              <th style="text-align:right;">Valor Planejado</th>
-            </tr>
-          </thead>
-          <tbody>${tableRows}</tbody>
-        </table>
-        <script>setTimeout(() => { window.print(); window.close(); }, 500);</script>
-      </body>
-      </html>
-    `);
-    printWindow.document.close();
+    autoTable(doc, {
+      head: [['Item', 'Período', 'Valor Planejado']],
+      body: body,
+      startY: 22,
+      styles: { fontSize: 9, cellPadding: 2 },
+      headStyles: { fillColor: [229, 229, 229], textColor: [0, 0, 0], fontStyle: 'bold' },
+    });
+    
+    doc.save(`PlanejamentoOrcamentario_${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
   return (
