@@ -624,19 +624,27 @@ export default function DREPage() {
         {/* Barra de scroll superior sincronizada */}
         <div 
           ref={topScrollRef}
-          className="overflow-x-auto"
-          style={{ overflowY: 'hidden', height: '16px' }}
+          className="overflow-x-scroll bg-gray-50 border-b border-gray-300"
+          style={{ 
+            overflowY: 'hidden',
+            scrollbarWidth: 'auto',
+            scrollbarColor: '#9ca3af #e5e7eb'
+          }}
           onScroll={handleTopScroll}
         >
-          <div style={{ width: tableRef.current?.scrollWidth || '100%', height: '1px' }}></div>
+          <div style={{ width: '1800px', height: '1px' }}></div>
         </div>
         
         <div 
           ref={scrollContainerRef}
-          className="overflow-x-auto"
+          className="overflow-x-scroll"
+          style={{
+            scrollbarWidth: 'auto',
+            scrollbarColor: '#9ca3af #e5e7eb'
+          }}
           onScroll={handleTableScroll}
         >
-          <table ref={tableRef} className="w-full text-sm border-collapse" data-testid="dre-table">
+          <table ref={tableRef} className="w-full text-sm border-collapse min-w-[1800px]" data-testid="dre-table">
           <thead>
             <tr className="bg-gray-100 border-b-2 border-gray-300">
               <th className="text-left p-2 sticky left-0 bg-gray-100 min-w-[320px] border-r border-gray-300">
