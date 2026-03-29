@@ -1,10 +1,5 @@
 {
-  "buildCommand": "yarn build",
-  "outputDirectory": "dist",
-  "installCommand": "yarn install",
-  "framework": "vite",
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "https://sistema-financeiro-backend.vercel.app/api/$1" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
