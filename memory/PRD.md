@@ -1,49 +1,95 @@
 # Sistema Financeiro Industrial - PRD
 
-## Problem Statement Original
-Aplicativo de controle financeiro com correções solicitadas em múltiplas iterações.
+## Visão Geral
+Sistema financeiro completo para gestão industrial com DRE, fluxo de caixa, planejamento orçamentário e relatórios comparativos.
 
-## Arquitetura
-- **Frontend**: React + Vite + TailwindCSS + Recharts + jsPDF
+## Stack Tecnológica
+- **Frontend**: React 18 + Vite + TailwindCSS
 - **Backend**: FastAPI (Python)
 - **Database**: Supabase (PostgreSQL)
-- **Autenticação**: JWT
+- **Charts**: Recharts
+- **PDF Export**: jsPDF + jsPDF-autotable
 
-## What's Been Implemented
+## Funcionalidades Implementadas
 
-### Iteração 1 - 2026-03-26
-1. DRE PDF/Excel - Exportação corrigida
-2. Fluxo de Caixa - Filtro por período
-3. Planejamento Orçamentário - Download PDF/Excel
-4. Relatórios Comparativos - Backend suporta data_inicio/data_fim
+### Autenticação
+- [x] Login/Registro com JWT
+- [x] Persistência de sessão via localStorage
 
-### Iteração 2 - 2026-03-26
-5. Dashboard - Gráfico Entradas x Saídas com cores (verde/vermelho)
-6. Dashboard - Gráfico Saídas por Plano de Contas compactado
-7. Dashboard - Gráfico Entradas por Plano de Contas com cores diferentes
-8. DRE - Scroll horizontal no topo sincronizado
-9. DRE - Exportação respeita estado de expansão
+### Dashboard
+- [x] Visão geral de receitas, margens e lucros
+- [x] Gráficos de entradas x saídas
+- [x] Saldo das contas bancárias
+- [x] Filtros por mês/ano
 
-### Iteração 3 - 2026-03-27
-10. Dashboard - Gráfico Saídas sem labels internos, apenas tooltip e legenda
-11. PDF - Download automático usando jsPDF (não abre outra aba)
-12. Fluxo de Caixa - Tabs separadas:
-    - "Resumo Mensal" = mostra semanas, não dias
-    - "Detalhamento por Período" = mostra dias com filtro De/Até
-13. DRE - Barra de scroll superior restaurada e funcional
+### Movimentações Financeiras
+- [x] CRUD completo de movimentações
+- [x] Vinculação com plano de contas hierárquico
+- [x] Vinculação com contas bancárias
+- [x] Atualização automática de saldos
 
-## Arquivos Modificados
-- `/app/backend/server.py`
-- `/app/frontend/src/pages/DashboardPage.jsx`
-- `/app/frontend/src/pages/DREPage.jsx`
-- `/app/frontend/src/pages/FluxoCaixaPage.jsx`
-- `/app/frontend/src/pages/PlanejamentoPage.jsx`
-- `/app/frontend/src/pages/RelatoriosPage.jsx`
+### DRE (Demonstrativo de Resultado)
+- [x] Visualização anual com estrutura hierárquica
+- [x] Expansão/recolhimento de categorias
+- [x] Exportação para Excel (CSV)
+- [x] Exportação para PDF
 
-## Dependências Adicionadas
-- jspdf
-- jspdf-autotable
+### Fluxo de Caixa
+- [x] Resumo mensal por semana
+- [x] Detalhamento diário por período
+- [x] Exportação para Excel e PDF
 
-## Next Tasks
-- Testar com dados reais
-- Validar formatação dos PDFs baixados
+### Planejamento Orçamentário
+- [x] Cadastro de orçamentos por período
+- [x] Comparativo orçado x realizado
+
+### Configurações
+- [x] Gestão de contas bancárias
+- [x] Plano de contas hierárquico (3 níveis)
+
+## Otimizações de Performance (29/03/2026)
+
+### Lazy Loading
+- Todas as páginas agora são carregadas sob demanda via React.lazy()
+- Reduz bundle inicial significativamente
+
+### Code Splitting (Vite)
+- Chunks separados: vendor-react, vendor-charts, vendor-pdf, vendor-utils
+- Melhor cache de navegador
+
+### Cache de API
+- Cache em memória para requisições GET (30s TTL)
+- Deduplicação de requests pendentes
+- Invalidação automática em mutações
+
+### Memoização de Componentes
+- Cards de indicadores memoizados
+- Gráficos memoizados
+- Sidebar com itens memoizados
+- useMemo/useCallback para dados processados
+
+### Prefetch
+- Páginas prováveis são pré-carregadas em background
+
+## Correções de Bugs (29/03/2026)
+
+### Erro 404 ao Atualizar Página
+- **Problema**: F5 retornava 404 em SPAs
+- **Solução**: Configuração de rewrites no vercel.json
+- **Status**: ✅ Corrigido
+
+## Backlog (P1)
+- [ ] Filtro avançado de movimentações
+- [ ] Gráficos de tendência
+- [ ] Dashboard com KPIs customizáveis
+
+## Backlog (P2)
+- [ ] Importação de dados via CSV
+- [ ] Notificações de vencimentos
+- [ ] Multi-empresa
+
+## Credenciais de Teste
+Ver `/app/memory/test_credentials.md`
+
+---
+Última atualização: 29/03/2026

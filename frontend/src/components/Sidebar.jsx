@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, memo, useCallback } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -25,15 +25,42 @@ const menuItems = [
   { path: '/configuracoes', icon: Settings, label: 'Configurações' },
 ];
 
-export default function Sidebar({ user, onLogout }) {
+// Item de menu memoizado
+const MenuItem = memo(({ item, isActive, isMinimized }) => {
+  const Icon = item.icon;
+  
+  return (
+    <Link
+      to={item.path}
+      className={`
+        flex items-center ${isMinimized ? 'justify-center px-2' : 'space-x-3 px-6'} py-3 transition-colors duration-150
+        ${
+          isActive
+            ? 'bg-blue-700 border-r-4 border-white text-white'
+            : 'text-blue-100 hover:bg-blue-800/50 hover:text-white'
+        }
+      `}
+      title={isMinimized ? item.label : ''}
+    >
+      <Icon size={20} />
+      {!isMinimized && <span className="text-sm font-medium">{item.label}</span>}
+    </Link>
+  );
+});
+
+export default memo(function Sidebar({ user, onLogout }) {
   const location = useLocation();
   const [isMinimized, setIsMinimized] = useState(false);
 
+  const toggleSidebar = useCallback(() => {
+    setIsMinimized(prev => !prev);
+  }, []);
+
   return (
-    <div className={`h-screen ${isMinimized ? 'w-16' : 'w-64'} bg-gradient-to-b from-blue-900 to-blue-800 text-white flex flex-col shadow-2xl transition-all duration-300 relative`}>
+    <div className={`h-screen ${isMinimized ? 'w-16' : 'w-64'} bg-gradient-to-b from-blue-900 to-blue-800 text-white flex flex-col shadow-2xl transition-all duration-200 relative`}>
       {/* Toggle Button */}
       <button
-        onClick={() => setIsMinimized(!isMinimized)}
+        onClick={toggleSidebar}
         className="absolute -right-3 top-8 w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center shadow-lg hover:bg-blue-500 transition z-10"
         data-testid="toggle-sidebar-btn"
       >
@@ -79,35 +106,20 @@ export default function Sidebar({ user, onLogout }) {
 
       {/* Menu */}
       <nav className="flex-1 overflow-y-auto py-4">
-        {menuItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = location.pathname === item.path;
-          
-          return (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={`
-                flex items-center ${isMinimized ? 'justify-center px-2' : 'space-x-3 px-6'} py-3 transition-all duration-200
-                ${
-                  isActive
-                    ? 'bg-blue-700 border-r-4 border-white text-white'
-                    : 'text-blue-100 hover:bg-blue-800/50 hover:text-white'
-                }
-              `}
-              title={isMinimized ? item.label : ''}
-            >
-              <Icon size={20} />
-              {!isMinimized && <span className="text-sm font-medium">{item.label}</span>}
-            </Link>
-          );
-        })}
+        {menuItems.map((item) => (
+          <MenuItem 
+            key={item.path}
+            item={item}
+            isActive={location.pathname === item.path}
+            isMinimized={isMinimized}
+          />
+        ))}
       </nav>
 
       {/* Logout */}
       <button
         onClick={onLogout}
-        className={`flex items-center ${isMinimized ? 'justify-center px-2' : 'space-x-3 px-6'} py-4 text-blue-100 hover:bg-red-600 hover:text-white transition-all duration-200 border-t border-blue-700`}
+        className={`flex items-center ${isMinimized ? 'justify-center px-2' : 'space-x-3 px-6'} py-4 text-blue-100 hover:bg-red-600 hover:text-white transition-colors duration-150 border-t border-blue-700`}
         title={isMinimized ? 'Sair' : ''}
       >
         <LogOut size={20} />
@@ -115,4 +127,4 @@ export default function Sidebar({ user, onLogout }) {
       </button>
     </div>
   );
-}
+});

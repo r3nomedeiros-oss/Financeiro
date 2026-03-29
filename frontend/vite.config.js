@@ -18,5 +18,30 @@ export default defineConfig({
   preview: {
     host: '0.0.0.0',
     port: 3000
+  },
+  build: {
+    // Otimizações de build
+    target: 'esnext',
+    minify: 'esbuild',
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        // Code splitting manual para melhor caching
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-charts': ['recharts'],
+          'vendor-pdf': ['jspdf', 'jspdf-autotable'],
+          'vendor-utils': ['axios', 'date-fns', 'lucide-react']
+        }
+      }
+    },
+    // Reduzir tamanho do bundle
+    chunkSizeWarningLimit: 500,
+    cssCodeSplit: true,
+    assetsInlineLimit: 4096
+  },
+  optimizeDeps: {
+    // Pre-bundle dependências para dev mais rápido
+    include: ['react', 'react-dom', 'react-router-dom', 'axios', 'recharts', 'lucide-react']
   }
 })

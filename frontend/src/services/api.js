@@ -2,39 +2,97 @@ import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_BACKEND_URL || '';
 
+// Cache em memória para requests GET
+const requestCache = new Map();
+const CACHE_TTL = 30000; // 30 segundos
+const pendingRequests = new Map();
+
 const api = axios.create({
   baseURL: API_URL,
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 15000, // 15s timeout
 });
 
-// Interceptor para adicionar token em todas as requisições
+// Interceptor para adicionar token e cache
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
+    // Cache apenas para GET requests
+    if (config.method === 'get' && config.cache !== false) {
+      const cacheKey = config.url + JSON.stringify(config.params || {});
+      const cached = requestCache.get(cacheKey);
+      
+      if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+        // Retornar dados do cache
+        config.adapter = () => Promise.resolve({
+          data: cached.data,
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          config,
+          request: {},
+          cached: true
+        });
+      }
+      
+      // Deduplicar requests pendentes
+      if (pendingRequests.has(cacheKey)) {
+        config.adapter = () => pendingRequests.get(cacheKey);
+      }
+    }
+    
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Interceptor para lidar com erros de autenticação
+// Interceptor para cache de respostas
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Cachear respostas GET
+    if (response.config.method === 'get' && !response.cached && response.config.cache !== false) {
+      const cacheKey = response.config.url + JSON.stringify(response.config.params || {});
+      requestCache.set(cacheKey, {
+        data: response.data,
+        timestamp: Date.now()
+      });
+      pendingRequests.delete(cacheKey);
+    }
+    return response;
+  },
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-      window.location.href = '/login';
+      window.location.href = '/';
+    }
+    // Limpar request pendente em caso de erro
+    if (error.config) {
+      const cacheKey = error.config.url + JSON.stringify(error.config.params || {});
+      pendingRequests.delete(cacheKey);
     }
     return Promise.reject(error);
   }
 );
+
+// Função para invalidar cache
+export const invalidateCache = (pattern = null) => {
+  if (pattern) {
+    for (const key of requestCache.keys()) {
+      if (key.includes(pattern)) {
+        requestCache.delete(key);
+      }
+    }
+  } else {
+    requestCache.clear();
+  }
+};
 
 // ============================================
 // AUTH
