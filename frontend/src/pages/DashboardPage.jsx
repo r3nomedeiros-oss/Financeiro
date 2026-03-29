@@ -3,19 +3,16 @@ import { dashboardAPI } from '../services/api';
 import {
   BarChart,
   Bar,
-  PieChart,
-  Pie,
-  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
+  Cell,
 } from 'recharts';
 import { TrendingUp, TrendingDown, DollarSign, Wallet } from 'lucide-react';
 
-const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316'];
+const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316', '#ec4899', '#14b8a6', '#84cc16'];
 
 // Formatador memoizado
 const formatCurrency = (value) => {
@@ -25,23 +22,35 @@ const formatCurrency = (value) => {
   }).format(value);
 };
 
-// Card memoizado para evitar re-renders
+// Formatador compacto para valores grandes
+const formatCurrencyCompact = (value) => {
+  const absValue = Math.abs(value);
+  if (absValue >= 1000000) {
+    return (value / 1000000).toFixed(1) + 'M';
+  }
+  if (absValue >= 1000) {
+    return (value / 1000).toFixed(1) + 'K';
+  }
+  return formatCurrency(value);
+};
+
+// Card memoizado para evitar re-renders - AJUSTADO para valores grandes
 const IndicatorCard = memo(({ title, value, percentage, icon: Icon, borderColor, bgColor, iconColor, percentColor }) => (
-  <div className={`bg-white rounded-xl shadow-md p-6 border-l-4 ${borderColor}`}>
-    <div className="flex justify-between items-start">
-      <div>
-        <p className="text-gray-600 text-sm font-medium">{title}</p>
-        <p className="text-2xl font-bold text-gray-800 mt-2">
+  <div className={`bg-white rounded-xl shadow-md p-4 border-l-4 ${borderColor} min-h-[120px]`}>
+    <div className="flex justify-between items-start gap-2">
+      <div className="flex-1 min-w-0">
+        <p className="text-gray-600 text-xs font-medium truncate">{title}</p>
+        <p className={`text-lg font-bold mt-1 truncate ${value < 0 ? 'text-red-600' : 'text-gray-800'}`} title={formatCurrency(value)}>
           {formatCurrency(value)}
         </p>
         {percentage !== undefined && (
-          <p className={`text-sm font-semibold mt-1 ${percentColor}`}>
+          <p className={`text-xs font-semibold mt-1 ${percentColor}`}>
             {percentage.toFixed(2)}%
           </p>
         )}
       </div>
-      <div className={`${bgColor} p-3 rounded-lg`}>
-        <Icon className={iconColor} size={24} />
+      <div className={`${bgColor} p-2 rounded-lg flex-shrink-0`}>
+        <Icon className={iconColor} size={20} />
       </div>
     </div>
   </div>
@@ -55,7 +64,7 @@ const EntradasSaidasChart = memo(({ data }) => (
       <BarChart data={data}>
         <CartesianGrid strokeDasharray="3 3" />
         <XAxis dataKey="name" />
-        <YAxis />
+        <YAxis tickFormatter={formatCurrencyCompact} />
         <Tooltip formatter={(value) => formatCurrency(value)} />
         <Bar dataKey="valor">
           {data.map((entry, index) => (
@@ -70,44 +79,75 @@ const EntradasSaidasChart = memo(({ data }) => (
   </div>
 ));
 
-// Gráfico de pizza memoizado
-const PieChartComponent = memo(({ data, title }) => (
-  <div className="bg-white rounded-xl shadow-md p-6">
-    <h3 className="text-lg font-semibold text-gray-800 mb-4">{title}</h3>
-    <ResponsiveContainer width="100%" height={300}>
-      <PieChart>
-        <Pie
-          data={data}
-          cx="35%"
-          cy="50%"
-          outerRadius={80}
-          innerRadius={40}
-          fill="#8884d8"
-          dataKey="valor"
-          paddingAngle={2}
-        >
-          {data.map((entry, index) => (
-            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-          ))}
-        </Pie>
-        <Tooltip 
-          formatter={(value, name, props) => [formatCurrency(value), props.payload.nome]}
-        />
-        <Legend 
-          layout="vertical" 
-          align="right" 
-          verticalAlign="middle"
-          wrapperStyle={{ paddingLeft: '20px', maxWidth: '45%' }}
-          formatter={(value, entry) => {
-            const nome = entry.payload.nome;
-            const nomeDisplay = nome.length > 18 ? nome.substring(0, 18) + '...' : nome;
-            return <span style={{ fontSize: '12px' }}>{nomeDisplay}</span>;
-          }}
-        />
-      </PieChart>
-    </ResponsiveContainer>
-  </div>
-));
+// Gráfico de barras horizontal com legenda lateral para Saídas
+const SaidasBarChart = memo(({ data, title }) => {
+  // Ordenar por valor decrescente e limitar a 8 itens
+  const sortedData = useMemo(() => {
+    return [...data]
+      .sort((a, b) => b.valor - a.valor)
+      .slice(0, 8)
+      .map((item, index) => ({
+        ...item,
+        color: COLORS[index % COLORS.length]
+      }));
+  }, [data]);
+
+  const total = useMemo(() => {
+    return sortedData.reduce((acc, item) => acc + item.valor, 0);
+  }, [sortedData]);
+
+  return (
+    <div className="bg-white rounded-xl shadow-md p-6">
+      <h3 className="text-lg font-semibold text-gray-800 mb-4">{title}</h3>
+      <div className="flex gap-4">
+        {/* Gráfico de barras horizontal */}
+        <div className="flex-1">
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={sortedData} layout="vertical" margin={{ left: 10, right: 10 }}>
+              <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+              <XAxis type="number" tickFormatter={formatCurrencyCompact} />
+              <YAxis type="category" dataKey="nome" hide />
+              <Tooltip 
+                formatter={(value) => formatCurrency(value)}
+                labelFormatter={(label) => label}
+              />
+              <Bar dataKey="valor" radius={[0, 4, 4, 0]}>
+                {sortedData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.color} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+        
+        {/* Legenda lateral */}
+        <div className="w-48 flex-shrink-0 overflow-y-auto max-h-[280px]">
+          <div className="space-y-2">
+            {sortedData.map((item, index) => (
+              <div key={index} className="flex items-center gap-2 text-xs">
+                <div 
+                  className="w-3 h-3 rounded flex-shrink-0" 
+                  style={{ backgroundColor: item.color }}
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="truncate text-gray-700" title={item.nome}>{item.nome}</p>
+                  <p className="text-gray-500 font-medium">{formatCurrency(item.valor)}</p>
+                </div>
+              </div>
+            ))}
+            {total > 0 && (
+              <div className="pt-2 border-t mt-2">
+                <p className="text-xs font-semibold text-gray-800">
+                  Total: {formatCurrency(total)}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+});
 
 // Conta Card memoizado
 const ContaCard = memo(({ conta }) => (
@@ -273,7 +313,7 @@ export default function DashboardPage() {
         <EntradasSaidasChart data={entradasVsSaidas} />
         
         {saidasPorPlano.length > 0 && (
-          <PieChartComponent data={saidasPorPlano} title="Saídas por Plano de Contas" />
+          <SaidasBarChart data={saidasPorPlano} title="Saídas por Plano de Contas" />
         )}
 
         {entradasPorPlano.length > 0 && (
@@ -282,8 +322,8 @@ export default function DashboardPage() {
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={entradasPorPlano}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="nome" />
-                <YAxis />
+                <XAxis dataKey="nome" tick={{ fontSize: 10 }} interval={0} angle={-45} textAnchor="end" height={80} />
+                <YAxis tickFormatter={formatCurrencyCompact} />
                 <Tooltip formatter={(value) => formatCurrency(value)} />
                 <Bar dataKey="valor">
                   {entradasPorPlano.map((entry, index) => (
