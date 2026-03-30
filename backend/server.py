@@ -919,7 +919,12 @@ async def create_planejamento(plan: PlanejamentoCreate, user_id: str = Depends(g
     existing = supabase.table("planejamento_orcamentario").select("*").eq("user_id", user_id).eq("mes", plan.mes).eq("ano", plan.ano).eq("plano_contas_id", plan.plano_contas_id).execute()
     
     if existing.data:
-        raise HTTPException(status_code=400, detail="Já existe planejamento para este período e plano de contas")
+        # Upsert: atualizar o existente ao invés de dar erro
+        existing_id = existing.data[0]["id"]
+        result = supabase.table("planejamento_orcamentario").update({
+            "valor_planejado": plan.valor_planejado
+        }).eq("id", existing_id).execute()
+        return result.data[0]
     
     novo_plan = {
         "id": str(uuid.uuid4()),

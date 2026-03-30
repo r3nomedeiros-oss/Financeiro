@@ -255,7 +255,16 @@ export default function PlanejamentoPage() {
       await carregarDados();
     } catch (error) {
       console.error('Erro ao salvar:', error);
-      alert('Erro ao salvar alterações: ' + (error.response?.data?.detail || error.message));
+      // Melhor tratamento de erro
+      let errorMsg = 'Erro desconhecido';
+      if (error.response?.data?.detail) {
+        errorMsg = error.response.data.detail;
+      } else if (error.message) {
+        errorMsg = error.message;
+      } else if (typeof error === 'string') {
+        errorMsg = error;
+      }
+      alert('Erro ao salvar alterações: ' + errorMsg);
     } finally {
       setSaving(false);
     }
