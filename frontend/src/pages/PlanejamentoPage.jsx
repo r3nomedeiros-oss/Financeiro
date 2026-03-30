@@ -123,7 +123,7 @@ export default function PlanejamentoPage() {
     }));
   };
 
-  // Formatação
+  // Formatação - CORRIGIDO para aceitar valores em reais diretamente
   const formatCurrency = (value) => {
     if (!value && value !== 0) return '-';
     return new Intl.NumberFormat('pt-BR', {
@@ -134,9 +134,11 @@ export default function PlanejamentoPage() {
     }).format(value);
   };
 
+  // Parser simples - aceita números inteiros diretamente (ex: 100000 = R$ 100.000)
   const parseCurrencyInput = (value) => {
+    // Remove tudo que não é número
     const numeros = value.replace(/\D/g, '');
-    return parseInt(numeros) / 100 || 0;
+    return parseInt(numeros) || 0;
   };
 
   const formatCurrencyInput = (value) => {
@@ -144,13 +146,16 @@ export default function PlanejamentoPage() {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
     }).format(value);
   };
 
   // Edição inline
   const startEdit = (itemId, mes, currentValue) => {
     setEditingCell({ itemId, mes });
-    setEditValue(currentValue > 0 ? formatCurrencyInput(currentValue) : '');
+    // Mostra o valor como número simples para facilitar edição
+    setEditValue(currentValue > 0 ? currentValue.toString() : '');
   };
 
   const cancelEdit = () => {
@@ -161,7 +166,9 @@ export default function PlanejamentoPage() {
   const confirmEdit = () => {
     if (!editingCell) return;
     
-    const valor = parseCurrencyInput(editValue);
+    // Aceita número direto ou com vírgula/ponto
+    const valorLimpo = editValue.replace(/[^\d,.-]/g, '').replace(',', '.');
+    const valor = parseFloat(valorLimpo) || 0;
     const pendingKey = `${editingCell.itemId}-${editingCell.mes}`;
     
     setPendingChanges(prev => ({
@@ -188,7 +195,9 @@ export default function PlanejamentoPage() {
   };
 
   const confirmApplyAll = () => {
-    const valor = parseCurrencyInput(applyAllData.valor);
+    // Aceita número direto ou com vírgula/ponto
+    const valorLimpo = applyAllData.valor.replace(/[^\d,.-]/g, '').replace(',', '.');
+    const valor = parseFloat(valorLimpo) || 0;
     const newChanges = { ...pendingChanges };
     
     MESES.forEach(mes => {
@@ -199,6 +208,13 @@ export default function PlanejamentoPage() {
     setPendingChanges(newChanges);
     setShowApplyAllModal(false);
     setApplyAllData({ itemId: '', itemNome: '', valor: '' });
+  };
+
+  // Calcular total anual do valor digitado no modal
+  const getValorAnualModal = () => {
+    const valorLimpo = applyAllData.valor.replace(/[^\d,.-]/g, '').replace(',', '.');
+    const valor = parseFloat(valorLimpo) || 0;
+    return valor * 12;
   };
 
   // Salvar todas as alterações pendentes
@@ -686,22 +702,25 @@ export default function PlanejamentoPage() {
             
             <div className="p-4 space-y-4">
               <p className="text-sm text-gray-600">
-                Digite o valor que será aplicado em <strong>todos os 12 meses</strong> para:
+                Digite o valor <strong>mensal</strong> que será aplicado em <strong>todos os 12 meses</strong> para:
               </p>
               <p className="font-medium text-blue-600">{applyAllData.itemNome}</p>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Valor Mensal</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Valor Mensal (em reais)</label>
                 <input
                   type="text"
                   value={applyAllData.valor}
                   onChange={(e) => setApplyAllData({ ...applyAllData, valor: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg text-lg font-semibold focus:ring-2 focus:ring-blue-500"
-                  placeholder="R$ 0,00"
+                  placeholder="Ex: 100000 ou 100.000"
                   autoFocus
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Total anual: {formatCurrency(parseCurrencyInput(applyAllData.valor) * 12)}
+                  Digite o valor sem R$. Ex: 100000 para cem mil reais
+                </p>
+                <p className="text-sm text-blue-600 font-medium mt-2">
+                  Total anual: {formatCurrency(getValorAnualModal())}
                 </p>
               </div>
               
