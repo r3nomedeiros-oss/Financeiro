@@ -281,7 +281,7 @@ export default function DashboardPage() {
           borderColor="border-green-500"
           bgColor="bg-green-100"
           iconColor="text-green-600"
-          percentColor="text-green-600"
+          percentColor={dados.indicadores.margem_contribuicao >= 0 ? 'text-green-600' : 'text-red-600'}
           data-testid="margem-contribuicao-valor"
         />
         <IndicatorCard
