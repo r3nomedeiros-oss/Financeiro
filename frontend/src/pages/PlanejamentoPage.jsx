@@ -1,55 +1,79 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { planejamentoAPI, planoContasAPI } from '../services/api';
-import { Plus, Edit2, Trash2, X, ChevronDown, ChevronRight, Download, FileSpreadsheet } from 'lucide-react';
+import { Save, Copy, ChevronDown, ChevronRight, Download, FileSpreadsheet, Check, X } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
+// Labels dos meses
+const MESES = [
+  { key: 'janeiro', label: 'Jan', num: 1 },
+  { key: 'fevereiro', label: 'Fev', num: 2 },
+  { key: 'marco', label: 'Mar', num: 3 },
+  { key: 'abril', label: 'Abr', num: 4 },
+  { key: 'maio', label: 'Mai', num: 5 },
+  { key: 'junho', label: 'Jun', num: 6 },
+  { key: 'julho', label: 'Jul', num: 7 },
+  { key: 'agosto', label: 'Ago', num: 8 },
+  { key: 'setembro', label: 'Set', num: 9 },
+  { key: 'outubro', label: 'Out', num: 10 },
+  { key: 'novembro', label: 'Nov', num: 11 },
+  { key: 'dezembro', label: 'Dez', num: 12 },
+];
+
 // Categorias fixas do DRE
-const CATEGORIAS_DRE = {
-  receita_bruta: { nome: "(+) Receita Bruta", cor: "cyan" },
-  deducoes_vendas: { nome: "(-) Deduções Sobre Vendas", cor: "red" },
-  custos_variaveis: { nome: "(-) Custos Variáveis", cor: "red" },
-  custos_fixos: { nome: "(-) Custos Fixos", cor: "red" },
-  resultado_nao_operacional: { nome: "Resultado Não Operacional", cor: "gray" },
+const CATEGORIAS_CONFIG = {
+  receita_bruta: { label: "(+) Receita Bruta", cor: "cyan", tipo: "positivo" },
+  deducoes_vendas: { label: "(-) Deduções Sobre Vendas", cor: "red", tipo: "negativo" },
+  custos_variaveis: { label: "(-) Custos Variáveis", cor: "red", tipo: "negativo" },
+  custos_fixos: { label: "(-) Custos Fixos", cor: "red", tipo: "negativo" },
+  resultado_nao_operacional: { label: "Resultado Não Operacional", cor: "gray", tipo: "misto" },
 };
 
 export default function PlanejamentoPage() {
-  const [planejamentos, setPlanejamentos] = useState([]);
   const [hierarquia, setHierarquia] = useState({});
+  const [planejamentos, setPlanejamentos] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [expandedCategories, setExpandedCategories] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [ano, setAno] = useState(new Date().getFullYear());
   
-  const [formData, setFormData] = useState({
-    mes: new Date().getMonth() + 1,
-    ano: new Date().getFullYear(),
-    plano_contas_id: '',
-    valor_planejado: '',
-    valorFormatado: ''
-  });
+  // Estado de expansão das categorias e subcategorias
+  const [expandedState, setExpandedState] = useState({});
+  
+  // Estado para edição inline
+  const [editingCell, setEditingCell] = useState(null); // { itemId, mes }
+  const [editValue, setEditValue] = useState('');
+  
+  // Estado para "Aplicar a todos os meses"
+  const [showApplyAllModal, setShowApplyAllModal] = useState(false);
+  const [applyAllData, setApplyAllData] = useState({ itemId: '', itemNome: '', valor: '' });
+  
+  // Alterações pendentes (buffer para salvar em lote)
+  const [pendingChanges, setPendingChanges] = useState({});
 
   useEffect(() => {
     carregarDados();
-  }, []);
+  }, [ano]);
 
   const carregarDados = async () => {
     try {
       setLoading(true);
-      const [planRes, hierRes] = await Promise.all([
-        planejamentoAPI.getAll(),
+      const [hierRes, planRes] = await Promise.all([
         planoContasAPI.getHierarquico(),
+        planejamentoAPI.getAll({ ano }),
       ]);
       
-      setPlanejamentos(planRes.data);
       setHierarquia(hierRes.data);
+      setPlanejamentos(planRes.data);
       
-      // Expandir todas categorias
-      const expanded = {};
+      // Inicializar estado de expansão
+      const initialExpanded = {};
       Object.keys(hierRes.data || {}).forEach(catId => {
-        expanded[catId] = true;
+        initialExpanded[catId] = { expanded: true, subcategorias: {} };
+        (hierRes.data[catId]?.subcategorias || []).forEach(sub => {
+          initialExpanded[catId].subcategorias[sub.id] = true;
+        });
       });
-      setExpandedCategories(expanded);
+      setExpandedState(initialExpanded);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
     } finally {
@@ -57,167 +81,314 @@ export default function PlanejamentoPage() {
     }
   };
 
-  // Extrair itens (nível 3) do plano de contas
-  const getItensPlanoContas = () => {
-    const itens = [];
-    
-    Object.entries(hierarquia).forEach(([catId, categoria]) => {
-      (categoria.subcategorias || []).forEach(subcat => {
-        (subcat.itens || []).forEach(item => {
-          itens.push({
-            id: item.id,
-            nome: item.nome,
-            subcategoria: subcat.nome,
-            categoria: categoria.nome,
-            categoriaId: catId
-          });
-        });
-        
-        // Se subcategoria não tem itens, usar ela mesma
-        if (!subcat.itens || subcat.itens.length === 0) {
-          itens.push({
-            id: subcat.id,
-            nome: subcat.nome,
-            subcategoria: '',
-            categoria: categoria.nome,
-            categoriaId: catId
-          });
-        }
-      });
+  // Criar mapa de valores planejados: { itemId: { mes: valor } }
+  const valoresMap = useMemo(() => {
+    const map = {};
+    planejamentos.forEach(p => {
+      if (!map[p.plano_contas_id]) {
+        map[p.plano_contas_id] = { planejamentos: {} };
+      }
+      map[p.plano_contas_id].planejamentos[p.mes] = { id: p.id, valor: p.valor_planejado };
     });
+    return map;
+  }, [planejamentos]);
 
-    return itens;
+  // Obter valor (considerando pendingChanges)
+  const getValor = useCallback((itemId, mes) => {
+    const pendingKey = `${itemId}-${mes}`;
+    if (pendingChanges[pendingKey] !== undefined) {
+      return pendingChanges[pendingKey];
+    }
+    return valoresMap[itemId]?.planejamentos[mes]?.valor || 0;
+  }, [valoresMap, pendingChanges]);
+
+  // Toggle expansão
+  const toggleCategoria = (catId) => {
+    setExpandedState(prev => ({
+      ...prev,
+      [catId]: { ...prev[catId], expanded: !prev[catId]?.expanded }
+    }));
   };
 
-  const formatarValorInput = (valor) => {
-    const numeros = valor.replace(/\D/g, '');
-    const decimal = (parseInt(numeros) / 100).toFixed(2);
+  const toggleSubcategoria = (catId, subcatId) => {
+    setExpandedState(prev => ({
+      ...prev,
+      [catId]: {
+        ...prev[catId],
+        subcategorias: {
+          ...prev[catId]?.subcategorias,
+          [subcatId]: !prev[catId]?.subcategorias?.[subcatId]
+        }
+      }
+    }));
+  };
+
+  // Formatação
+  const formatCurrency = (value) => {
+    if (!value && value !== 0) return '-';
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
-    }).format(decimal);
+      currency: 'BRL',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(value);
   };
 
-  const handleValorChange = (e) => {
-    const inputValue = e.target.value;
-    const numeros = inputValue.replace(/\D/g, '');
-    const valorNumerico = parseInt(numeros) / 100 || 0;
-    
-    setFormData({
-      ...formData,
-      valor_planejado: valorNumerico.toString(),
-      valorFormatado: numeros ? formatarValorInput(inputValue) : ''
-    });
+  const parseCurrencyInput = (value) => {
+    const numeros = value.replace(/\D/g, '');
+    return parseInt(numeros) / 100 || 0;
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    try {
-      const data = {
-        mes: formData.mes,
-        ano: formData.ano,
-        plano_contas_id: formData.plano_contas_id,
-        valor_planejado: parseFloat(formData.valor_planejado),
-      };
-
-      if (editingId) {
-        await planejamentoAPI.update(editingId, data);
-      } else {
-        await planejamentoAPI.create(data);
-      }
-      
-      setShowModal(false);
-      resetForm();
-      carregarDados();
-    } catch (error) {
-      console.error('Erro ao salvar:', error);
-      alert(error.response?.data?.detail || 'Erro ao salvar planejamento');
-    }
-  };
-
-  const handleEdit = (plan) => {
-    setEditingId(plan.id);
-    const valorFormatado = new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    }).format(plan.valor_planejado);
-    
-    setFormData({
-      mes: plan.mes,
-      ano: plan.ano,
-      plano_contas_id: plan.plano_contas_id,
-      valor_planejado: plan.valor_planejado.toString(),
-      valorFormatado: valorFormatado
-    });
-    setShowModal(true);
-  };
-
-  const handleDelete = async (id) => {
-    if (!confirm('Deseja realmente excluir este planejamento?')) return;
-    
-    try {
-      await planejamentoAPI.delete(id);
-      carregarDados();
-    } catch (error) {
-      console.error('Erro ao excluir:', error);
-    }
-  };
-
-  const resetForm = () => {
-    setFormData({
-      mes: new Date().getMonth() + 1,
-      ano: new Date().getFullYear(),
-      plano_contas_id: '',
-      valor_planejado: '',
-      valorFormatado: ''
-    });
-    setEditingId(null);
-  };
-
-  const formatCurrency = (value) => {
+  const formatCurrencyInput = (value) => {
+    if (!value) return '';
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
     }).format(value);
   };
 
-  const toggleCategoria = (catId) => {
-    setExpandedCategories(prev => ({
-      ...prev,
-      [catId]: !prev[catId]
-    }));
+  // Edição inline
+  const startEdit = (itemId, mes, currentValue) => {
+    setEditingCell({ itemId, mes });
+    setEditValue(currentValue > 0 ? formatCurrencyInput(currentValue) : '');
   };
 
-  const getCorClasse = (cor) => {
-    const cores = {
-      cyan: 'bg-cyan-50 border-cyan-200 text-cyan-700',
-      red: 'bg-red-50 border-red-200 text-red-700',
-      gray: 'bg-gray-50 border-gray-200 text-gray-700',
-    };
-    return cores[cor] || 'bg-gray-50 border-gray-200';
+  const cancelEdit = () => {
+    setEditingCell(null);
+    setEditValue('');
   };
 
-  // Agrupar planejamentos por categoria DRE
-  const planejamentosPorCategoria = () => {
-    const agrupado = {};
-    const itens = getItensPlanoContas();
+  const confirmEdit = () => {
+    if (!editingCell) return;
     
-    planejamentos.forEach(plan => {
-      const item = itens.find(i => i.id === plan.plano_contas_id);
-      if (item) {
-        if (!agrupado[item.categoriaId]) {
-          agrupado[item.categoriaId] = [];
+    const valor = parseCurrencyInput(editValue);
+    const pendingKey = `${editingCell.itemId}-${editingCell.mes}`;
+    
+    setPendingChanges(prev => ({
+      ...prev,
+      [pendingKey]: valor
+    }));
+    
+    setEditingCell(null);
+    setEditValue('');
+  };
+
+  const handleEditKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      confirmEdit();
+    } else if (e.key === 'Escape') {
+      cancelEdit();
+    }
+  };
+
+  // Aplicar valor a todos os meses
+  const openApplyAllModal = (itemId, itemNome) => {
+    setApplyAllData({ itemId, itemNome, valor: '' });
+    setShowApplyAllModal(true);
+  };
+
+  const confirmApplyAll = () => {
+    const valor = parseCurrencyInput(applyAllData.valor);
+    const newChanges = { ...pendingChanges };
+    
+    MESES.forEach(mes => {
+      const pendingKey = `${applyAllData.itemId}-${mes.num}`;
+      newChanges[pendingKey] = valor;
+    });
+    
+    setPendingChanges(newChanges);
+    setShowApplyAllModal(false);
+    setApplyAllData({ itemId: '', itemNome: '', valor: '' });
+  };
+
+  // Salvar todas as alterações pendentes
+  const salvarAlteracoes = async () => {
+    if (Object.keys(pendingChanges).length === 0) return;
+    
+    setSaving(true);
+    try {
+      const promises = [];
+      
+      for (const [key, valor] of Object.entries(pendingChanges)) {
+        const [itemId, mesStr] = key.split('-');
+        const mes = parseInt(mesStr);
+        
+        const existente = valoresMap[itemId]?.planejamentos[mes];
+        
+        if (existente) {
+          // Atualizar existente
+          if (valor > 0) {
+            promises.push(planejamentoAPI.update(existente.id, { valor_planejado: valor }));
+          } else {
+            // Deletar se valor é 0
+            promises.push(planejamentoAPI.delete(existente.id));
+          }
+        } else if (valor > 0) {
+          // Criar novo
+          promises.push(planejamentoAPI.create({
+            plano_contas_id: itemId,
+            mes,
+            ano,
+            valor_planejado: valor
+          }));
         }
-        agrupado[item.categoriaId].push({
-          ...plan,
-          itemNome: item.nome,
-          subcategoria: item.subcategoria
+      }
+      
+      await Promise.all(promises);
+      setPendingChanges({});
+      await carregarDados();
+    } catch (error) {
+      console.error('Erro ao salvar:', error);
+      alert('Erro ao salvar alterações: ' + (error.response?.data?.detail || error.message));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Calcular totais
+  const calcularTotalLinha = useCallback((itemId) => {
+    let total = 0;
+    MESES.forEach(mes => {
+      total += getValor(itemId, mes.num);
+    });
+    return total;
+  }, [getValor]);
+
+  const calcularTotalCategoria = useCallback((catId) => {
+    const cat = hierarquia[catId];
+    if (!cat) return { meses: {}, total: 0 };
+    
+    const totais = { meses: {}, total: 0 };
+    MESES.forEach(mes => {
+      totais.meses[mes.num] = 0;
+    });
+    
+    (cat.subcategorias || []).forEach(sub => {
+      // Soma da subcategoria
+      const subValor = getValor(sub.id, 0); // subcategoria em si (se tiver)
+      
+      (sub.itens || []).forEach(item => {
+        MESES.forEach(mes => {
+          const valor = getValor(item.id, mes.num);
+          totais.meses[mes.num] += valor;
+          totais.total += valor;
+        });
+      });
+      
+      // Se não tem itens, usar subcategoria
+      if (!sub.itens || sub.itens.length === 0) {
+        MESES.forEach(mes => {
+          const valor = getValor(sub.id, mes.num);
+          totais.meses[mes.num] += valor;
+          totais.total += valor;
         });
       }
     });
     
-    return agrupado;
+    return totais;
+  }, [hierarquia, getValor]);
+
+  // Cores
+  const getCorClasse = (cor, isHeader = false) => {
+    const cores = {
+      cyan: isHeader ? 'bg-cyan-50 text-cyan-700' : 'text-cyan-700',
+      red: isHeader ? 'bg-red-50 text-red-600' : 'text-red-600',
+      gray: isHeader ? 'bg-gray-100 text-gray-800' : 'text-gray-800',
+    };
+    return cores[cor] || '';
+  };
+
+  // Exportar Excel
+  const exportToExcel = () => {
+    const rows = [];
+    rows.push(['Descrição', ...MESES.map(m => m.label), 'Total'].join(';'));
+    
+    Object.entries(CATEGORIAS_CONFIG).forEach(([catId, config]) => {
+      const totais = calcularTotalCategoria(catId);
+      rows.push([
+        config.label,
+        ...MESES.map(m => (totais.meses[m.num] || 0).toFixed(2).replace('.', ',')),
+        totais.total.toFixed(2).replace('.', ',')
+      ].join(';'));
+      
+      const cat = hierarquia[catId];
+      (cat?.subcategorias || []).forEach(sub => {
+        const itens = sub.itens || [];
+        if (itens.length === 0) {
+          rows.push([
+            '  ' + sub.nome,
+            ...MESES.map(m => getValor(sub.id, m.num).toFixed(2).replace('.', ',')),
+            calcularTotalLinha(sub.id).toFixed(2).replace('.', ',')
+          ].join(';'));
+        } else {
+          itens.forEach(item => {
+            rows.push([
+              '  ' + sub.nome + ' > ' + item.nome,
+              ...MESES.map(m => getValor(item.id, m.num).toFixed(2).replace('.', ',')),
+              calcularTotalLinha(item.id).toFixed(2).replace('.', ',')
+            ].join(';'));
+          });
+        }
+      });
+    });
+    
+    const csvContent = '\uFEFF' + rows.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `Planejamento_${ano}.csv`;
+    link.click();
+  };
+
+  // Exportar PDF
+  const exportToPDF = () => {
+    const doc = new jsPDF('landscape', 'mm', 'a4');
+    
+    doc.setFontSize(14);
+    doc.text(`Planejamento Orçamentário - ${ano}`, doc.internal.pageSize.width / 2, 15, { align: 'center' });
+    
+    const headers = ['Descrição', ...MESES.map(m => m.label), 'Total'];
+    const body = [];
+    
+    Object.entries(CATEGORIAS_CONFIG).forEach(([catId, config]) => {
+      const totais = calcularTotalCategoria(catId);
+      body.push([
+        config.label,
+        ...MESES.map(m => formatCurrency(totais.meses[m.num] || 0)),
+        formatCurrency(totais.total)
+      ]);
+      
+      const cat = hierarquia[catId];
+      (cat?.subcategorias || []).forEach(sub => {
+        const itens = sub.itens || [];
+        if (itens.length === 0) {
+          body.push([
+            '  ' + sub.nome,
+            ...MESES.map(m => formatCurrency(getValor(sub.id, m.num))),
+            formatCurrency(calcularTotalLinha(sub.id))
+          ]);
+        } else {
+          itens.forEach(item => {
+            body.push([
+              '    ' + item.nome,
+              ...MESES.map(m => formatCurrency(getValor(item.id, m.num))),
+              formatCurrency(calcularTotalLinha(item.id))
+            ]);
+          });
+        }
+      });
+    });
+    
+    autoTable(doc, {
+      head: [headers],
+      body: body,
+      startY: 22,
+      styles: { fontSize: 7, cellPadding: 1.5 },
+      headStyles: { fillColor: [229, 229, 229], textColor: [0, 0, 0], fontStyle: 'bold' },
+      columnStyles: { 0: { cellWidth: 50 } },
+    });
+    
+    doc.save(`Planejamento_${ano}.pdf`);
   };
 
   if (loading) {
@@ -228,312 +399,328 @@ export default function PlanejamentoPage() {
     );
   }
 
-  const itensDisponiveis = getItensPlanoContas();
-  const planejamentosAgrupados = planejamentosPorCategoria();
+  const hasPendingChanges = Object.keys(pendingChanges).length > 0;
 
-  // Exportar para Excel
-  const exportToExcel = () => {
-    const rows = [['Categoria', 'Item', 'Período', 'Valor Planejado'].join(';')];
+  // Renderizar célula editável
+  const renderCell = (itemId, mes, valor) => {
+    const isEditing = editingCell?.itemId === itemId && editingCell?.mes === mes.num;
+    const pendingKey = `${itemId}-${mes.num}`;
+    const isPending = pendingChanges[pendingKey] !== undefined;
     
-    Object.entries(CATEGORIAS_DRE).forEach(([catId, catInfo]) => {
-      const planejamentosCat = planejamentosAgrupados[catId] || [];
-      planejamentosCat.forEach(plan => {
-        rows.push([
-          catInfo.nome,
-          plan.subcategoria ? `${plan.subcategoria} → ${plan.itemNome}` : plan.itemNome,
-          new Date(plan.ano, plan.mes - 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }),
-          plan.valor_planejado.toFixed(2).replace('.', ',')
-        ].join(';'));
-      });
-    });
+    if (isEditing) {
+      return (
+        <td key={mes.key} className="p-1 border-r border-gray-200">
+          <input
+            type="text"
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onKeyDown={handleEditKeyDown}
+            onBlur={confirmEdit}
+            autoFocus
+            className="w-full px-1 py-0.5 text-right text-sm border border-blue-400 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+            placeholder="R$ 0,00"
+          />
+        </td>
+      );
+    }
     
-    // Total geral
-    const totalGeral = planejamentos.reduce((a, p) => a + p.valor_planejado, 0);
-    rows.push(['', '', 'TOTAL GERAL', totalGeral.toFixed(2).replace('.', ',')].join(';'));
-    
-    const csvContent = '\uFEFF' + rows.join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `PlanejamentoOrcamentario_${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
+    return (
+      <td 
+        key={mes.key} 
+        className={`p-1 text-right text-sm border-r border-gray-200 cursor-pointer hover:bg-blue-50 transition ${isPending ? 'bg-yellow-50' : ''}`}
+        onClick={() => startEdit(itemId, mes.num, valor)}
+        title="Clique para editar"
+      >
+        {valor > 0 ? formatCurrency(valor) : '-'}
+      </td>
+    );
   };
 
-  // Exportar para PDF - download automático
-  const exportToPDF = () => {
-    const doc = new jsPDF('portrait', 'mm', 'a4');
+  // Renderizar linha de item
+  const renderItemRow = (item, nivel = 2) => {
+    const paddingLeft = nivel === 2 ? 'pl-8' : 'pl-14';
     
-    doc.setFontSize(16);
-    doc.text('Planejamento Orçamentário', doc.internal.pageSize.width / 2, 15, { align: 'center' });
-    
-    const body = [];
-    
-    Object.entries(CATEGORIAS_DRE).forEach(([catId, catInfo]) => {
-      const planejamentosCat = planejamentosAgrupados[catId] || [];
-      const totalCat = planejamentosCat.reduce((a, p) => a + p.valor_planejado, 0);
-      
-      // Header da categoria
-      body.push([
-        { content: catInfo.nome, colSpan: 2, styles: { fontStyle: 'bold', fillColor: catInfo.cor === 'cyan' ? [224, 247, 250] : catInfo.cor === 'red' ? [255, 235, 238] : [245, 245, 245] } },
-        { content: formatCurrency(totalCat), styles: { fontStyle: 'bold', halign: 'right', fillColor: catInfo.cor === 'cyan' ? [224, 247, 250] : catInfo.cor === 'red' ? [255, 235, 238] : [245, 245, 245] } }
-      ]);
-      
-      // Itens da categoria
-      planejamentosCat.forEach(plan => {
-        body.push([
-          '    ' + (plan.subcategoria ? `${plan.subcategoria} → ${plan.itemNome}` : plan.itemNome),
-          new Date(plan.ano, plan.mes - 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }),
-          { content: formatCurrency(plan.valor_planejado), styles: { halign: 'right' } }
-        ]);
-      });
-    });
-    
-    const totalGeral = planejamentos.reduce((a, p) => a + p.valor_planejado, 0);
-    body.push([
-      { content: 'TOTAL GERAL', colSpan: 2, styles: { fontStyle: 'bold', fillColor: [200, 200, 200] } },
-      { content: formatCurrency(totalGeral), styles: { fontStyle: 'bold', halign: 'right', fillColor: [200, 200, 200] } }
-    ]);
-    
-    autoTable(doc, {
-      head: [['Item', 'Período', 'Valor Planejado']],
-      body: body,
-      startY: 22,
-      styles: { fontSize: 9, cellPadding: 2 },
-      headStyles: { fillColor: [229, 229, 229], textColor: [0, 0, 0], fontStyle: 'bold' },
-    });
-    
-    doc.save(`PlanejamentoOrcamentario_${new Date().toISOString().split('T')[0]}.pdf`);
+    return (
+      <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50">
+        <td className={`p-2 ${paddingLeft} sticky left-0 bg-white hover:bg-gray-50 border-r border-gray-300 text-sm`}>
+          <div className="flex items-center justify-between">
+            <span className={nivel === 3 ? 'text-gray-600' : ''}>{nivel === 3 ? '• ' : ''}{item.nome}</span>
+            <button
+              onClick={() => openApplyAllModal(item.id, item.nome)}
+              className="ml-2 p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition"
+              title="Aplicar valor para todos os meses"
+            >
+              <Copy size={14} />
+            </button>
+          </div>
+        </td>
+        {MESES.map(mes => renderCell(item.id, mes, getValor(item.id, mes.num)))}
+        <td className="p-2 text-right font-semibold bg-gray-50 border-r border-gray-300 text-sm">
+          {formatCurrency(calcularTotalLinha(item.id))}
+        </td>
+      </tr>
+    );
+  };
+
+  // Renderizar categoria hierárquica
+  const renderCategoriaHierarquica = (catId, config) => {
+    const cat = hierarquia[catId];
+    const isExpanded = expandedState[catId]?.expanded;
+    const subcategorias = cat?.subcategorias || [];
+    const totais = calcularTotalCategoria(catId);
+
+    return (
+      <React.Fragment key={catId}>
+        {/* Linha da Categoria */}
+        <tr 
+          className={`${getCorClasse(config.cor, true)} border-b border-gray-200 cursor-pointer hover:opacity-90`}
+          onClick={() => toggleCategoria(catId)}
+        >
+          <td className={`p-2 sticky left-0 ${getCorClasse(config.cor, true)} font-semibold border-r border-gray-300`}>
+            <div className="flex items-center gap-2">
+              {subcategorias.length > 0 && (
+                <span className="transition-transform duration-200">
+                  {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                </span>
+              )}
+              {config.label}
+            </div>
+          </td>
+          {MESES.map(mes => (
+            <td key={mes.key} className={`p-2 text-right font-semibold ${getCorClasse(config.cor)} border-r border-gray-200 text-sm`}>
+              {formatCurrency(totais.meses[mes.num] || 0)}
+            </td>
+          ))}
+          <td className={`p-2 text-right font-bold bg-gray-100 border-r border-gray-300 text-sm`}>
+            {formatCurrency(totais.total)}
+          </td>
+        </tr>
+
+        {/* Subcategorias */}
+        {isExpanded && subcategorias.map(sub => {
+          const isSubExpanded = expandedState[catId]?.subcategorias?.[sub.id];
+          const itens = sub.itens || [];
+          const hasItens = itens.length > 0;
+
+          return (
+            <React.Fragment key={sub.id}>
+              {/* Linha da Subcategoria */}
+              <tr 
+                className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
+                onClick={() => hasItens && toggleSubcategoria(catId, sub.id)}
+              >
+                <td className="p-2 pl-6 sticky left-0 bg-white hover:bg-gray-50 border-r border-gray-300 text-sm font-medium">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {hasItens && (
+                        <span className="transition-transform duration-200">
+                          {isSubExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                        </span>
+                      )}
+                      {sub.nome}
+                    </div>
+                    {!hasItens && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); openApplyAllModal(sub.id, sub.nome); }}
+                        className="ml-2 p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition"
+                        title="Aplicar valor para todos os meses"
+                      >
+                        <Copy size={14} />
+                      </button>
+                    )}
+                  </div>
+                </td>
+                {hasItens ? (
+                  // Se tem itens, mostrar soma
+                  <>
+                    {MESES.map(mes => {
+                      const somaItens = itens.reduce((acc, item) => acc + getValor(item.id, mes.num), 0);
+                      return (
+                        <td key={mes.key} className="p-2 text-right text-sm border-r border-gray-200 text-gray-500">
+                          {somaItens > 0 ? formatCurrency(somaItens) : '-'}
+                        </td>
+                      );
+                    })}
+                    <td className="p-2 text-right font-semibold bg-gray-50 border-r border-gray-300 text-sm">
+                      {formatCurrency(itens.reduce((acc, item) => acc + calcularTotalLinha(item.id), 0))}
+                    </td>
+                  </>
+                ) : (
+                  // Se não tem itens, permite editar subcategoria diretamente
+                  <>
+                    {MESES.map(mes => renderCell(sub.id, mes, getValor(sub.id, mes.num)))}
+                    <td className="p-2 text-right font-semibold bg-gray-50 border-r border-gray-300 text-sm">
+                      {formatCurrency(calcularTotalLinha(sub.id))}
+                    </td>
+                  </>
+                )}
+              </tr>
+
+              {/* Itens (nível 3) */}
+              {isSubExpanded && hasItens && itens.map(item => renderItemRow(item, 3))}
+            </React.Fragment>
+          );
+        })}
+      </React.Fragment>
+    );
   };
 
   return (
-    <div className="space-y-6" data-testid="planejamento-page">
+    <div className="space-y-4" data-testid="planejamento-page">
+      {/* Header */}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Planejamento Orçamentário</h1>
-          <p className="text-gray-600 text-sm">Defina metas seguindo a estrutura do DRE</p>
+          <p className="text-gray-600 text-sm">Defina metas mensais seguindo a estrutura do DRE</p>
         </div>
-        
+
         <div className="flex items-center gap-3">
-          {/* Botões de Exportação */}
+          {/* Indicador de alterações pendentes */}
+          {hasPendingChanges && (
+            <span className="text-sm text-amber-600 bg-amber-50 px-3 py-1 rounded-full">
+              {Object.keys(pendingChanges).length} alterações não salvas
+            </span>
+          )}
+          
+          {/* Botão Salvar */}
+          <button
+            onClick={salvarAlteracoes}
+            disabled={!hasPendingChanges || saving}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition ${
+              hasPendingChanges 
+                ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+            }`}
+          >
+            <Save size={18} />
+            {saving ? 'Salvando...' : 'Salvar Alterações'}
+          </button>
+
+          {/* Exportações */}
           <button
             onClick={exportToExcel}
-            className="flex items-center gap-2 px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700"
-            data-testid="export-excel-btn"
+            className="flex items-center gap-2 px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700"
           >
             <FileSpreadsheet size={16} />
             Excel
           </button>
           <button
             onClick={exportToPDF}
-            className="flex items-center gap-2 px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700"
-            data-testid="export-pdf-btn"
+            className="flex items-center gap-2 px-3 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700"
           >
             <Download size={16} />
             PDF
           </button>
-          
-          <button
-            onClick={() => {
-              resetForm();
-              setShowModal(true);
-            }}
-            className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition shadow-md"
-            data-testid="novo-planejamento-btn"
+
+          {/* Seletor de Ano */}
+          <select
+            value={ano}
+            onChange={(e) => setAno(parseInt(e.target.value))}
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
           >
-            <Plus size={20} />
-            Novo Planejamento
-          </button>
+            {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() + i - 1).map((a) => (
+              <option key={a} value={a}>{a}</option>
+            ))}
+          </select>
         </div>
       </div>
 
-      {/* Visualização por Categoria DRE */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        {Object.entries(CATEGORIAS_DRE).map(([catId, catInfo]) => {
-          const isExpanded = expandedCategories[catId];
-          const planejamentosCat = planejamentosAgrupados[catId] || [];
-
-          return (
-            <div key={catId} className="border-b border-gray-200 last:border-b-0">
-              {/* Header da Categoria */}
-              <div 
-                className={`flex items-center justify-between p-4 ${getCorClasse(catInfo.cor)} cursor-pointer hover:opacity-90`}
-                onClick={() => toggleCategoria(catId)}
-              >
-                <div className="flex items-center gap-2">
-                  {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
-                  <span className="font-semibold">{catInfo.nome}</span>
-                  <span className="text-xs bg-white/50 px-2 py-0.5 rounded">
-                    {planejamentosCat.length} itens planejados
-                  </span>
-                </div>
-                <span className="font-bold">
-                  {formatCurrency(planejamentosCat.reduce((a, p) => a + p.valor_planejado, 0))}
-                </span>
-              </div>
-
-              {/* Itens da Categoria */}
-              {isExpanded && (
-                <div className="bg-white">
-                  {planejamentosCat.length === 0 ? (
-                    <div className="p-4 pl-10 text-sm text-gray-500 italic">
-                      Nenhum planejamento cadastrado para esta categoria
-                    </div>
-                  ) : (
-                    <table className="w-full">
-                      <thead className="bg-gray-50 text-xs text-gray-500">
-                        <tr>
-                          <th className="text-left p-3 pl-10">Item</th>
-                          <th className="text-left p-3">Período</th>
-                          <th className="text-right p-3">Valor Planejado</th>
-                          <th className="text-center p-3">Ações</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {planejamentosCat.map(plan => (
-                          <tr key={plan.id} className="border-t border-gray-100 hover:bg-gray-50">
-                            <td className="p-3 pl-10">
-                              <span className="font-medium">{plan.itemNome}</span>
-                              {plan.subcategoria && (
-                                <span className="text-xs text-gray-500 block">{plan.subcategoria}</span>
-                              )}
-                            </td>
-                            <td className="p-3 text-sm">
-                              {new Date(plan.ano, plan.mes - 1).toLocaleDateString('pt-BR', {
-                                month: 'long',
-                                year: 'numeric',
-                              })}
-                            </td>
-                            <td className="p-3 text-right font-semibold text-blue-600">
-                              {formatCurrency(plan.valor_planejado)}
-                            </td>
-                            <td className="p-3">
-                              <div className="flex justify-center gap-2">
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); handleEdit(plan); }}
-                                  className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                                >
-                                  <Edit2 size={16} />
-                                </button>
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); handleDelete(plan.id); }}
-                                  className="p-1 text-red-600 hover:bg-red-50 rounded"
-                                >
-                                  <Trash2 size={16} />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
+      {/* Instruções */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
+        <strong>Dica:</strong> Clique em qualquer célula para editar o valor. Use o botão 
+        <Copy size={14} className="inline mx-1" /> ao lado de cada item para aplicar o mesmo valor em todos os meses.
       </div>
 
-      {/* Modal */}
-      {showModal && (
+      {/* Tabela */}
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm border-collapse min-w-[1200px]">
+            <thead>
+              <tr className="bg-gray-100 border-b-2 border-gray-300">
+                <th className="text-left p-2 sticky left-0 bg-gray-100 min-w-[250px] border-r border-gray-300">
+                  Descrição
+                </th>
+                {MESES.map(mes => (
+                  <th key={mes.key} className="text-right p-2 min-w-[80px] border-r border-gray-200">
+                    {mes.label}
+                  </th>
+                ))}
+                <th className="text-right p-2 min-w-[100px] bg-gray-200 border-r border-gray-300 font-bold">
+                  Total {ano}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(CATEGORIAS_CONFIG).map(([catId, config]) => 
+                renderCategoriaHierarquica(catId, config)
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Legenda */}
+      <div className="bg-white rounded-lg shadow p-4 text-sm">
+        <div className="flex flex-wrap gap-6">
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-yellow-50 border border-yellow-300 rounded"></div>
+            <span>Valor alterado (não salvo)</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Copy size={16} className="text-gray-400" />
+            <span>Aplicar para todos os meses</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Modal Aplicar a Todos */}
+      {showApplyAllModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg">
-            <div className="flex justify-between items-center p-6 border-b">
-              <h2 className="text-xl font-bold text-gray-800">
-                {editingId ? 'Editar Planejamento' : 'Novo Planejamento'}
-              </h2>
-              <button onClick={() => { setShowModal(false); resetForm(); }} className="text-gray-400 hover:text-gray-600">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
+            <div className="flex justify-between items-center p-4 border-b">
+              <h2 className="text-lg font-bold text-gray-800">Aplicar para Todos os Meses</h2>
+              <button onClick={() => setShowApplyAllModal(false)} className="text-gray-400 hover:text-gray-600">
                 <X size={24} />
               </button>
             </div>
-
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Mês *</label>
-                  <select
-                    value={formData.mes}
-                    onChange={(e) => setFormData({ ...formData, mes: parseInt(e.target.value) })}
-                    required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  >
-                    {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                      <option key={m} value={m}>
-                        {new Date(2000, m - 1).toLocaleDateString('pt-BR', { month: 'long' })}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Ano *</label>
-                  <select
-                    value={formData.ano}
-                    onChange={(e) => setFormData({ ...formData, ano: parseInt(e.target.value) })}
-                    required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  >
-                    {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() + i).map((a) => (
-                      <option key={a} value={a}>
-                        {a}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
+            
+            <div className="p-4 space-y-4">
+              <p className="text-sm text-gray-600">
+                Digite o valor que será aplicado em <strong>todos os 12 meses</strong> para:
+              </p>
+              <p className="font-medium text-blue-600">{applyAllData.itemNome}</p>
+              
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Item/Conta *</label>
-                <select
-                  value={formData.plano_contas_id}
-                  onChange={(e) => setFormData({ ...formData, plano_contas_id: e.target.value })}
-                  required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  data-testid="item-select"
-                >
-                  <option value="">Selecione...</option>
-                  {Object.entries(CATEGORIAS_DRE).map(([catId, catInfo]) => (
-                    <optgroup key={catId} label={catInfo.nome}>
-                      {itensDisponiveis
-                        .filter(item => item.categoriaId === catId)
-                        .map((item) => (
-                          <option key={item.id} value={item.id}>
-                            {item.subcategoria ? `${item.subcategoria} → ${item.nome}` : item.nome}
-                          </option>
-                        ))}
-                    </optgroup>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Valor Planejado *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Valor Mensal</label>
                 <input
                   type="text"
-                  value={formData.valorFormatado}
-                  onChange={handleValorChange}
-                  required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-lg font-semibold"
+                  value={applyAllData.valor}
+                  onChange={(e) => setApplyAllData({ ...applyAllData, valor: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-lg font-semibold focus:ring-2 focus:ring-blue-500"
                   placeholder="R$ 0,00"
+                  autoFocus
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Total anual: {formatCurrency(parseCurrencyInput(applyAllData.valor) * 12)}
+                </p>
               </div>
-
-              <div className="flex gap-3 pt-4">
+              
+              <div className="flex gap-3 pt-2">
                 <button
-                  type="button"
-                  onClick={() => { setShowModal(false); resetForm(); }}
-                  className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium"
+                  onClick={() => setShowApplyAllModal(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
                 >
                   Cancelar
                 </button>
                 <button
-                  type="submit"
-                  className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
+                  onClick={confirmApplyAll}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2"
                 >
-                  Salvar
+                  <Check size={18} />
+                  Aplicar
                 </button>
               </div>
-            </form>
+            </div>
           </div>
         </div>
       )}
