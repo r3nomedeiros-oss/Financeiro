@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { planejamentoAPI, planoContasAPI } from '../services/api';
-import { Save, Copy, ChevronDown, ChevronRight, Download, FileSpreadsheet, Check, X } from 'lucide-react';
+import { Save, Copy, ChevronDown, ChevronRight, Download, FileSpreadsheet, Check, X, ChevronsDown, ChevronsUp } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -40,14 +40,14 @@ export default function PlanejamentoPage() {
   const [expandedState, setExpandedState] = useState({});
   
   // Estado para edição inline
-  const [editingCell, setEditingCell] = useState(null); // { itemId, mes }
+  const [editingCell, setEditingCell] = useState(null);
   const [editValue, setEditValue] = useState('');
   
   // Estado para "Aplicar a todos os meses"
   const [showApplyAllModal, setShowApplyAllModal] = useState(false);
   const [applyAllData, setApplyAllData] = useState({ itemId: '', itemNome: '', valor: '' });
   
-  // Alterações pendentes (buffer para salvar em lote)
+  // Alterações pendentes
   const [pendingChanges, setPendingChanges] = useState({});
 
   useEffect(() => {
@@ -65,7 +65,7 @@ export default function PlanejamentoPage() {
       setHierarquia(hierRes.data);
       setPlanejamentos(planRes.data);
       
-      // Inicializar estado de expansão
+      // Inicializar estado de expansão - todas expandidas
       const initialExpanded = {};
       Object.keys(hierRes.data || {}).forEach(catId => {
         initialExpanded[catId] = { expanded: true, subcategorias: {} };
@@ -81,7 +81,27 @@ export default function PlanejamentoPage() {
     }
   };
 
-  // Criar mapa de valores planejados: { itemId: { mes: valor } }
+  // Expandir/Recolher Tudo
+  const expandirTudo = () => {
+    const newState = {};
+    Object.keys(hierarquia).forEach(catId => {
+      newState[catId] = { expanded: true, subcategorias: {} };
+      (hierarquia[catId]?.subcategorias || []).forEach(sub => {
+        newState[catId].subcategorias[sub.id] = true;
+      });
+    });
+    setExpandedState(newState);
+  };
+
+  const recolherTudo = () => {
+    const newState = {};
+    Object.keys(hierarquia).forEach(catId => {
+      newState[catId] = { expanded: false, subcategorias: {} };
+    });
+    setExpandedState(newState);
+  };
+
+  // Criar mapa de valores planejados
   const valoresMap = useMemo(() => {
     const map = {};
     planejamentos.forEach(p => {
@@ -123,26 +143,9 @@ export default function PlanejamentoPage() {
     }));
   };
 
-  // Formatação - CORRIGIDO para aceitar valores em reais diretamente
+  // Formatação
   const formatCurrency = (value) => {
     if (!value && value !== 0) return '-';
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
-
-  // Parser simples - aceita números inteiros diretamente (ex: 100000 = R$ 100.000)
-  const parseCurrencyInput = (value) => {
-    // Remove tudo que não é número
-    const numeros = value.replace(/\D/g, '');
-    return parseInt(numeros) || 0;
-  };
-
-  const formatCurrencyInput = (value) => {
-    if (!value) return '';
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
@@ -154,7 +157,6 @@ export default function PlanejamentoPage() {
   // Edição inline
   const startEdit = (itemId, mes, currentValue) => {
     setEditingCell({ itemId, mes });
-    // Mostra o valor como número simples para facilitar edição
     setEditValue(currentValue > 0 ? currentValue.toString() : '');
   };
 
@@ -166,7 +168,6 @@ export default function PlanejamentoPage() {
   const confirmEdit = () => {
     if (!editingCell) return;
     
-    // Aceita número direto ou com vírgula/ponto
     const valorLimpo = editValue.replace(/[^\d,.-]/g, '').replace(',', '.');
     const valor = parseFloat(valorLimpo) || 0;
     const pendingKey = `${editingCell.itemId}-${editingCell.mes}`;
@@ -195,7 +196,6 @@ export default function PlanejamentoPage() {
   };
 
   const confirmApplyAll = () => {
-    // Aceita número direto ou com vírgula/ponto
     const valorLimpo = applyAllData.valor.replace(/[^\d,.-]/g, '').replace(',', '.');
     const valor = parseFloat(valorLimpo) || 0;
     const newChanges = { ...pendingChanges };
@@ -210,21 +210,18 @@ export default function PlanejamentoPage() {
     setApplyAllData({ itemId: '', itemNome: '', valor: '' });
   };
 
-  // Calcular total anual do valor digitado no modal
   const getValorAnualModal = () => {
     const valorLimpo = applyAllData.valor.replace(/[^\d,.-]/g, '').replace(',', '.');
     const valor = parseFloat(valorLimpo) || 0;
     return valor * 12;
   };
 
-  // Salvar todas as alterações pendentes
+  // Salvar alterações
   const salvarAlteracoes = async () => {
     if (Object.keys(pendingChanges).length === 0) return;
     
     setSaving(true);
     try {
-      const promises = [];
-      
       for (const [key, valor] of Object.entries(pendingChanges)) {
         const [itemId, mesStr] = key.split('-');
         const mes = parseInt(mesStr);
@@ -232,39 +229,33 @@ export default function PlanejamentoPage() {
         const existente = valoresMap[itemId]?.planejamentos[mes];
         
         if (existente) {
-          // Atualizar existente
           if (valor > 0) {
-            promises.push(planejamentoAPI.update(existente.id, { valor_planejado: valor }));
+            await planejamentoAPI.update(existente.id, { valor_planejado: valor });
           } else {
-            // Deletar se valor é 0
-            promises.push(planejamentoAPI.delete(existente.id));
+            await planejamentoAPI.delete(existente.id);
           }
         } else if (valor > 0) {
-          // Criar novo
-          promises.push(planejamentoAPI.create({
+          await planejamentoAPI.create({
             plano_contas_id: itemId,
             mes,
             ano,
             valor_planejado: valor
-          }));
+          });
         }
       }
       
-      await Promise.all(promises);
       setPendingChanges({});
       await carregarDados();
+      alert('Alterações salvas com sucesso!');
     } catch (error) {
       console.error('Erro ao salvar:', error);
-      // Melhor tratamento de erro
       let errorMsg = 'Erro desconhecido';
       if (error.response?.data?.detail) {
         errorMsg = error.response.data.detail;
       } else if (error.message) {
         errorMsg = error.message;
-      } else if (typeof error === 'string') {
-        errorMsg = error;
       }
-      alert('Erro ao salvar alterações: ' + errorMsg);
+      alert('Erro ao salvar: ' + errorMsg);
     } finally {
       setSaving(false);
     }
@@ -289,9 +280,6 @@ export default function PlanejamentoPage() {
     });
     
     (cat.subcategorias || []).forEach(sub => {
-      // Soma da subcategoria
-      const subValor = getValor(sub.id, 0); // subcategoria em si (se tiver)
-      
       (sub.itens || []).forEach(item => {
         MESES.forEach(mes => {
           const valor = getValor(item.id, mes.num);
@@ -300,7 +288,6 @@ export default function PlanejamentoPage() {
         });
       });
       
-      // Se não tem itens, usar subcategoria
       if (!sub.itens || sub.itens.length === 0) {
         MESES.forEach(mes => {
           const valor = getValor(sub.id, mes.num);
@@ -442,8 +429,8 @@ export default function PlanejamentoPage() {
             onKeyDown={handleEditKeyDown}
             onBlur={confirmEdit}
             autoFocus
-            className="w-full px-1 py-0.5 text-right text-sm border border-blue-400 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-            placeholder="R$ 0,00"
+            className="w-full px-1 py-0.5 text-right text-sm border border-blue-400 rounded focus:outline-none"
+            placeholder="0"
           />
         </td>
       );
@@ -452,9 +439,8 @@ export default function PlanejamentoPage() {
     return (
       <td 
         key={mes.key} 
-        className={`p-1 text-right text-sm border-r border-gray-200 cursor-pointer hover:bg-blue-50 transition ${isPending ? 'bg-yellow-50' : ''}`}
+        className={`p-1 text-right text-sm border-r border-gray-200 cursor-pointer hover:bg-blue-50 ${isPending ? 'bg-yellow-50' : ''}`}
         onClick={() => startEdit(itemId, mes.num, valor)}
-        title="Clique para editar"
       >
         {valor > 0 ? formatCurrency(valor) : '-'}
       </td>
@@ -467,20 +453,20 @@ export default function PlanejamentoPage() {
     
     return (
       <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50">
-        <td className={`p-2 ${paddingLeft} sticky left-0 bg-white hover:bg-gray-50 border-r border-gray-300 text-sm`}>
+        <td className={`p-2 ${paddingLeft} sticky left-0 bg-white z-10 border-r border-gray-300 text-sm`}>
           <div className="flex items-center justify-between">
             <span className={nivel === 3 ? 'text-gray-600' : ''}>{nivel === 3 ? '• ' : ''}{item.nome}</span>
             <button
               onClick={() => openApplyAllModal(item.id, item.nome)}
-              className="ml-2 p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition"
-              title="Aplicar valor para todos os meses"
+              className="ml-2 p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded"
+              title="Aplicar para todos os meses"
             >
               <Copy size={14} />
             </button>
           </div>
         </td>
         {MESES.map(mes => renderCell(item.id, mes, getValor(item.id, mes.num)))}
-        <td className="p-2 text-right font-semibold bg-gray-50 border-r border-gray-300 text-sm">
+        <td className="p-2 text-right font-semibold bg-gray-50 text-sm">
           {formatCurrency(calcularTotalLinha(item.id))}
         </td>
       </tr>
@@ -496,17 +482,14 @@ export default function PlanejamentoPage() {
 
     return (
       <React.Fragment key={catId}>
-        {/* Linha da Categoria */}
         <tr 
           className={`${getCorClasse(config.cor, true)} border-b border-gray-200 cursor-pointer hover:opacity-90`}
           onClick={() => toggleCategoria(catId)}
         >
-          <td className={`p-2 sticky left-0 ${getCorClasse(config.cor, true)} font-semibold border-r border-gray-300`}>
+          <td className={`p-2 sticky left-0 z-10 ${getCorClasse(config.cor, true)} font-semibold border-r border-gray-300`}>
             <div className="flex items-center gap-2">
               {subcategorias.length > 0 && (
-                <span className="transition-transform duration-200">
-                  {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                </span>
+                isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />
               )}
               {config.label}
             </div>
@@ -516,12 +499,11 @@ export default function PlanejamentoPage() {
               {formatCurrency(totais.meses[mes.num] || 0)}
             </td>
           ))}
-          <td className={`p-2 text-right font-bold bg-gray-100 border-r border-gray-300 text-sm`}>
+          <td className="p-2 text-right font-bold bg-gray-100 text-sm">
             {formatCurrency(totais.total)}
           </td>
         </tr>
 
-        {/* Subcategorias */}
         {isExpanded && subcategorias.map(sub => {
           const isSubExpanded = expandedState[catId]?.subcategorias?.[sub.id];
           const itens = sub.itens || [];
@@ -529,26 +511,22 @@ export default function PlanejamentoPage() {
 
           return (
             <React.Fragment key={sub.id}>
-              {/* Linha da Subcategoria */}
               <tr 
                 className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
                 onClick={() => hasItens && toggleSubcategoria(catId, sub.id)}
               >
-                <td className="p-2 pl-6 sticky left-0 bg-white hover:bg-gray-50 border-r border-gray-300 text-sm font-medium">
+                <td className="p-2 pl-6 sticky left-0 bg-white z-10 border-r border-gray-300 text-sm font-medium">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       {hasItens && (
-                        <span className="transition-transform duration-200">
-                          {isSubExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                        </span>
+                        isSubExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />
                       )}
                       {sub.nome}
                     </div>
                     {!hasItens && (
                       <button
                         onClick={(e) => { e.stopPropagation(); openApplyAllModal(sub.id, sub.nome); }}
-                        className="ml-2 p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition"
-                        title="Aplicar valor para todos os meses"
+                        className="ml-2 p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded"
                       >
                         <Copy size={14} />
                       </button>
@@ -556,7 +534,6 @@ export default function PlanejamentoPage() {
                   </div>
                 </td>
                 {hasItens ? (
-                  // Se tem itens, mostrar soma
                   <>
                     {MESES.map(mes => {
                       const somaItens = itens.reduce((acc, item) => acc + getValor(item.id, mes.num), 0);
@@ -566,22 +543,20 @@ export default function PlanejamentoPage() {
                         </td>
                       );
                     })}
-                    <td className="p-2 text-right font-semibold bg-gray-50 border-r border-gray-300 text-sm">
+                    <td className="p-2 text-right font-semibold bg-gray-50 text-sm">
                       {formatCurrency(itens.reduce((acc, item) => acc + calcularTotalLinha(item.id), 0))}
                     </td>
                   </>
                 ) : (
-                  // Se não tem itens, permite editar subcategoria diretamente
                   <>
                     {MESES.map(mes => renderCell(sub.id, mes, getValor(sub.id, mes.num)))}
-                    <td className="p-2 text-right font-semibold bg-gray-50 border-r border-gray-300 text-sm">
+                    <td className="p-2 text-right font-semibold bg-gray-50 text-sm">
                       {formatCurrency(calcularTotalLinha(sub.id))}
                     </td>
                   </>
                 )}
               </tr>
 
-              {/* Itens (nível 3) */}
               {isSubExpanded && hasItens && itens.map(item => renderItemRow(item, 3))}
             </React.Fragment>
           );
@@ -592,86 +567,81 @@ export default function PlanejamentoPage() {
 
   return (
     <div className="space-y-4" data-testid="planejamento-page">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">Planejamento Orçamentário</h1>
-          <p className="text-gray-600 text-sm">Defina metas mensais seguindo a estrutura do DRE</p>
-        </div>
+      {/* Header Fixo */}
+      <div className="sticky top-0 z-20 bg-gray-50 pb-4 -mx-6 px-6 -mt-6 pt-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">Planejamento Orçamentário</h1>
+            <p className="text-gray-600 text-sm">Clique na célula para editar. Digite valores em reais (ex: 100000)</p>
+          </div>
 
-        <div className="flex items-center gap-3">
-          {/* Indicador de alterações pendentes */}
-          {hasPendingChanges && (
-            <span className="text-sm text-amber-600 bg-amber-50 px-3 py-1 rounded-full">
-              {Object.keys(pendingChanges).length} alterações não salvas
-            </span>
-          )}
-          
-          {/* Botão Salvar */}
-          <button
-            onClick={salvarAlteracoes}
-            disabled={!hasPendingChanges || saving}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition ${
-              hasPendingChanges 
-                ? 'bg-blue-600 text-white hover:bg-blue-700' 
-                : 'bg-gray-200 text-gray-500 cursor-not-allowed'
-            }`}
-          >
-            <Save size={18} />
-            {saving ? 'Salvando...' : 'Salvar Alterações'}
-          </button>
+          <div className="flex items-center gap-2">
+            {hasPendingChanges && (
+              <span className="text-sm text-amber-600 bg-amber-50 px-3 py-1 rounded-full">
+                {Object.keys(pendingChanges).length} alterações
+              </span>
+            )}
+            
+            <button
+              onClick={salvarAlteracoes}
+              disabled={!hasPendingChanges || saving}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium ${
+                hasPendingChanges 
+                  ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                  : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+              }`}
+            >
+              <Save size={16} />
+              {saving ? 'Salvando...' : 'Salvar'}
+            </button>
 
-          {/* Exportações */}
-          <button
-            onClick={exportToExcel}
-            className="flex items-center gap-2 px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700"
-          >
-            <FileSpreadsheet size={16} />
-            Excel
-          </button>
-          <button
-            onClick={exportToPDF}
-            className="flex items-center gap-2 px-3 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700"
-          >
-            <Download size={16} />
-            PDF
-          </button>
+            <div className="h-6 w-px bg-gray-300"></div>
 
-          {/* Seletor de Ano */}
-          <select
-            value={ano}
-            onChange={(e) => setAno(parseInt(e.target.value))}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-          >
-            {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() + i - 1).map((a) => (
-              <option key={a} value={a}>{a}</option>
-            ))}
-          </select>
+            <button onClick={expandirTudo} className="flex items-center gap-1 px-3 py-2 text-sm bg-gray-100 rounded-lg hover:bg-gray-200" title="Expandir Tudo">
+              <ChevronsDown size={16} />
+            </button>
+            <button onClick={recolherTudo} className="flex items-center gap-1 px-3 py-2 text-sm bg-gray-100 rounded-lg hover:bg-gray-200" title="Recolher Tudo">
+              <ChevronsUp size={16} />
+            </button>
+
+            <div className="h-6 w-px bg-gray-300"></div>
+
+            <button onClick={exportToExcel} className="flex items-center gap-1 px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700">
+              <FileSpreadsheet size={16} />
+            </button>
+            <button onClick={exportToPDF} className="flex items-center gap-1 px-3 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700">
+              <Download size={16} />
+            </button>
+
+            <select
+              value={ano}
+              onChange={(e) => setAno(parseInt(e.target.value))}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+            >
+              {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() + i - 1).map((a) => (
+                <option key={a} value={a}>{a}</option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
-      {/* Instruções */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
-        <strong>Dica:</strong> Clique em qualquer célula para editar o valor. Use o botão 
-        <Copy size={14} className="inline mx-1" /> ao lado de cada item para aplicar o mesmo valor em todos os meses.
-      </div>
-
-      {/* Tabela */}
+      {/* Tabela com scroll horizontal */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm border-collapse min-w-[1200px]">
-            <thead>
+            <thead className="sticky top-0 z-10">
               <tr className="bg-gray-100 border-b-2 border-gray-300">
-                <th className="text-left p-2 sticky left-0 bg-gray-100 min-w-[250px] border-r border-gray-300">
+                <th className="text-left p-2 sticky left-0 bg-gray-100 min-w-[220px] border-r border-gray-300">
                   Descrição
                 </th>
                 {MESES.map(mes => (
-                  <th key={mes.key} className="text-right p-2 min-w-[80px] border-r border-gray-200">
+                  <th key={mes.key} className="text-right p-2 min-w-[75px] border-r border-gray-200">
                     {mes.label}
                   </th>
                 ))}
-                <th className="text-right p-2 min-w-[100px] bg-gray-200 border-r border-gray-300 font-bold">
-                  Total {ano}
+                <th className="text-right p-2 min-w-[90px] bg-gray-200 font-bold">
+                  Total
                 </th>
               </tr>
             </thead>
@@ -681,20 +651,6 @@ export default function PlanejamentoPage() {
               )}
             </tbody>
           </table>
-        </div>
-      </div>
-
-      {/* Legenda */}
-      <div className="bg-white rounded-lg shadow p-4 text-sm">
-        <div className="flex flex-wrap gap-6">
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-yellow-50 border border-yellow-300 rounded"></div>
-            <span>Valor alterado (não salvo)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Copy size={16} className="text-gray-400" />
-            <span>Aplicar para todos os meses</span>
-          </div>
         </div>
       </div>
 
