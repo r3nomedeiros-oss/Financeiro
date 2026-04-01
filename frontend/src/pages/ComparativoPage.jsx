@@ -4,13 +4,13 @@ import { TrendingUp, TrendingDown, Minus, ChevronDown, ChevronRight, ChevronsDow
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-// Categorias fixas do DRE
+// Categorias fixas do DRE com cores para PDF
 const CATEGORIAS_CONFIG = {
-  receita_bruta: { label: "(+) Receita Bruta", tipo: "receita", cor: "cyan" },
-  deducoes_vendas: { label: "(-) Deduções Sobre Vendas", tipo: "despesa", cor: "red" },
-  custos_variaveis: { label: "(-) Custos Variáveis", tipo: "despesa", cor: "red" },
-  custos_fixos: { label: "(-) Custos Fixos", tipo: "despesa", cor: "red" },
-  resultado_nao_operacional: { label: "Resultado Não Operacional", tipo: "misto", cor: "gray" },
+  receita_bruta: { label: "(+) Receita Bruta", tipo: "receita", cor: "cyan", rgbHeader: [224, 247, 250], rgbText: [6, 148, 162] },
+  deducoes_vendas: { label: "(-) Deduções Sobre Vendas", tipo: "despesa", cor: "red", rgbHeader: [254, 226, 226], rgbText: [185, 28, 28] },
+  custos_variaveis: { label: "(-) Custos Variáveis", tipo: "despesa", cor: "red", rgbHeader: [254, 226, 226], rgbText: [185, 28, 28] },
+  custos_fixos: { label: "(-) Custos Fixos", tipo: "despesa", cor: "red", rgbHeader: [254, 226, 226], rgbText: [185, 28, 28] },
+  resultado_nao_operacional: { label: "Resultado Não Operacional", tipo: "misto", cor: "gray", rgbHeader: [243, 244, 246], rgbText: [55, 65, 81] },
 };
 
 export default function ComparativoPage() {
@@ -121,7 +121,17 @@ export default function ComparativoPage() {
       .reduce((acc, m) => acc + m.valor, 0);
     
     const diferenca = realizado - orcado;
-    const variacao = orcado > 0 ? (diferenca / orcado) * 100 : (realizado > 0 ? 100 : 0);
+    // Variação: se orçado = 0 e realizado = 0, variação = 0
+    // se orçado = 0 e realizado > 0, variação = 100%
+    // se orçado > 0, variação = (realizado - orcado) / orcado * 100
+    let variacao = 0;
+    if (orcado > 0) {
+      variacao = (diferenca / orcado) * 100;
+    } else if (realizado > 0) {
+      variacao = 100;
+    } else if (realizado < 0) {
+      variacao = -100;
+    }
     
     return { orcado, realizado, diferenca, variacao };
   }, [planejamentos, movimentacoes, mes]);
@@ -149,7 +159,15 @@ export default function ComparativoPage() {
     });
     
     const diferenca = realizado - orcado;
-    const variacao = orcado > 0 ? (diferenca / orcado) * 100 : (realizado > 0 ? 100 : 0);
+    // Variação corrigida
+    let variacao = 0;
+    if (orcado > 0) {
+      variacao = (diferenca / orcado) * 100;
+    } else if (realizado > 0) {
+      variacao = 100;
+    } else if (realizado < 0) {
+      variacao = -100;
+    }
     
     return { orcado, realizado, diferenca, variacao };
   }, [hierarquia, getValores]);
@@ -269,7 +287,7 @@ export default function ComparativoPage() {
     link.click();
   };
 
-  // Exportar PDF
+  // Exportar PDF COM CORES
   const exportToPDF = () => {
     const doc = new jsPDF('portrait', 'mm', 'a4');
     const mesNome = new Date(ano, mes - 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
@@ -282,12 +300,14 @@ export default function ComparativoPage() {
     
     Object.entries(CATEGORIAS_CONFIG).forEach(([catId, config]) => {
       const totais = calcularTotaisCategoria(catId);
+      
+      // Linha da categoria com cor
       body.push([
-        config.label,
-        formatCurrency(totais.orcado),
-        formatCurrency(totais.realizado),
-        formatCurrency(totais.diferenca),
-        formatPercent(totais.variacao)
+        { content: config.label, styles: { fontStyle: 'bold', fillColor: config.rgbHeader, textColor: config.rgbText } },
+        { content: formatCurrency(totais.orcado), styles: { halign: 'right', fillColor: config.rgbHeader } },
+        { content: formatCurrency(totais.realizado), styles: { halign: 'right', fillColor: config.rgbHeader } },
+        { content: formatCurrency(totais.diferenca), styles: { halign: 'right', fillColor: config.rgbHeader, textColor: totais.diferenca >= 0 ? [22, 163, 74] : [220, 38, 38] } },
+        { content: formatPercent(totais.variacao), styles: { halign: 'right', fillColor: config.rgbHeader, textColor: totais.variacao >= 0 ? [22, 163, 74] : [220, 38, 38] } }
       ]);
       
       const cat = hierarquia[catId];
@@ -297,11 +317,11 @@ export default function ComparativoPage() {
           const valores = getValores(sub.id);
           if (valores.orcado > 0 || valores.realizado > 0) {
             body.push([
-              '  ' + sub.nome,
-              formatCurrency(valores.orcado),
-              formatCurrency(valores.realizado),
-              formatCurrency(valores.diferenca),
-              formatPercent(valores.variacao)
+              { content: '  ' + sub.nome },
+              { content: formatCurrency(valores.orcado), styles: { halign: 'right' } },
+              { content: formatCurrency(valores.realizado), styles: { halign: 'right' } },
+              { content: formatCurrency(valores.diferenca), styles: { halign: 'right', textColor: valores.diferenca >= 0 ? [22, 163, 74] : [220, 38, 38] } },
+              { content: formatPercent(valores.variacao), styles: { halign: 'right', textColor: valores.variacao >= 0 ? [22, 163, 74] : [220, 38, 38] } }
             ]);
           }
         } else {
@@ -309,11 +329,11 @@ export default function ComparativoPage() {
             const valores = getValores(item.id);
             if (valores.orcado > 0 || valores.realizado > 0) {
               body.push([
-                '    ' + item.nome,
-                formatCurrency(valores.orcado),
-                formatCurrency(valores.realizado),
-                formatCurrency(valores.diferenca),
-                formatPercent(valores.variacao)
+                { content: '    ' + item.nome },
+                { content: formatCurrency(valores.orcado), styles: { halign: 'right' } },
+                { content: formatCurrency(valores.realizado), styles: { halign: 'right' } },
+                { content: formatCurrency(valores.diferenca), styles: { halign: 'right', textColor: valores.diferenca >= 0 ? [22, 163, 74] : [220, 38, 38] } },
+                { content: formatPercent(valores.variacao), styles: { halign: 'right', textColor: valores.variacao >= 0 ? [22, 163, 74] : [220, 38, 38] } }
               ]);
             }
           });
@@ -321,12 +341,14 @@ export default function ComparativoPage() {
       });
     });
     
+    // Linha de Resultado
+    const varResultado = resultadoOrcado !== 0 ? ((resultadoRealizado - resultadoOrcado) / Math.abs(resultadoOrcado)) * 100 : 0;
     body.push([
-      'RESULTADO',
-      formatCurrency(resultadoOrcado),
-      formatCurrency(resultadoRealizado),
-      formatCurrency(resultadoRealizado - resultadoOrcado),
-      formatPercent(resultadoOrcado !== 0 ? ((resultadoRealizado - resultadoOrcado) / Math.abs(resultadoOrcado)) * 100 : 0)
+      { content: 'RESULTADO', styles: { fontStyle: 'bold', fillColor: [200, 200, 200] } },
+      { content: formatCurrency(resultadoOrcado), styles: { halign: 'right', fontStyle: 'bold', fillColor: [200, 200, 200] } },
+      { content: formatCurrency(resultadoRealizado), styles: { halign: 'right', fontStyle: 'bold', fillColor: [200, 200, 200], textColor: resultadoRealizado >= 0 ? [22, 163, 74] : [220, 38, 38] } },
+      { content: formatCurrency(resultadoRealizado - resultadoOrcado), styles: { halign: 'right', fontStyle: 'bold', fillColor: [200, 200, 200], textColor: (resultadoRealizado - resultadoOrcado) >= 0 ? [22, 163, 74] : [220, 38, 38] } },
+      { content: formatPercent(varResultado), styles: { halign: 'right', fontStyle: 'bold', fillColor: [200, 200, 200], textColor: varResultado >= 0 ? [22, 163, 74] : [220, 38, 38] } }
     ]);
     
     autoTable(doc, {
@@ -334,7 +356,7 @@ export default function ComparativoPage() {
       body: body,
       startY: 22,
       styles: { fontSize: 8, cellPadding: 2 },
-      headStyles: { fillColor: [229, 229, 229], textColor: [0, 0, 0], fontStyle: 'bold' },
+      headStyles: { fillColor: [59, 130, 246], textColor: [255, 255, 255], fontStyle: 'bold' },
       columnStyles: { 0: { cellWidth: 70 } },
     });
     

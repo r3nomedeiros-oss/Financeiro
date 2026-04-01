@@ -1,10 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { movimentacoesAPI, planoContasAPI } from '../services/api';
-import { Download, Filter, Eye, EyeOff } from 'lucide-react';
+import { Download, Filter, Eye, EyeOff, ChevronDown, ChevronRight, ChevronsDown, ChevronsUp, FileSpreadsheet } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+
+// Categorias fixas do DRE
+const CATEGORIAS_CONFIG = {
+  receita_bruta: { label: "(+) Receita Bruta", tipo: "receita", cor: "cyan", rgbHeader: [224, 247, 250], rgbText: [6, 148, 162] },
+  deducoes_vendas: { label: "(-) Deduções Sobre Vendas", tipo: "despesa", cor: "red", rgbHeader: [254, 226, 226], rgbText: [185, 28, 28] },
+  custos_variaveis: { label: "(-) Custos Variáveis", tipo: "despesa", cor: "red", rgbHeader: [254, 226, 226], rgbText: [185, 28, 28] },
+  custos_fixos: { label: "(-) Custos Fixos", tipo: "despesa", cor: "red", rgbHeader: [254, 226, 226], rgbText: [185, 28, 28] },
+  resultado_nao_operacional: { label: "Resultado Não Operacional", tipo: "misto", cor: "gray", rgbHeader: [243, 244, 246], rgbText: [55, 65, 81] },
+};
 
 export default function RelatoriosPage() {
   const [loading, setLoading] = useState(false);
   const [hierarquia, setHierarquia] = useState({});
+  const [expandedState, setExpandedState] = useState({});
   
   // Filtros de período 1
   const [periodo1Inicio, setPeriodo1Inicio] = useState(
@@ -38,9 +50,58 @@ export default function RelatoriosPage() {
     try {
       const res = await planoContasAPI.getHierarquico();
       setHierarquia(res.data);
+      
+      // Inicializar expansão
+      const initialExpanded = {};
+      Object.keys(res.data || {}).forEach(catId => {
+        initialExpanded[catId] = { expanded: true, subcategorias: {} };
+        (res.data[catId]?.subcategorias || []).forEach(sub => {
+          initialExpanded[catId].subcategorias[sub.id] = true;
+        });
+      });
+      setExpandedState(initialExpanded);
     } catch (error) {
       console.error('Erro ao carregar hierarquia:', error);
     }
+  };
+
+  const expandirTudo = () => {
+    const newState = {};
+    Object.keys(hierarquia).forEach(catId => {
+      newState[catId] = { expanded: true, subcategorias: {} };
+      (hierarquia[catId]?.subcategorias || []).forEach(sub => {
+        newState[catId].subcategorias[sub.id] = true;
+      });
+    });
+    setExpandedState(newState);
+  };
+
+  const recolherTudo = () => {
+    const newState = {};
+    Object.keys(hierarquia).forEach(catId => {
+      newState[catId] = { expanded: false, subcategorias: {} };
+    });
+    setExpandedState(newState);
+  };
+
+  const toggleCategoria = (catId) => {
+    setExpandedState(prev => ({
+      ...prev,
+      [catId]: { ...prev[catId], expanded: !prev[catId]?.expanded }
+    }));
+  };
+
+  const toggleSubcategoria = (catId, subcatId) => {
+    setExpandedState(prev => ({
+      ...prev,
+      [catId]: {
+        ...prev[catId],
+        subcategorias: {
+          ...prev[catId]?.subcategorias,
+          [subcatId]: !prev[catId]?.subcategorias?.[subcatId]
+        }
+      }
+    }));
   };
 
   const compararPeriodos = async () => {
@@ -68,10 +129,12 @@ export default function RelatoriosPage() {
   };
 
   const formatCurrency = (value) => {
-    if (value === null || value === undefined || value === 0) return '-';
+    if (value === null || value === undefined) return '-';
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
     }).format(value);
   };
 
@@ -81,36 +144,61 @@ export default function RelatoriosPage() {
     return `${prefix}${value.toFixed(1)}%`;
   };
 
-  // Agrupar movimentações por categoria
-  const agruparPorCategoria = (movimentacoes) => {
-    const agrupado = {};
+  // Calcular valores por item
+  const getValores = useCallback((itemId) => {
+    const valor1 = dadosPeriodo1
+      .filter(m => m.plano_contas_id === itemId)
+      .reduce((acc, m) => acc + m.valor, 0);
     
-    movimentacoes.forEach(mov => {
-      const planoId = mov.plano_contas_id;
-      if (!agrupado[planoId]) {
-        agrupado[planoId] = {
-          nome: mov.plano_contas?.nome || 'Sem categoria',
-          categoria: mov.plano_contas?.categoria || '',
-          tipo: mov.tipo,
-          total: 0
-        };
+    const valor2 = dadosPeriodo2
+      .filter(m => m.plano_contas_id === itemId)
+      .reduce((acc, m) => acc + m.valor, 0);
+    
+    return { valor1, valor2 };
+  }, [dadosPeriodo1, dadosPeriodo2]);
+
+  // Calcular totais da categoria
+  const calcularTotaisCategoria = useCallback((catId) => {
+    const cat = hierarquia[catId];
+    if (!cat) return { valor1: 0, valor2: 0 };
+    
+    let valor1 = 0;
+    let valor2 = 0;
+    
+    (cat.subcategorias || []).forEach(sub => {
+      (sub.itens || []).forEach(item => {
+        const valores = getValores(item.id);
+        valor1 += valores.valor1;
+        valor2 += valores.valor2;
+      });
+      
+      if (!sub.itens || sub.itens.length === 0) {
+        const valores = getValores(sub.id);
+        valor1 += valores.valor1;
+        valor2 += valores.valor2;
       }
-      agrupado[planoId].total += mov.valor;
     });
+    
+    return { valor1, valor2 };
+  }, [hierarquia, getValores]);
 
-    return agrupado;
-  };
+  // Totais gerais
+  const totaisReceitas = useMemo(() => calcularTotaisCategoria('receita_bruta'), [calcularTotaisCategoria]);
+  
+  const totaisDespesas = useMemo(() => {
+    const deducoes = calcularTotaisCategoria('deducoes_vendas');
+    const variaveis = calcularTotaisCategoria('custos_variaveis');
+    const fixos = calcularTotaisCategoria('custos_fixos');
+    const naoOp = calcularTotaisCategoria('resultado_nao_operacional');
+    
+    return {
+      valor1: deducoes.valor1 + variaveis.valor1 + fixos.valor1 + naoOp.valor1,
+      valor2: deducoes.valor2 + variaveis.valor2 + fixos.valor2 + naoOp.valor2
+    };
+  }, [calcularTotaisCategoria]);
 
-  const dadosAgrupados1 = agruparPorCategoria(dadosPeriodo1);
-  const dadosAgrupados2 = agruparPorCategoria(dadosPeriodo2);
-
-  // Calcular totais
-  const totalReceitas1 = dadosPeriodo1.filter(m => m.tipo === 'entrada').reduce((a, m) => a + m.valor, 0);
-  const totalReceitas2 = dadosPeriodo2.filter(m => m.tipo === 'entrada').reduce((a, m) => a + m.valor, 0);
-  const totalDespesas1 = dadosPeriodo1.filter(m => m.tipo === 'saida').reduce((a, m) => a + m.valor, 0);
-  const totalDespesas2 = dadosPeriodo2.filter(m => m.tipo === 'saida').reduce((a, m) => a + m.valor, 0);
-  const resultado1 = totalReceitas1 - totalDespesas1;
-  const resultado2 = totalReceitas2 - totalDespesas2;
+  const resultado1 = totaisReceitas.valor1 - totaisDespesas.valor1;
+  const resultado2 = totaisReceitas.valor2 - totaisDespesas.valor2;
 
   // Análise Vertical (AV) - % sobre receita total
   const calcularAV = (valor, totalReceita) => {
@@ -118,19 +206,13 @@ export default function RelatoriosPage() {
     return (valor / totalReceita) * 100;
   };
 
-  // Análise Horizontal (AH) - variação entre períodos
+  // Análise Horizontal (AH) - variação entre períodos (P1 vs P2)
   const calcularAH = (valorAtual, valorAnterior) => {
     if (!valorAnterior || valorAnterior === 0) {
-      return valorAtual > 0 ? 100 : 0;
+      return valorAtual > 0 ? 100 : (valorAtual < 0 ? -100 : 0);
     }
-    return ((valorAtual - valorAnterior) / valorAnterior) * 100;
+    return ((valorAtual - valorAnterior) / Math.abs(valorAnterior)) * 100;
   };
-
-  // Obter todas as categorias únicas
-  const todasCategorias = new Set([
-    ...Object.keys(dadosAgrupados1),
-    ...Object.keys(dadosAgrupados2)
-  ]);
 
   const formatarPeriodo = (inicio, fim) => {
     const di = new Date(inicio + 'T00:00:00');
@@ -138,269 +220,384 @@ export default function RelatoriosPage() {
     return `${di.toLocaleDateString('pt-BR')} - ${df.toLocaleDateString('pt-BR')}`;
   };
 
+  const getCorClasse = (cor, isHeader = false) => {
+    const cores = {
+      cyan: isHeader ? 'bg-cyan-50 text-cyan-700' : 'text-cyan-700',
+      red: isHeader ? 'bg-red-50 text-red-600' : 'text-red-600',
+      gray: isHeader ? 'bg-gray-100 text-gray-800' : 'text-gray-800',
+    };
+    return cores[cor] || '';
+  };
+
+  // Exportar Excel COM CORES
+  const exportToExcel = () => {
+    const rows = [];
+    const headers = ['Descrição', 'Período 1'];
+    if (mostrarAV) headers.push('AV%');
+    headers.push('Período 2');
+    if (mostrarAV) headers.push('AV%');
+    if (mostrarAH) headers.push('AH%');
+    
+    rows.push(headers.join(';'));
+    
+    Object.entries(CATEGORIAS_CONFIG).forEach(([catId, config]) => {
+      const totais = calcularTotaisCategoria(catId);
+      const row = [config.label, totais.valor1.toFixed(2).replace('.', ',')];
+      if (mostrarAV) row.push(calcularAV(totais.valor1, totaisReceitas.valor1).toFixed(1).replace('.', ',') + '%');
+      row.push(totais.valor2.toFixed(2).replace('.', ','));
+      if (mostrarAV) row.push(calcularAV(totais.valor2, totaisReceitas.valor2).toFixed(1).replace('.', ',') + '%');
+      if (mostrarAH) row.push(calcularAH(totais.valor1, totais.valor2).toFixed(1).replace('.', ',') + '%');
+      rows.push(row.join(';'));
+      
+      const cat = hierarquia[catId];
+      (cat?.subcategorias || []).forEach(sub => {
+        const itens = sub.itens || [];
+        if (itens.length === 0) {
+          const valores = getValores(sub.id);
+          if (valores.valor1 > 0 || valores.valor2 > 0) {
+            const row = ['  ' + sub.nome, valores.valor1.toFixed(2).replace('.', ',')];
+            if (mostrarAV) row.push(calcularAV(valores.valor1, totaisReceitas.valor1).toFixed(1).replace('.', ',') + '%');
+            row.push(valores.valor2.toFixed(2).replace('.', ','));
+            if (mostrarAV) row.push(calcularAV(valores.valor2, totaisReceitas.valor2).toFixed(1).replace('.', ',') + '%');
+            if (mostrarAH) row.push(calcularAH(valores.valor1, valores.valor2).toFixed(1).replace('.', ',') + '%');
+            rows.push(row.join(';'));
+          }
+        } else {
+          itens.forEach(item => {
+            const valores = getValores(item.id);
+            if (valores.valor1 > 0 || valores.valor2 > 0) {
+              const row = ['    ' + item.nome, valores.valor1.toFixed(2).replace('.', ',')];
+              if (mostrarAV) row.push(calcularAV(valores.valor1, totaisReceitas.valor1).toFixed(1).replace('.', ',') + '%');
+              row.push(valores.valor2.toFixed(2).replace('.', ','));
+              if (mostrarAV) row.push(calcularAV(valores.valor2, totaisReceitas.valor2).toFixed(1).replace('.', ',') + '%');
+              if (mostrarAH) row.push(calcularAH(valores.valor1, valores.valor2).toFixed(1).replace('.', ',') + '%');
+              rows.push(row.join(';'));
+            }
+          });
+        }
+      });
+    });
+    
+    const rowResult = ['RESULTADO', resultado1.toFixed(2).replace('.', ',')];
+    if (mostrarAV) rowResult.push(calcularAV(resultado1, totaisReceitas.valor1).toFixed(1).replace('.', ',') + '%');
+    rowResult.push(resultado2.toFixed(2).replace('.', ','));
+    if (mostrarAV) rowResult.push(calcularAV(resultado2, totaisReceitas.valor2).toFixed(1).replace('.', ',') + '%');
+    if (mostrarAH) rowResult.push(calcularAH(resultado1, resultado2).toFixed(1).replace('.', ',') + '%');
+    rows.push(rowResult.join(';'));
+    
+    const csvContent = '\uFEFF' + rows.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `Relatorio_Comparativo_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+  };
+
+  // Exportar PDF COM CORES
+  const exportToPDF = () => {
+    const doc = new jsPDF('landscape', 'mm', 'a4');
+    
+    doc.setFontSize(14);
+    doc.text('Relatório Comparativo', doc.internal.pageSize.width / 2, 12, { align: 'center' });
+    doc.setFontSize(9);
+    doc.text(`Período 1: ${formatarPeriodo(periodo1Inicio, periodo1Fim)} | Período 2: ${formatarPeriodo(periodo2Inicio, periodo2Fim)}`, doc.internal.pageSize.width / 2, 18, { align: 'center' });
+    
+    const headers = ['Descrição', 'Período 1'];
+    if (mostrarAV) headers.push('AV%');
+    headers.push('Período 2');
+    if (mostrarAV) headers.push('AV%');
+    if (mostrarAH) headers.push('AH%');
+    
+    const body = [];
+    
+    Object.entries(CATEGORIAS_CONFIG).forEach(([catId, config]) => {
+      const totais = calcularTotaisCategoria(catId);
+      const ah = calcularAH(totais.valor1, totais.valor2);
+      
+      const row = [
+        { content: config.label, styles: { fontStyle: 'bold', fillColor: config.rgbHeader, textColor: config.rgbText } },
+        { content: formatCurrency(totais.valor1), styles: { halign: 'right', fontStyle: 'bold', fillColor: config.rgbHeader } }
+      ];
+      if (mostrarAV) row.push({ content: formatPercent(calcularAV(totais.valor1, totaisReceitas.valor1)), styles: { halign: 'right', fillColor: [220, 252, 231] } });
+      row.push({ content: formatCurrency(totais.valor2), styles: { halign: 'right', fontStyle: 'bold', fillColor: config.rgbHeader } });
+      if (mostrarAV) row.push({ content: formatPercent(calcularAV(totais.valor2, totaisReceitas.valor2)), styles: { halign: 'right', fillColor: [220, 252, 231] } });
+      if (mostrarAH) row.push({ content: formatPercent(ah), styles: { halign: 'right', fillColor: [243, 232, 255], textColor: ah >= 0 ? [22, 163, 74] : [220, 38, 38] } });
+      body.push(row);
+      
+      const cat = hierarquia[catId];
+      (cat?.subcategorias || []).forEach(sub => {
+        const itens = sub.itens || [];
+        if (itens.length === 0) {
+          const valores = getValores(sub.id);
+          if (valores.valor1 > 0 || valores.valor2 > 0) {
+            const ahItem = calcularAH(valores.valor1, valores.valor2);
+            const rowItem = [
+              { content: '  ' + sub.nome },
+              { content: formatCurrency(valores.valor1), styles: { halign: 'right' } }
+            ];
+            if (mostrarAV) rowItem.push({ content: formatPercent(calcularAV(valores.valor1, totaisReceitas.valor1)), styles: { halign: 'right', fillColor: [220, 252, 231], fontSize: 7 } });
+            rowItem.push({ content: formatCurrency(valores.valor2), styles: { halign: 'right' } });
+            if (mostrarAV) rowItem.push({ content: formatPercent(calcularAV(valores.valor2, totaisReceitas.valor2)), styles: { halign: 'right', fillColor: [220, 252, 231], fontSize: 7 } });
+            if (mostrarAH) rowItem.push({ content: formatPercent(ahItem), styles: { halign: 'right', textColor: ahItem >= 0 ? [22, 163, 74] : [220, 38, 38], fontSize: 7 } });
+            body.push(rowItem);
+          }
+        } else {
+          itens.forEach(item => {
+            const valores = getValores(item.id);
+            if (valores.valor1 > 0 || valores.valor2 > 0) {
+              const ahItem = calcularAH(valores.valor1, valores.valor2);
+              const rowItem = [
+                { content: '    ' + item.nome },
+                { content: formatCurrency(valores.valor1), styles: { halign: 'right' } }
+              ];
+              if (mostrarAV) rowItem.push({ content: formatPercent(calcularAV(valores.valor1, totaisReceitas.valor1)), styles: { halign: 'right', fillColor: [220, 252, 231], fontSize: 7 } });
+              rowItem.push({ content: formatCurrency(valores.valor2), styles: { halign: 'right' } });
+              if (mostrarAV) rowItem.push({ content: formatPercent(calcularAV(valores.valor2, totaisReceitas.valor2)), styles: { halign: 'right', fillColor: [220, 252, 231], fontSize: 7 } });
+              if (mostrarAH) rowItem.push({ content: formatPercent(ahItem), styles: { halign: 'right', textColor: ahItem >= 0 ? [22, 163, 74] : [220, 38, 38], fontSize: 7 } });
+              body.push(rowItem);
+            }
+          });
+        }
+      });
+    });
+    
+    // Resultado
+    const ahResultado = calcularAH(resultado1, resultado2);
+    const rowResult = [
+      { content: 'RESULTADO', styles: { fontStyle: 'bold', fillColor: [200, 200, 200] } },
+      { content: formatCurrency(resultado1), styles: { halign: 'right', fontStyle: 'bold', fillColor: [200, 200, 200], textColor: resultado1 >= 0 ? [22, 163, 74] : [220, 38, 38] } }
+    ];
+    if (mostrarAV) rowResult.push({ content: formatPercent(calcularAV(resultado1, totaisReceitas.valor1)), styles: { halign: 'right', fillColor: [200, 200, 200] } });
+    rowResult.push({ content: formatCurrency(resultado2), styles: { halign: 'right', fontStyle: 'bold', fillColor: [200, 200, 200], textColor: resultado2 >= 0 ? [22, 163, 74] : [220, 38, 38] } });
+    if (mostrarAV) rowResult.push({ content: formatPercent(calcularAV(resultado2, totaisReceitas.valor2)), styles: { halign: 'right', fillColor: [200, 200, 200] } });
+    if (mostrarAH) rowResult.push({ content: formatPercent(ahResultado), styles: { halign: 'right', fillColor: [200, 200, 200], textColor: ahResultado >= 0 ? [22, 163, 74] : [220, 38, 38] } });
+    body.push(rowResult);
+    
+    autoTable(doc, {
+      head: [headers],
+      body: body,
+      startY: 22,
+      styles: { fontSize: 8, cellPadding: 2 },
+      headStyles: { fillColor: [59, 130, 246], textColor: [255, 255, 255], fontStyle: 'bold' },
+      columnStyles: { 0: { cellWidth: 60 } },
+    });
+    
+    doc.save(`Relatorio_Comparativo_${new Date().toISOString().split('T')[0]}.pdf`);
+  };
+
+  const temDados = dadosPeriodo1.length > 0 || dadosPeriodo2.length > 0;
+
+  // Renderizar linha de item
+  const renderItemRow = (item, nivel = 2) => {
+    const valores = getValores(item.id);
+    if (valores.valor1 === 0 && valores.valor2 === 0) return null;
+    
+    const paddingLeft = nivel === 2 ? 'pl-8' : 'pl-14';
+    const ah = calcularAH(valores.valor1, valores.valor2);
+    
+    return (
+      <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50">
+        <td className={`p-2 ${paddingLeft} text-sm`}>
+          {nivel === 3 ? '• ' : ''}{item.nome}
+        </td>
+        <td className="p-2 text-right text-sm">{formatCurrency(valores.valor1)}</td>
+        {mostrarAV && <td className="p-2 text-right text-xs text-green-600 bg-green-50">{formatPercent(calcularAV(valores.valor1, totaisReceitas.valor1))}</td>}
+        <td className="p-2 text-right text-sm">{formatCurrency(valores.valor2)}</td>
+        {mostrarAV && <td className="p-2 text-right text-xs text-green-600 bg-green-50">{formatPercent(calcularAV(valores.valor2, totaisReceitas.valor2))}</td>}
+        {mostrarAH && <td className={`p-2 text-right text-xs bg-purple-50 ${ah >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatPercent(ah)}</td>}
+      </tr>
+    );
+  };
+
+  // Renderizar categoria hierárquica
+  const renderCategoriaHierarquica = (catId, config) => {
+    const cat = hierarquia[catId];
+    const isExpanded = expandedState[catId]?.expanded;
+    const subcategorias = cat?.subcategorias || [];
+    const totais = calcularTotaisCategoria(catId);
+    const ah = calcularAH(totais.valor1, totais.valor2);
+
+    return (
+      <React.Fragment key={catId}>
+        <tr 
+          className={`${getCorClasse(config.cor, true)} border-b border-gray-200 cursor-pointer hover:opacity-90`}
+          onClick={() => toggleCategoria(catId)}
+        >
+          <td className="p-2 font-semibold">
+            <div className="flex items-center gap-2">
+              {subcategorias.length > 0 && (
+                isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />
+              )}
+              {config.label}
+            </div>
+          </td>
+          <td className="p-2 text-right font-semibold">{formatCurrency(totais.valor1)}</td>
+          {mostrarAV && <td className="p-2 text-right text-sm text-green-600 bg-green-50">{formatPercent(calcularAV(totais.valor1, totaisReceitas.valor1))}</td>}
+          <td className="p-2 text-right font-semibold">{formatCurrency(totais.valor2)}</td>
+          {mostrarAV && <td className="p-2 text-right text-sm text-green-600 bg-green-50">{formatPercent(calcularAV(totais.valor2, totaisReceitas.valor2))}</td>}
+          {mostrarAH && <td className={`p-2 text-right font-semibold bg-purple-50 ${ah >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatPercent(ah)}</td>}
+        </tr>
+
+        {isExpanded && subcategorias.map(sub => {
+          const isSubExpanded = expandedState[catId]?.subcategorias?.[sub.id];
+          const itens = sub.itens || [];
+          const hasItens = itens.length > 0;
+
+          // Calcular totais da subcategoria
+          let subValor1 = 0, subValor2 = 0;
+          if (hasItens) {
+            itens.forEach(item => {
+              const v = getValores(item.id);
+              subValor1 += v.valor1;
+              subValor2 += v.valor2;
+            });
+          } else {
+            const v = getValores(sub.id);
+            subValor1 = v.valor1;
+            subValor2 = v.valor2;
+          }
+          
+          if (subValor1 === 0 && subValor2 === 0) return null;
+          
+          const subAh = calcularAH(subValor1, subValor2);
+
+          return (
+            <React.Fragment key={sub.id}>
+              <tr 
+                className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
+                onClick={() => hasItens && toggleSubcategoria(catId, sub.id)}
+              >
+                <td className="p-2 pl-6 text-sm font-medium">
+                  <div className="flex items-center gap-2">
+                    {hasItens && (
+                      isSubExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />
+                    )}
+                    {sub.nome}
+                  </div>
+                </td>
+                <td className="p-2 text-right text-sm">{formatCurrency(subValor1)}</td>
+                {mostrarAV && <td className="p-2 text-right text-xs text-green-600 bg-green-50">{formatPercent(calcularAV(subValor1, totaisReceitas.valor1))}</td>}
+                <td className="p-2 text-right text-sm">{formatCurrency(subValor2)}</td>
+                {mostrarAV && <td className="p-2 text-right text-xs text-green-600 bg-green-50">{formatPercent(calcularAV(subValor2, totaisReceitas.valor2))}</td>}
+                {mostrarAH && <td className={`p-2 text-right text-xs bg-purple-50 ${subAh >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatPercent(subAh)}</td>}
+              </tr>
+
+              {isSubExpanded && hasItens && itens.map(item => renderItemRow(item, 3))}
+            </React.Fragment>
+          );
+        })}
+      </React.Fragment>
+    );
+  };
+
   return (
-    <div className="space-y-6" data-testid="relatorios-page">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">Relatórios Comparativos</h1>
-          <p className="text-gray-600 text-sm">Compare períodos com análise vertical e horizontal</p>
+    <div className="space-y-4" data-testid="relatorios-page">
+      {/* Header Fixo */}
+      <div className="sticky top-0 z-20 bg-gray-50 pb-4 -mx-6 px-6 -mt-6 pt-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">Relatórios Comparativos</h1>
+            <p className="text-gray-600 text-sm">Compare períodos com análise vertical e horizontal</p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button onClick={expandirTudo} className="flex items-center gap-1 px-3 py-2 text-sm bg-gray-100 rounded-lg hover:bg-gray-200" title="Expandir Tudo">
+              <ChevronsDown size={16} />
+            </button>
+            <button onClick={recolherTudo} className="flex items-center gap-1 px-3 py-2 text-sm bg-gray-100 rounded-lg hover:bg-gray-200" title="Recolher Tudo">
+              <ChevronsUp size={16} />
+            </button>
+
+            <div className="h-6 w-px bg-gray-300"></div>
+
+            <button onClick={exportToExcel} disabled={!temDados} className="flex items-center gap-1 px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50">
+              <FileSpreadsheet size={16} />
+            </button>
+            <button onClick={exportToPDF} disabled={!temDados} className="flex items-center gap-1 px-3 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50">
+              <Download size={16} />
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Filtros */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="font-semibold text-gray-700 mb-4 flex items-center gap-2">
-          <Filter size={18} /> Configuração de Períodos
-        </h3>
-        
-        <div className="grid grid-cols-2 gap-6">
+      <div className="bg-white rounded-lg shadow p-4">
+        <div className="grid grid-cols-2 gap-4">
           {/* Período 1 */}
-          <div className="space-y-3 p-4 bg-blue-50 rounded-lg">
-            <h4 className="font-medium text-blue-800">Período 1 (Atual)</h4>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs text-gray-600 mb-1">Data Início</label>
-                <input
-                  type="date"
-                  value={periodo1Inicio}
-                  onChange={(e) => setPeriodo1Inicio(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-                  data-testid="periodo1-inicio"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-600 mb-1">Data Fim</label>
-                <input
-                  type="date"
-                  value={periodo1Fim}
-                  onChange={(e) => setPeriodo1Fim(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-                  data-testid="periodo1-fim"
-                />
-              </div>
+          <div className="space-y-2 p-3 bg-blue-50 rounded-lg">
+            <h4 className="font-medium text-blue-800 text-sm">Período 1 (Atual)</h4>
+            <div className="grid grid-cols-2 gap-2">
+              <input type="date" value={periodo1Inicio} onChange={(e) => setPeriodo1Inicio(e.target.value)} className="w-full px-2 py-1 border rounded text-sm" />
+              <input type="date" value={periodo1Fim} onChange={(e) => setPeriodo1Fim(e.target.value)} className="w-full px-2 py-1 border rounded text-sm" />
             </div>
           </div>
 
           {/* Período 2 */}
-          <div className="space-y-3 p-4 bg-gray-100 rounded-lg">
-            <h4 className="font-medium text-gray-700">Período 2 (Comparação)</h4>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs text-gray-600 mb-1">Data Início</label>
-                <input
-                  type="date"
-                  value={periodo2Inicio}
-                  onChange={(e) => setPeriodo2Inicio(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-                  data-testid="periodo2-inicio"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-600 mb-1">Data Fim</label>
-                <input
-                  type="date"
-                  value={periodo2Fim}
-                  onChange={(e) => setPeriodo2Fim(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-                  data-testid="periodo2-fim"
-                />
-              </div>
+          <div className="space-y-2 p-3 bg-gray-100 rounded-lg">
+            <h4 className="font-medium text-gray-700 text-sm">Período 2 (Comparação)</h4>
+            <div className="grid grid-cols-2 gap-2">
+              <input type="date" value={periodo2Inicio} onChange={(e) => setPeriodo2Inicio(e.target.value)} className="w-full px-2 py-1 border rounded text-sm" />
+              <input type="date" value={periodo2Fim} onChange={(e) => setPeriodo2Fim(e.target.value)} className="w-full px-2 py-1 border rounded text-sm" />
             </div>
           </div>
         </div>
 
-        <div className="flex justify-between items-center mt-4 pt-4 border-t">
-          {/* Opções de Exibição */}
-          <div className="flex gap-4">
-            <button
-              onClick={() => setMostrarAV(!mostrarAV)}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition ${
-                mostrarAV ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-              }`}
-              data-testid="toggle-av"
-            >
-              {mostrarAV ? <Eye size={16} /> : <EyeOff size={16} />}
-              Análise Vertical (AV%)
+        <div className="flex justify-between items-center mt-3 pt-3 border-t">
+          <div className="flex gap-2">
+            <button onClick={() => setMostrarAV(!mostrarAV)} className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${mostrarAV ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+              {mostrarAV ? <Eye size={14} /> : <EyeOff size={14} />} AV%
             </button>
-            <button
-              onClick={() => setMostrarAH(!mostrarAH)}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition ${
-                mostrarAH ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-500'
-              }`}
-              data-testid="toggle-ah"
-            >
-              {mostrarAH ? <Eye size={16} /> : <EyeOff size={16} />}
-              Análise Horizontal (AH%)
+            <button onClick={() => setMostrarAH(!mostrarAH)} className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${mostrarAH ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-500'}`}>
+              {mostrarAH ? <Eye size={14} /> : <EyeOff size={14} />} AH%
             </button>
           </div>
 
-          <button
-            onClick={compararPeriodos}
-            disabled={loading}
-            className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-            data-testid="comparar-btn"
-          >
-            {loading ? 'Carregando...' : 'Comparar Períodos'}
+          <button onClick={compararPeriodos} disabled={loading} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm">
+            {loading ? 'Carregando...' : 'Comparar'}
           </button>
         </div>
       </div>
 
-      {/* Tabela Comparativa */}
+      {/* Tabela */}
       {loading ? (
         <div className="flex items-center justify-center h-48 bg-white rounded-lg shadow">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
         </div>
-      ) : (dadosPeriodo1.length > 0 || dadosPeriodo2.length > 0) ? (
+      ) : temDados ? (
         <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm" data-testid="tabela-comparativa">
-              <thead className="bg-gray-100">
-                <tr>
-                  <th className="text-left p-3 font-semibold text-gray-700 border-b min-w-[200px]">Descrição</th>
-                  <th className="text-right p-3 font-semibold text-blue-700 border-b bg-blue-50">
-                    Período 1
-                    <div className="text-xs font-normal text-blue-500">{formatarPeriodo(periodo1Inicio, periodo1Fim)}</div>
-                  </th>
-                  {mostrarAV && (
-                    <th className="text-right p-3 font-semibold text-green-700 border-b bg-green-50">AV%</th>
-                  )}
-                  <th className="text-right p-3 font-semibold text-gray-700 border-b">
-                    Período 2
-                    <div className="text-xs font-normal text-gray-500">{formatarPeriodo(periodo2Inicio, periodo2Fim)}</div>
-                  </th>
-                  {mostrarAV && (
-                    <th className="text-right p-3 font-semibold text-green-700 border-b bg-green-50">AV%</th>
-                  )}
-                  {mostrarAH && (
-                    <th className="text-right p-3 font-semibold text-purple-700 border-b bg-purple-50">AH%</th>
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {/* Receitas */}
-                <tr className="bg-cyan-50 font-semibold">
-                  <td className="p-3 text-cyan-700">RECEITAS</td>
-                  <td className="p-3 text-right text-cyan-700">{formatCurrency(totalReceitas1)}</td>
-                  {mostrarAV && <td className="p-3 text-right text-green-600">100%</td>}
-                  <td className="p-3 text-right text-cyan-700">{formatCurrency(totalReceitas2)}</td>
-                  {mostrarAV && <td className="p-3 text-right text-green-600">100%</td>}
-                  {mostrarAH && (
-                    <td className={`p-3 text-right font-semibold ${calcularAH(totalReceitas1, totalReceitas2) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {formatPercent(calcularAH(totalReceitas1, totalReceitas2))}
-                    </td>
-                  )}
-                </tr>
+          <table className="w-full text-sm">
+            <thead className="bg-blue-600 text-white sticky top-0">
+              <tr>
+                <th className="text-left p-2 font-semibold min-w-[200px]">Descrição</th>
+                <th className="text-right p-2 font-semibold w-28">Período 1</th>
+                {mostrarAV && <th className="text-right p-2 font-semibold w-16 bg-green-600">AV%</th>}
+                <th className="text-right p-2 font-semibold w-28">Período 2</th>
+                {mostrarAV && <th className="text-right p-2 font-semibold w-16 bg-green-600">AV%</th>}
+                {mostrarAH && <th className="text-right p-2 font-semibold w-16 bg-purple-600">AH%</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(CATEGORIAS_CONFIG).map(([catId, config]) => 
+                renderCategoriaHierarquica(catId, config)
+              )}
 
-                {/* Itens de Receita */}
-                {Array.from(todasCategorias)
-                  .filter(id => dadosAgrupados1[id]?.tipo === 'entrada' || dadosAgrupados2[id]?.tipo === 'entrada')
-                  .map(id => {
-                    const item1 = dadosAgrupados1[id];
-                    const item2 = dadosAgrupados2[id];
-                    const valor1 = item1?.total || 0;
-                    const valor2 = item2?.total || 0;
-                    
-                    return (
-                      <tr key={id} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="p-3 pl-6">{item1?.nome || item2?.nome}</td>
-                        <td className="p-3 text-right">{formatCurrency(valor1)}</td>
-                        {mostrarAV && <td className="p-3 text-right text-green-600 text-xs">{formatPercent(calcularAV(valor1, totalReceitas1))}</td>}
-                        <td className="p-3 text-right">{formatCurrency(valor2)}</td>
-                        {mostrarAV && <td className="p-3 text-right text-green-600 text-xs">{formatPercent(calcularAV(valor2, totalReceitas2))}</td>}
-                        {mostrarAH && (
-                          <td className={`p-3 text-right text-xs ${calcularAH(valor1, valor2) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {formatPercent(calcularAH(valor1, valor2))}
-                          </td>
-                        )}
-                      </tr>
-                    );
-                  })}
-
-                {/* Despesas */}
-                <tr className="bg-red-50 font-semibold">
-                  <td className="p-3 text-red-700">DESPESAS</td>
-                  <td className="p-3 text-right text-red-700">{formatCurrency(totalDespesas1)}</td>
-                  {mostrarAV && <td className="p-3 text-right text-green-600">{formatPercent(calcularAV(totalDespesas1, totalReceitas1))}</td>}
-                  <td className="p-3 text-right text-red-700">{formatCurrency(totalDespesas2)}</td>
-                  {mostrarAV && <td className="p-3 text-right text-green-600">{formatPercent(calcularAV(totalDespesas2, totalReceitas2))}</td>}
-                  {mostrarAH && (
-                    <td className={`p-3 text-right font-semibold ${calcularAH(totalDespesas1, totalDespesas2) <= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {formatPercent(calcularAH(totalDespesas1, totalDespesas2))}
-                    </td>
-                  )}
-                </tr>
-
-                {/* Itens de Despesa */}
-                {Array.from(todasCategorias)
-                  .filter(id => dadosAgrupados1[id]?.tipo === 'saida' || dadosAgrupados2[id]?.tipo === 'saida')
-                  .map(id => {
-                    const item1 = dadosAgrupados1[id];
-                    const item2 = dadosAgrupados2[id];
-                    const valor1 = item1?.total || 0;
-                    const valor2 = item2?.total || 0;
-                    
-                    return (
-                      <tr key={id} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="p-3 pl-6">{item1?.nome || item2?.nome}</td>
-                        <td className="p-3 text-right">{formatCurrency(valor1)}</td>
-                        {mostrarAV && <td className="p-3 text-right text-green-600 text-xs">{formatPercent(calcularAV(valor1, totalReceitas1))}</td>}
-                        <td className="p-3 text-right">{formatCurrency(valor2)}</td>
-                        {mostrarAV && <td className="p-3 text-right text-green-600 text-xs">{formatPercent(calcularAV(valor2, totalReceitas2))}</td>}
-                        {mostrarAH && (
-                          <td className={`p-3 text-right text-xs ${calcularAH(valor1, valor2) <= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {formatPercent(calcularAH(valor1, valor2))}
-                          </td>
-                        )}
-                      </tr>
-                    );
-                  })}
-
-                {/* Resultado */}
-                <tr className="bg-gray-200 font-bold">
-                  <td className="p-3">RESULTADO</td>
-                  <td className={`p-3 text-right ${resultado1 >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                    {formatCurrency(resultado1)}
-                  </td>
-                  {mostrarAV && <td className="p-3 text-right text-green-600">{formatPercent(calcularAV(resultado1, totalReceitas1))}</td>}
-                  <td className={`p-3 text-right ${resultado2 >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                    {formatCurrency(resultado2)}
-                  </td>
-                  {mostrarAV && <td className="p-3 text-right text-green-600">{formatPercent(calcularAV(resultado2, totalReceitas2))}</td>}
-                  {mostrarAH && (
-                    <td className={`p-3 text-right ${calcularAH(resultado1, resultado2) >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                      {formatPercent(calcularAH(resultado1, resultado2))}
-                    </td>
-                  )}
-                </tr>
-              </tbody>
-            </table>
-          </div>
+              {/* Resultado */}
+              <tr className="bg-gray-200 font-bold">
+                <td className="p-2">RESULTADO</td>
+                <td className={`p-2 text-right ${resultado1 >= 0 ? 'text-green-700' : 'text-red-700'}`}>{formatCurrency(resultado1)}</td>
+                {mostrarAV && <td className="p-2 text-right bg-green-100">{formatPercent(calcularAV(resultado1, totaisReceitas.valor1))}</td>}
+                <td className={`p-2 text-right ${resultado2 >= 0 ? 'text-green-700' : 'text-red-700'}`}>{formatCurrency(resultado2)}</td>
+                {mostrarAV && <td className="p-2 text-right bg-green-100">{formatPercent(calcularAV(resultado2, totaisReceitas.valor2))}</td>}
+                {mostrarAH && <td className={`p-2 text-right bg-purple-100 ${calcularAH(resultado1, resultado2) >= 0 ? 'text-green-700' : 'text-red-700'}`}>{formatPercent(calcularAH(resultado1, resultado2))}</td>}
+              </tr>
+            </tbody>
+          </table>
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500" data-testid="sem-dados-msg">
-          <p className="text-lg">Clique em "Comparar Períodos" para visualizar o relatório comparativo</p>
-          <p className="text-sm mt-2">Configure os períodos desejados nos filtros acima</p>
+        <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
+          <p className="text-lg">Clique em "Comparar" para visualizar o relatório</p>
         </div>
       )}
-
-      {/* Legenda */}
-      <div className="bg-white rounded-lg shadow p-4">
-        <h3 className="font-semibold text-gray-700 mb-2">Legenda:</h3>
-        <div className="flex flex-wrap gap-4 text-sm">
-          <div className="flex items-center gap-2">
-            <span className="font-medium text-green-600">AV%</span>
-            <span className="text-gray-600">= Análise Vertical (% sobre receita total)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="font-medium text-purple-600">AH%</span>
-            <span className="text-gray-600">= Análise Horizontal (variação entre períodos)</span>
-          </div>
-        </div>
-        <p className="text-xs text-gray-500 mt-2">
-          Use os filtros de data para comparar qualquer período: dia a dia, semana, mês, trimestre, etc.
-        </p>
-      </div>
     </div>
   );
 }

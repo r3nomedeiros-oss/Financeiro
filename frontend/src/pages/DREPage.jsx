@@ -32,19 +32,19 @@ const MESES_LABELS = {
   dezembro: "Dez"
 };
 
-// Estrutura de categorias fixas do DRE
+// Estrutura de categorias fixas do DRE com cores para PDF
 const CATEGORIAS_CONFIG = {
-  receita_bruta: { label: "(+) Receita Bruta", cor: "cyan", tipo: "positivo" },
-  deducoes_vendas: { label: "(-) Deduções Sobre Vendas", cor: "red", tipo: "negativo" },
-  receita_liquida: { label: "(=) Receita Líquida", cor: "cyan", tipo: "resultado", isTotal: true },
-  custos_variaveis: { label: "(-) Custos Variáveis", cor: "red", tipo: "negativo" },
-  margem_contribuicao: { label: "(=) Margem de Contribuição", cor: "cyan", tipo: "resultado", isTotal: true },
-  margem_contribuicao_pct: { label: "(=) % Margem de Contribuição", cor: "blue", tipo: "percentual", isTotal: true },
-  custos_fixos: { label: "(-) Custos Fixos", cor: "red", tipo: "negativo" },
-  resultado_operacional: { label: "(=) Resultado Operacional", cor: "cyan", tipo: "resultado", isTotal: true },
-  resultado_nao_operacional: { label: "Resultado Não Operacional", cor: "gray", tipo: "misto" },
-  lucro_liquido: { label: "(=) Lucro Líquido", cor: "green", tipo: "resultado", isTotal: true },
-  margem_liquida_pct: { label: "(=) % Margem Líquida", cor: "blue", tipo: "percentual", isTotal: true },
+  receita_bruta: { label: "(+) Receita Bruta", cor: "cyan", tipo: "positivo", rgbHeader: [224, 247, 250], rgbText: [6, 148, 162] },
+  deducoes_vendas: { label: "(-) Deduções Sobre Vendas", cor: "red", tipo: "negativo", rgbHeader: [254, 226, 226], rgbText: [185, 28, 28] },
+  receita_liquida: { label: "(=) Receita Líquida", cor: "cyan", tipo: "resultado", isTotal: true, rgbHeader: [207, 250, 254], rgbText: [21, 94, 117] },
+  custos_variaveis: { label: "(-) Custos Variáveis", cor: "red", tipo: "negativo", rgbHeader: [254, 226, 226], rgbText: [185, 28, 28] },
+  margem_contribuicao: { label: "(=) Margem de Contribuição", cor: "cyan", tipo: "resultado", isTotal: true, rgbHeader: [207, 250, 254], rgbText: [21, 94, 117] },
+  margem_contribuicao_pct: { label: "(=) % Margem de Contribuição", cor: "blue", tipo: "percentual", isTotal: true, rgbHeader: [219, 234, 254], rgbText: [30, 64, 175] },
+  custos_fixos: { label: "(-) Custos Fixos", cor: "red", tipo: "negativo", rgbHeader: [254, 226, 226], rgbText: [185, 28, 28] },
+  resultado_operacional: { label: "(=) Resultado Operacional", cor: "cyan", tipo: "resultado", isTotal: true, rgbHeader: [207, 250, 254], rgbText: [21, 94, 117] },
+  resultado_nao_operacional: { label: "Resultado Não Operacional", cor: "gray", tipo: "misto", rgbHeader: [243, 244, 246], rgbText: [55, 65, 81] },
+  lucro_liquido: { label: "(=) Lucro Líquido", cor: "green", tipo: "resultado", isTotal: true, rgbHeader: [220, 252, 231], rgbText: [22, 101, 52] },
+  margem_liquida_pct: { label: "(=) % Margem Líquida", cor: "blue", tipo: "percentual", isTotal: true, rgbHeader: [219, 234, 254], rgbText: [30, 64, 175] },
 };
 
 export default function DREPage() {

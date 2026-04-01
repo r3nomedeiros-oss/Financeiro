@@ -8,7 +8,7 @@ Sistema financeiro completo para gestão industrial com DRE, fluxo de caixa, pla
 - **Backend**: FastAPI (Python)
 - **Database**: Supabase (PostgreSQL)
 - **Charts**: Recharts
-- **PDF Export**: jsPDF + jsPDF-autotable
+- **PDF Export**: jsPDF + jsPDF-autotable (COM CORES)
 
 ## Funcionalidades Implementadas
 
@@ -34,59 +34,70 @@ Sistema financeiro completo para gestão industrial com DRE, fluxo de caixa, pla
 - [x] Visualização anual com estrutura hierárquica
 - [x] Expansão/recolhimento de categorias
 - [x] Exportação para Excel (CSV)
-- [x] Exportação para PDF
+- [x] Exportação para PDF COM CORES
 
 ### Fluxo de Caixa
 - [x] Resumo mensal por semana
 - [x] Detalhamento diário por período
 - [x] Exportação para Excel e PDF
 
-### Planejamento Orçamentário (ATUALIZADO 29/03/2026)
-- [x] **Nova interface estilo planilha** (Jan-Dez + Total)
-- [x] **Mesma estrutura hierárquica do DRE**
-- [x] **Edição inline** - clique na célula para editar
-- [x] **Botão "Aplicar para todos os meses"** - facilita preenchimento em massa
-- [x] Salvamento em lote de alterações
-- [x] Indicador de alterações pendentes
-- [x] Totais automáticos por categoria e geral
-- [x] Exportação para Excel e PDF
+### Planejamento Orçamentário (ATUALIZADO)
+- [x] Estrutura hierárquica igual ao DRE
+- [x] Interface estilo planilha (Jan-Dez + Total)
+- [x] Edição inline - clique na célula para editar
+- [x] Botão "Aplicar para todos os meses"
+- [x] **Barra superior fixa** com controles
+- [x] **Botões Expandir/Recolher Tudo**
+- [x] Salvamento sequencial
+- [x] Exportação PDF COM CORES
+- [x] Exportação Excel
+
+### Orçado x Realizado (ATUALIZADO)
+- [x] **Estrutura hierárquica igual ao DRE**
+- [x] **Cards compactos**
+- [x] **Botões Expandir/Recolher Tudo**
+- [x] **Percentuais corrigidos** (variação real vs orçado)
+- [x] Exportação PDF COM CORES
+- [x] Exportação Excel
+
+### Relatórios Comparativos (ATUALIZADO)
+- [x] **Estrutura hierárquica igual ao DRE**
+- [x] Comparação de dois períodos
+- [x] Análise Vertical (AV%)
+- [x] Análise Horizontal (AH%) 
+- [x] **Botões Expandir/Recolher Tudo**
+- [x] Exportação PDF COM CORES
+- [x] Exportação Excel
 
 ### Configurações
 - [x] Gestão de contas bancárias
 - [x] Plano de contas hierárquico (3 níveis)
 
-## Otimizações de Performance (29/03/2026)
+## Correções (29/03/2026)
 
-### Lazy Loading
-- Todas as páginas carregadas sob demanda via React.lazy()
+### PDFs e Excel
+- ✅ Todos os relatórios agora exportam COM CORES
+- ✅ Cabeçalhos coloridos por categoria
+- ✅ Valores positivos/negativos com cores distintas
 
-### Code Splitting (Vite)
-- Chunks separados: vendor-react, vendor-charts, vendor-pdf, vendor-utils
+### Planejamento Orçamentário
+- ✅ Barra superior fixa
+- ✅ Botões expandir/recolher tudo
 
-### Cache de API
-- Cache em memória para requisições GET (30s TTL)
-- Deduplicação de requests pendentes
+### Orçado x Realizado
+- ✅ Cards compactos
+- ✅ Estrutura DRE
+- ✅ Percentuais corrigidos
 
-### Memoização de Componentes
-- Cards, gráficos e sidebar memoizados
-
-## Correções de Bugs (29/03/2026)
-
-### Erro 404 ao Atualizar Página
-- **Status**: ✅ Corrigido (vercel.json rewrites)
-
-### Dashboard - Layout dos Cards
-- **Status**: ✅ Corrigido (padding, truncate, cores dinâmicas)
-
-### Dashboard - Gráfico de Saídas
-- **Status**: ✅ Corrigido (barras horizontais com legenda lateral)
+### Relatórios Comparativos
+- ✅ Estrutura DRE hierárquica
+- ✅ Exportações com cores
 
 ## Backlog (P1)
-- [ ] Comparativo Orçado x Realizado com mesmo layout
-- [ ] Filtro avançado de movimentações
+- [ ] Resolver erro de Network ao salvar (verificar ambiente de produção)
+- [ ] Importação de dados via CSV
 
 ## Backlog (P2)
-- [ ] Importação de dados via CSV
 - [ ] Notificações de vencimentos
 - [ ] Multi-empresa
 

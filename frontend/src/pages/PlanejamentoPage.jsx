@@ -20,13 +20,13 @@ const MESES = [
   { key: 'dezembro', label: 'Dez', num: 12 },
 ];
 
-// Categorias fixas do DRE
+// Categorias fixas do DRE com cores para PDF
 const CATEGORIAS_CONFIG = {
-  receita_bruta: { label: "(+) Receita Bruta", cor: "cyan", tipo: "positivo" },
-  deducoes_vendas: { label: "(-) Deduções Sobre Vendas", cor: "red", tipo: "negativo" },
-  custos_variaveis: { label: "(-) Custos Variáveis", cor: "red", tipo: "negativo" },
-  custos_fixos: { label: "(-) Custos Fixos", cor: "red", tipo: "negativo" },
-  resultado_nao_operacional: { label: "Resultado Não Operacional", cor: "gray", tipo: "misto" },
+  receita_bruta: { label: "(+) Receita Bruta", cor: "cyan", tipo: "positivo", rgbHeader: [224, 247, 250], rgbText: [6, 148, 162] },
+  deducoes_vendas: { label: "(-) Deduções Sobre Vendas", cor: "red", tipo: "negativo", rgbHeader: [254, 226, 226], rgbText: [185, 28, 28] },
+  custos_variaveis: { label: "(-) Custos Variáveis", cor: "red", tipo: "negativo", rgbHeader: [254, 226, 226], rgbText: [185, 28, 28] },
+  custos_fixos: { label: "(-) Custos Fixos", cor: "red", tipo: "negativo", rgbHeader: [254, 226, 226], rgbText: [185, 28, 28] },
+  resultado_nao_operacional: { label: "Resultado Não Operacional", cor: "gray", tipo: "misto", rgbHeader: [243, 244, 246], rgbText: [55, 65, 81] },
 };
 
 export default function PlanejamentoPage() {
@@ -352,7 +352,7 @@ export default function PlanejamentoPage() {
     link.click();
   };
 
-  // Exportar PDF
+  // Exportar PDF COM CORES
   const exportToPDF = () => {
     const doc = new jsPDF('landscape', 'mm', 'a4');
     
@@ -364,28 +364,37 @@ export default function PlanejamentoPage() {
     
     Object.entries(CATEGORIAS_CONFIG).forEach(([catId, config]) => {
       const totais = calcularTotalCategoria(catId);
-      body.push([
-        config.label,
-        ...MESES.map(m => formatCurrency(totais.meses[m.num] || 0)),
-        formatCurrency(totais.total)
-      ]);
+      
+      // Linha da categoria com cor
+      const catRow = [
+        { content: config.label, styles: { fontStyle: 'bold', fillColor: config.rgbHeader, textColor: config.rgbText } },
+        ...MESES.map(m => ({ content: formatCurrency(totais.meses[m.num] || 0), styles: { halign: 'right', fontStyle: 'bold', fillColor: config.rgbHeader } })),
+        { content: formatCurrency(totais.total), styles: { halign: 'right', fontStyle: 'bold', fillColor: [200, 200, 200] } }
+      ];
+      body.push(catRow);
       
       const cat = hierarquia[catId];
       (cat?.subcategorias || []).forEach(sub => {
         const itens = sub.itens || [];
         if (itens.length === 0) {
-          body.push([
-            '  ' + sub.nome,
-            ...MESES.map(m => formatCurrency(getValor(sub.id, m.num))),
-            formatCurrency(calcularTotalLinha(sub.id))
-          ]);
+          const valor = calcularTotalLinha(sub.id);
+          if (valor > 0) {
+            body.push([
+              { content: '  ' + sub.nome },
+              ...MESES.map(m => ({ content: formatCurrency(getValor(sub.id, m.num)), styles: { halign: 'right' } })),
+              { content: formatCurrency(valor), styles: { halign: 'right', fillColor: [240, 240, 240] } }
+            ]);
+          }
         } else {
           itens.forEach(item => {
-            body.push([
-              '    ' + item.nome,
-              ...MESES.map(m => formatCurrency(getValor(item.id, m.num))),
-              formatCurrency(calcularTotalLinha(item.id))
-            ]);
+            const valor = calcularTotalLinha(item.id);
+            if (valor > 0) {
+              body.push([
+                { content: '    ' + item.nome },
+                ...MESES.map(m => ({ content: formatCurrency(getValor(item.id, m.num)), styles: { halign: 'right' } })),
+                { content: formatCurrency(valor), styles: { halign: 'right', fillColor: [240, 240, 240] } }
+              ]);
+            }
           });
         }
       });
@@ -396,7 +405,7 @@ export default function PlanejamentoPage() {
       body: body,
       startY: 22,
       styles: { fontSize: 7, cellPadding: 1.5 },
-      headStyles: { fillColor: [229, 229, 229], textColor: [0, 0, 0], fontStyle: 'bold' },
+      headStyles: { fillColor: [59, 130, 246], textColor: [255, 255, 255], fontStyle: 'bold' },
       columnStyles: { 0: { cellWidth: 50 } },
     });
     
@@ -412,6 +421,13 @@ export default function PlanejamentoPage() {
   }
 
   const hasPendingChanges = Object.keys(pendingChanges).length > 0;
+
+  // Debug: log pending changes
+  useEffect(() => {
+    if (Object.keys(pendingChanges).length > 0) {
+      console.log('Pending changes:', pendingChanges);
+    }
+  }, [pendingChanges]);
 
   // Renderizar célula editável
   const renderCell = (itemId, mes, valor) => {
