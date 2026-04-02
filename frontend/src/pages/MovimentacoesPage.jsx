@@ -88,6 +88,9 @@ export default function MovimentacoesPage() {
     return itens;
   };
 
+  // Definir itensDisponiveis primeiro
+  const itensDisponiveis = getItensPlanoContas(formData.tipo);
+
   // Filtrar itens pela busca
   const itensFiltrados = itensDisponiveis.filter(item => {
     const texto = buscaItem.toLowerCase();
@@ -246,8 +249,6 @@ export default function MovimentacoesPage() {
       </div>
     );
   }
-
-  const itensDisponiveis = getItensPlanoContas(formData.tipo);
 
   return (
     <div className="space-y-6" data-testid="movimentacoes-page">
