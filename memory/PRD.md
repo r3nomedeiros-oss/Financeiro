@@ -26,9 +26,11 @@ Sistema de controle financeiro industrial que precisava de:
 
 ## O que foi implementado (02/04/2026)
 
-### Bug Fix
-- Instalado módulo `postgrest` que estava faltando (causava página em branco no Planejamento)
-- Corrigida estrutura de carregamento da página PlanejamentoPage.jsx
+### Bug Fixes
+1. Instalado módulo `postgrest` que estava faltando
+2. **CORRIGIDO:** Erro de Hooks no PlanejamentoPage.jsx
+   - Problema: `useEffect` estava após `return` condicional, violando regras de Hooks do React
+   - Solução: Movido `useEffect` para antes do return e `SkeletonRow` para fora do componente
 
 ### Otimizações de Performance
 
@@ -40,15 +42,11 @@ Sistema de controle financeiro industrial que precisava de:
    - Adicionados em PlanejamentoPage para feedback visual imediato
    - Melhora percepção de velocidade
 
-3. **Carregamento Sequencial Otimizado:**
-   - Hierarquia carrega primeiro (estrutura visível mais rápida)
-   - Dados secundários carregam em background
-
-4. **Cache de API:**
+3. **Cache de API:**
    - TTL aumentado para 60 segundos
    - Timeout aumentado para 30s (operações pesadas)
 
-5. **Paginação no Backend:**
+4. **Paginação no Backend:**
    - Endpoint `/api/movimentacoes` agora suporta paginação
    - Parâmetros: `page` e `limit` (padrão: 100 itens)
 
@@ -68,13 +66,7 @@ Sistema de controle financeiro industrial que precisava de:
 ### P2 (Médio)
 - [ ] Migração para TanStack Query para cache avançado
 - [ ] Code splitting mais granular por rotas
-- [ ] Prefetch de dados nas transições de página
-
-### P3 (Baixo)
-- [ ] Optimistic updates para ações CRUD
-- [ ] Service Worker para cache offline
 
 ## Próximas Tarefas
-1. Verificar se há mais páginas com problemas de carregamento
-2. Implementar virtualização nas tabelas de DRE e Planejamento
-3. Monitorar performance em produção
+1. Monitorar outras páginas para problemas similares
+2. Implementar virtualização nas tabelas de DRE

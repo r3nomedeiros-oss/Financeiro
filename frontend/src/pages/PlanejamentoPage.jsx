@@ -24,6 +24,15 @@ const MESES = [
   { key: 'dezembro', label: 'Dez', num: 12 },
 ];
 
+// Skeleton Loader para carregamento mais suave (fora do componente)
+const SkeletonRow = () => (
+  <tr className="animate-pulse">
+    <td className="p-2 sticky left-0 bg-white"><div className="h-4 bg-gray-200 rounded w-32"></div></td>
+    {MESES.map(m => <td key={m.key} className="p-1"><div className="h-4 bg-gray-100 rounded w-14 ml-auto"></div></td>)}
+    <td className="p-2 bg-gray-50"><div className="h-4 bg-gray-200 rounded w-16 ml-auto"></div></td>
+  </tr>
+);
+
 // Categorias fixas do DRE com cores para PDF
 const CATEGORIAS_CONFIG = {
   receita_bruta: { label: "(+) Receita Bruta", cor: "cyan", tipo: "positivo", rgbHeader: [224, 247, 250], rgbText: [6, 148, 162] },
@@ -53,6 +62,13 @@ export default function PlanejamentoPage() {
   
   // Alterações pendentes
   const [pendingChanges, setPendingChanges] = useState({});
+
+  // Debug: log pending changes
+  useEffect(() => {
+    if (Object.keys(pendingChanges).length > 0) {
+      console.log('Pending changes:', pendingChanges);
+    }
+  }, [pendingChanges]);
 
   useEffect(() => {
     carregarDados();
@@ -417,15 +433,6 @@ export default function PlanejamentoPage() {
     doc.save(`Planejamento_${ano}.pdf`);
   };
 
-  // Skeleton Loader para carregamento mais suave
-  const SkeletonRow = () => (
-    <tr className="animate-pulse">
-      <td className="p-2 sticky left-0 bg-white"><div className="h-4 bg-gray-200 rounded w-32"></div></td>
-      {MESES.map(m => <td key={m.key} className="p-1"><div className="h-4 bg-gray-100 rounded w-14 ml-auto"></div></td>)}
-      <td className="p-2 bg-gray-50"><div className="h-4 bg-gray-200 rounded w-16 ml-auto"></div></td>
-    </tr>
-  );
-
   if (loading && Object.keys(hierarquia).length === 0) {
     return (
       <div className="space-y-4" data-testid="planejamento-page">
@@ -454,13 +461,6 @@ export default function PlanejamentoPage() {
   }
 
   const hasPendingChanges = Object.keys(pendingChanges).length > 0;
-
-  // Debug: log pending changes
-  useEffect(() => {
-    if (Object.keys(pendingChanges).length > 0) {
-      console.log('Pending changes:', pendingChanges);
-    }
-  }, [pendingChanges]);
 
   // Renderizar célula editável
   const renderCell = (itemId, mes, valor) => {
