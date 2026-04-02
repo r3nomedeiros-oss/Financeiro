@@ -19,13 +19,23 @@ export default function FluxoCaixaPage() {
   );
   const [dataFim, setDataFim] = useState(new Date().toISOString().split('T')[0]);
 
+  // Carrega com loading apenas na primeira vez
   useEffect(() => {
-    carregarDados();
+    carregarDados(true);
+  }, []);
+
+  // Recarrega sem loading quando muda filtros
+  useEffect(() => {
+    if (movimentacoes.length > 0 || contas.length > 0) {
+      carregarDados(false);
+    }
   }, [mes, ano, modoVisualizacao, dataInicio, dataFim]);
 
-  const carregarDados = async () => {
+  const carregarDados = async (showLoading = true) => {
     try {
-      setLoading(true);
+      if (showLoading && movimentacoes.length === 0) {
+        setLoading(true);
+      }
       
       let params = {};
       if (modoVisualizacao === 'periodo') {
