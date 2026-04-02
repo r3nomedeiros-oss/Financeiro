@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { movimentacoesAPI, planoContasAPI, contasAPI } from '../services/api';
-import { Plus, Edit2, Trash2, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, X, Search } from 'lucide-react';
 
 export default function MovimentacoesPage() {
   const [movimentacoes, setMovimentacoes] = useState([]);
@@ -9,6 +9,12 @@ export default function MovimentacoesPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  
+  // Estado para busca do Item/Conta
+  const [buscaItem, setBuscaItem] = useState('');
+  const [showItemDropdown, setShowItemDropdown] = useState(false);
+  const itemInputRef = useRef(null);
+  const dropdownRef = useRef(null);
   
   const [formData, setFormData] = useState({
     data: new Date().toISOString().split('T')[0],
@@ -82,6 +88,34 @@ export default function MovimentacoesPage() {
     return itens;
   };
 
+  // Filtrar itens pela busca
+  const itensFiltrados = itensDisponiveis.filter(item => {
+    const texto = buscaItem.toLowerCase();
+    const nomeCompleto = item.subcategoria 
+      ? `${item.subcategoria} ${item.nome}`.toLowerCase()
+      : item.nome.toLowerCase();
+    return nomeCompleto.includes(texto);
+  });
+
+  // Fechar dropdown ao clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target) &&
+          itemInputRef.current && !itemInputRef.current.contains(event.target)) {
+        setShowItemDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Selecionar item
+  const selecionarItem = (item) => {
+    setFormData({ ...formData, plano_contas_id: item.id });
+    setBuscaItem(item.subcategoria ? `${item.subcategoria} → ${item.nome}` : item.nome);
+    setShowItemDropdown(false);
+  };
+
   // Formatar valor como moeda brasileira (sem centavos)
   const formatarValorInput = (valor) => {
     // Remove tudo que não é número
@@ -148,6 +182,12 @@ export default function MovimentacoesPage() {
       maximumFractionDigits: 0
     }).format(mov.valor);
     
+    // Buscar nome do item para preencher o campo de busca
+    const item = itensDisponiveis.find(i => i.id === mov.plano_contas_id);
+    if (item) {
+      setBuscaItem(item.subcategoria ? `${item.subcategoria} → ${item.nome}` : item.nome);
+    }
+    
     setFormData({
       data: mov.data,
       tipo: mov.tipo,
@@ -182,6 +222,7 @@ export default function MovimentacoesPage() {
       valor: '',
       valorFormatado: ''
     });
+    setBuscaItem('');
     setEditingId(null);
   };
 
@@ -347,7 +388,10 @@ export default function MovimentacoesPage() {
                   </label>
                   <select
                     value={formData.tipo}
-                    onChange={(e) => setFormData({ ...formData, tipo: e.target.value, plano_contas_id: '' })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, tipo: e.target.value, plano_contas_id: '' });
+                      setBuscaItem('');
+                    }}
                     required
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
@@ -361,25 +405,66 @@ export default function MovimentacoesPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Item/Conta *
                 </label>
-                <select
-                  value={formData.plano_contas_id}
-                  onChange={(e) => setFormData({ ...formData, plano_contas_id: e.target.value })}
-                  required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  data-testid="item-conta-select"
-                >
-                  <option value="">Selecione um item...</option>
-                  {itensDisponiveis.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.subcategoria ? `${item.subcategoria} → ${item.nome}` : item.nome}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                    <input
+                      ref={itemInputRef}
+                      type="text"
+                      value={buscaItem}
+                      onChange={(e) => {
+                        setBuscaItem(e.target.value);
+                        setFormData({ ...formData, plano_contas_id: '' });
+                        setShowItemDropdown(true);
+                      }}
+                      onFocus={() => setShowItemDropdown(true)}
+                      placeholder="Digite para buscar..."
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      data-testid="item-conta-input"
+                    />
+                  </div>
+                  
+                  {showItemDropdown && (
+                    <div 
+                      ref={dropdownRef}
+                      className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto"
+                    >
+                      {itensFiltrados.length > 0 ? (
+                        itensFiltrados.map((item) => (
+                          <div
+                            key={item.id}
+                            onClick={() => selecionarItem(item)}
+                            className={`px-4 py-2 cursor-pointer hover:bg-blue-50 ${
+                              formData.plano_contas_id === item.id ? 'bg-blue-100' : ''
+                            }`}
+                          >
+                            <span className="text-sm">
+                              {item.subcategoria ? (
+                                <>
+                                  <span className="text-gray-500">{item.subcategoria} → </span>
+                                  <span className="font-medium">{item.nome}</span>
+                                </>
+                              ) : (
+                                <span className="font-medium">{item.nome}</span>
+                              )}
+                            </span>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="px-4 py-2 text-gray-500 text-sm">
+                          Nenhum item encontrado
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
                 {itensDisponiveis.length === 0 && (
                   <p className="text-xs text-amber-600 mt-1">
                     Nenhum item cadastrado. Vá em Configurações para criar o plano de contas.
                   </p>
                 )}
+                {/* Campo hidden para validação */}
+                <input type="hidden" value={formData.plano_contas_id} required />
               </div>
 
               <div>
