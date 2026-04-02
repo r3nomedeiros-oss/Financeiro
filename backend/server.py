@@ -332,6 +332,8 @@ async def get_movimentacoes(
     ano: Optional[int] = None,
     data_inicio: Optional[str] = None,
     data_fim: Optional[str] = None,
+    page: Optional[int] = 1,
+    limit: Optional[int] = 100,
     user_id: str = Depends(get_current_user)
 ):
     supabase = get_supabase()
@@ -356,7 +358,9 @@ async def get_movimentacoes(
     elif ano:
         query = query.gte("data", f"{ano}-01-01").lt("data", f"{ano + 1}-01-01")
     
-    result = query.order("data", desc=True).execute()
+    # Paginação otimizada
+    offset = (page - 1) * limit
+    result = query.order("data", desc=True).range(offset, offset + limit - 1).execute()
     return result.data
 
 @app.post("/api/movimentacoes")

@@ -92,6 +92,10 @@ class FinanceAPITester:
             return True, response
         return False, {}
 
+    def test_admin_login(self):
+        """Login with admin credentials"""
+        return self.test_login_user("admin@sfi.com", "admin123")
+
     def test_me(self):
         """Test getting current user"""
         return self.run_test("Get Current User", "GET", "/api/auth/me", 200)
@@ -103,6 +107,20 @@ class FinanceAPITester:
     def test_get_plano_contas(self):
         """Test getting chart of accounts"""
         return self.run_test("Get Chart of Accounts", "GET", "/api/plano-contas", 200)
+
+    def test_get_plano_contas_hierarquico(self):
+        """Test getting hierarchical chart of accounts"""
+        return self.run_test("Get Hierarchical Chart of Accounts", "GET", "/api/plano-contas/hierarquico", 200)
+
+    def test_planejamento_endpoints(self):
+        """Test planejamento (budget planning) endpoints"""
+        # Test getting planejamento data
+        success1, response1 = self.run_test("Get Planejamento", "GET", "/api/planejamento", 200)
+        
+        # Test with year filter
+        success2, response2 = self.run_test("Get Planejamento 2024", "GET", "/api/planejamento?ano=2024", 200)
+        
+        return success1 and success2, {"all": response1, "2024": response2}
 
     def test_dre_anual(self, year=2024):
         """Test DRE annual endpoint"""
@@ -199,12 +217,17 @@ def main():
         tester.log("❌ Backend is not responding. Stopping tests.")
         return 1
     
-    # Register and login
-    tester.log("🔐 Testing authentication...")
-    success, user_data = tester.test_register_user()
+    # Try to login with admin credentials first
+    tester.log("🔐 Testing authentication with admin credentials...")
+    success, user_data = tester.test_admin_login()
+    
     if not success:
-        tester.log("❌ User registration failed. Stopping tests.")
-        return 1
+        # If admin login fails, try registering a new user
+        tester.log("🔐 Admin login failed, trying to register new user...")
+        success, user_data = tester.test_register_user()
+        if not success:
+            tester.log("❌ Both admin login and user registration failed. Stopping tests.")
+            return 1
     
     # Test getting current user
     tester.test_me()
@@ -215,8 +238,13 @@ def main():
     # Create standard chart of accounts
     tester.test_create_standard_accounts()
     
-    # Get chart of accounts
+    # Get chart of accounts (both flat and hierarchical)
     plano_success, plano_data = tester.test_get_plano_contas()
+    hierarquico_success, hierarquico_data = tester.test_get_plano_contas_hierarquico()
+    
+    # Test Planejamento endpoints (the main issue that was fixed)
+    tester.log("📋 Testing Planejamento Orçamentário endpoints...")
+    tester.test_planejamento_endpoints()
     
     # Test DRE endpoints
     tester.test_dre_anual(2024)

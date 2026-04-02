@@ -4,7 +4,7 @@ const API_URL = import.meta.env.VITE_BACKEND_URL || '';
 
 // Cache em memória para requests GET
 const requestCache = new Map();
-const CACHE_TTL = 30000; // 30 segundos
+const CACHE_TTL = 60000; // 60 segundos - aumentado para melhor performance
 const pendingRequests = new Map();
 
 const api = axios.create({
@@ -12,7 +12,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 15000, // 15s timeout
+  timeout: 30000, // 30s timeout - aumentado para operações pesadas
 });
 
 // Interceptor para adicionar token e cache

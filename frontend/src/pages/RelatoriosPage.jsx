@@ -1,8 +1,12 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { movimentacoesAPI, planoContasAPI } from '../services/api';
 import { Download, Filter, Eye, EyeOff, ChevronDown, ChevronRight, ChevronsDown, ChevronsUp, FileSpreadsheet } from 'lucide-react';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+
+// Lazy load de bibliotecas pesadas para PDF/Excel
+const loadPdfLibs = () => Promise.all([
+  import('jspdf'),
+  import('jspdf-autotable')
+]);
 
 // Categorias fixas do DRE
 const CATEGORIAS_CONFIG = {
@@ -293,8 +297,9 @@ export default function RelatoriosPage() {
     link.click();
   };
 
-  // Exportar PDF COM CORES
-  const exportToPDF = () => {
+  // Exportar PDF COM CORES - Lazy loaded
+  const exportToPDF = async () => {
+    const [{ default: jsPDF }, { default: autoTable }] = await loadPdfLibs();
     const doc = new jsPDF('landscape', 'mm', 'a4');
     
     doc.setFontSize(14);

@@ -1,8 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { dreAPI, planoContasAPI, movimentacoesAPI } from '../services/api';
 import { Download, FileSpreadsheet } from 'lucide-react';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+
+// Lazy load de bibliotecas pesadas para PDF/Excel
+const loadPdfLibs = () => Promise.all([
+  import('jspdf'),
+  import('jspdf-autotable')
+]);
 
 // Ícones
 const ChevronRight = () => (
@@ -94,19 +98,21 @@ export default function DREPage() {
   const carregarDados = async () => {
     try {
       setLoading(true);
-      const [dreRes, hierarquiaRes] = await Promise.all([
-        dreAPI.getAnual(ano),
-        planoContasAPI.getHierarquico()
-      ]);
-      setDre(dreRes.data);
-      setHierarquia(hierarquiaRes.data);
       
-      // Inicializar estado de expansão
+      // Carregar hierarquia primeiro para mostrar estrutura
+      const hierarquiaRes = await planoContasAPI.getHierarquico();
+      setHierarquia(hierarquiaRes.data || {});
+      
+      // Inicializar estado de expansão imediatamente
       const initialExpanded = {};
       Object.keys(hierarquiaRes.data || {}).forEach(catId => {
         initialExpanded[catId] = { expanded: true, subcategorias: {} };
       });
       setExpandedState(initialExpanded);
+      
+      // Carregar DRE (pode demorar mais)
+      const dreRes = await dreAPI.getAnual(ano);
+      setDre(dreRes.data);
     } catch (error) {
       console.error('Erro ao carregar DRE:', error);
     } finally {
@@ -302,9 +308,11 @@ export default function DREPage() {
     link.click();
   };
 
-  // Exportar para PDF - download automático usando jsPDF
-  const exportToPDF = () => {
+  // Exportar para PDF - download automático usando jsPDF (Lazy loaded)
+  const exportToPDF = async () => {
     if (!dre || !totais) return;
+    
+    const [{ default: jsPDF }, { default: autoTable }] = await loadPdfLibs();
     
     const formatVal = (v) => {
       if (v === null || v === undefined || v === 0) return '-';

@@ -1,8 +1,12 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
 import { planejamentoAPI, planoContasAPI } from '../services/api';
 import { Save, Copy, ChevronDown, ChevronRight, Download, FileSpreadsheet, Check, X, ChevronsDown, ChevronsUp } from 'lucide-react';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+
+// Lazy load de bibliotecas pesadas para PDF/Excel
+const loadPdfLibs = () => Promise.all([
+  import('jspdf'),
+  import('jspdf-autotable')
+]);
 
 // Labels dos meses
 const MESES = [
@@ -352,8 +356,9 @@ export default function PlanejamentoPage() {
     link.click();
   };
 
-  // Exportar PDF COM CORES
-  const exportToPDF = () => {
+  // Exportar PDF COM CORES - Lazy loaded
+  const exportToPDF = async () => {
+    const [{ default: jsPDF }, { default: autoTable }] = await loadPdfLibs();
     const doc = new jsPDF('landscape', 'mm', 'a4');
     
     doc.setFontSize(14);
@@ -412,10 +417,38 @@ export default function PlanejamentoPage() {
     doc.save(`Planejamento_${ano}.pdf`);
   };
 
-  if (loading) {
+  // Skeleton Loader para carregamento mais suave
+  const SkeletonRow = () => (
+    <tr className="animate-pulse">
+      <td className="p-2 sticky left-0 bg-white"><div className="h-4 bg-gray-200 rounded w-32"></div></td>
+      {MESES.map(m => <td key={m.key} className="p-1"><div className="h-4 bg-gray-100 rounded w-14 ml-auto"></div></td>)}
+      <td className="p-2 bg-gray-50"><div className="h-4 bg-gray-200 rounded w-16 ml-auto"></div></td>
+    </tr>
+  );
+
+  if (loading && Object.keys(hierarquia).length === 0) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="space-y-4" data-testid="planejamento-page">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">Planejamento Orçamentário</h1>
+            <p className="text-gray-600 text-sm">Carregando dados...</p>
+          </div>
+        </div>
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-100 border-b-2 border-gray-300">
+              <tr>
+                <th className="text-left p-2 sticky left-0 bg-gray-100 min-w-[220px]">Descrição</th>
+                {MESES.map(m => <th key={m.key} className="text-right p-2 min-w-[75px]">{m.label}</th>)}
+                <th className="text-right p-2 min-w-[90px] bg-gray-200">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[1,2,3,4,5].map(i => <SkeletonRow key={i} />)}
+            </tbody>
+          </table>
+        </div>
       </div>
     );
   }
