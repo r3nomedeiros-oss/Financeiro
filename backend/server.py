@@ -917,31 +917,34 @@ async def get_planejamento(
 
 @app.post("/api/planejamento")
 async def create_planejamento(plan: PlanejamentoCreate, user_id: str = Depends(get_current_user)):
-    supabase = get_supabase()
-    
-    # Verificar se já existe planejamento para esse período e plano de contas
-    existing = supabase.table("planejamento_orcamentario").select("*").eq("user_id", user_id).eq("mes", plan.mes).eq("ano", plan.ano).eq("plano_contas_id", plan.plano_contas_id).execute()
-    
-    if existing.data:
-        # Upsert: atualizar o existente ao invés de dar erro
-        existing_id = existing.data[0]["id"]
-        result = supabase.table("planejamento_orcamentario").update({
-            "valor_planejado": plan.valor_planejado
-        }).eq("id", existing_id).execute()
+    try:
+        supabase = get_supabase()
+        
+        # Verificar se já existe planejamento para esse período e plano de contas
+        existing = supabase.table("planejamento_orcamentario").select("*").eq("user_id", user_id).eq("mes", plan.mes).eq("ano", plan.ano).eq("plano_contas_id", plan.plano_contas_id).execute()
+        
+        if existing.data:
+            # Upsert: atualizar o existente ao invés de dar erro
+            existing_id = existing.data[0]["id"]
+            result = supabase.table("planejamento_orcamentario").update({
+                "valor_planejado": plan.valor_planejado
+            }).eq("id", existing_id).execute()
+            return result.data[0]
+        
+        novo_plan = {
+            "id": str(uuid.uuid4()),
+            "user_id": user_id,
+            "mes": plan.mes,
+            "ano": plan.ano,
+            "plano_contas_id": plan.plano_contas_id,
+            "valor_planejado": plan.valor_planejado,
+            "created_at": datetime.utcnow().isoformat()
+        }
+        
+        result = supabase.table("planejamento_orcamentario").insert(novo_plan).execute()
         return result.data[0]
-    
-    novo_plan = {
-        "id": str(uuid.uuid4()),
-        "user_id": user_id,
-        "mes": plan.mes,
-        "ano": plan.ano,
-        "plano_contas_id": plan.plano_contas_id,
-        "valor_planejado": plan.valor_planejado,
-        "created_at": datetime.utcnow().isoformat()
-    }
-    
-    result = supabase.table("planejamento_orcamentario").insert(novo_plan).execute()
-    return result.data[0]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao salvar planejamento: {str(e)}")
 
 @app.put("/api/planejamento/{plan_id}")
 async def update_planejamento(plan_id: str, plan: PlanejamentoUpdate, user_id: str = Depends(get_current_user)):
