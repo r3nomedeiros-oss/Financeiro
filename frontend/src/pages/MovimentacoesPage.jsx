@@ -82,25 +82,27 @@ export default function MovimentacoesPage() {
     return itens;
   };
 
-  // Formatar valor como moeda brasileira
+  // Formatar valor como moeda brasileira (sem centavos)
   const formatarValorInput = (valor) => {
     // Remove tudo que não é número
     const numeros = valor.replace(/\D/g, '');
     
-    // Converte para decimal
-    const decimal = (parseInt(numeros) / 100).toFixed(2);
+    // Converte para inteiro (sem centavos)
+    const inteiro = parseInt(numeros) || 0;
     
-    // Formata como moeda
+    // Formata como moeda sem centavos
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
-    }).format(decimal);
+      currency: 'BRL',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(inteiro);
   };
 
   const handleValorChange = (e) => {
     const inputValue = e.target.value;
     const numeros = inputValue.replace(/\D/g, '');
-    const valorNumerico = parseInt(numeros) / 100 || 0;
+    const valorNumerico = parseInt(numeros) || 0;
     
     setFormData({
       ...formData,
@@ -141,7 +143,9 @@ export default function MovimentacoesPage() {
     setEditingId(mov.id);
     const valorFormatado = new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
     }).format(mov.valor);
     
     setFormData({
@@ -185,6 +189,8 @@ export default function MovimentacoesPage() {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
     }).format(value);
   };
 
@@ -405,7 +411,7 @@ export default function MovimentacoesPage() {
                   onChange={handleValorChange}
                   required
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg font-semibold"
-                  placeholder="R$ 0,00"
+                  placeholder="R$ 0"
                   data-testid="valor-input"
                 />
               </div>

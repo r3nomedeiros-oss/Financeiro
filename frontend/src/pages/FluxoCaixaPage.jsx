@@ -51,6 +51,8 @@ export default function FluxoCaixaPage() {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
     }).format(value);
   };
 
@@ -207,9 +209,9 @@ export default function FluxoCaixaPage() {
         rows.push([
           `${String(dia.dia).padStart(2, '0')}/${String(dia.mes).padStart(2, '0')}/${dia.ano}`,
           dia.diaSemana,
-          dia.entradas.toFixed(2).replace('.', ','),
-          dia.saidas.toFixed(2).replace('.', ','),
-          dia.saldo.toFixed(2).replace('.', ',')
+          dia.entradas.toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.'),
+          dia.saidas.toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.'),
+          dia.saldo.toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.')
         ].join(';'));
       });
     } else {
@@ -218,14 +220,14 @@ export default function FluxoCaixaPage() {
         rows.push([
           `Semana ${sem.numero}`,
           `${String(sem.inicio).padStart(2, '0')}/${String(mes).padStart(2, '0')} - ${String(sem.fim).padStart(2, '0')}/${String(mes).padStart(2, '0')}`,
-          sem.entradas.toFixed(2).replace('.', ','),
-          sem.saidas.toFixed(2).replace('.', ','),
-          sem.saldo.toFixed(2).replace('.', ',')
+          sem.entradas.toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.'),
+          sem.saidas.toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.'),
+          sem.saldo.toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.')
         ].join(';'));
       });
     }
     
-    rows.push(['TOTAL', '', totais.entradas.toFixed(2).replace('.', ','), totais.saidas.toFixed(2).replace('.', ','), saldoFinal.toFixed(2).replace('.', ',')].join(';'));
+    rows.push(['TOTAL', '', totais.entradas.toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.'), totais.saidas.toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.'), saldoFinal.toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.')].join(';'));
     
     const csvContent = '\uFEFF' + rows.join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });

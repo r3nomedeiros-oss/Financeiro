@@ -238,9 +238,9 @@ export default function ComparativoPage() {
       const totais = calcularTotaisCategoria(catId);
       rows.push([
         config.label,
-        totais.orcado.toFixed(2).replace('.', ','),
-        totais.realizado.toFixed(2).replace('.', ','),
-        totais.diferenca.toFixed(2).replace('.', ','),
+        totais.orcado.toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.'),
+        totais.realizado.toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.'),
+        totais.diferenca.toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.'),
         totais.variacao.toFixed(1).replace('.', ',') + '%'
       ].join(';'));
       
@@ -251,9 +251,9 @@ export default function ComparativoPage() {
           const valores = getValores(sub.id);
           rows.push([
             '  ' + sub.nome,
-            valores.orcado.toFixed(2).replace('.', ','),
-            valores.realizado.toFixed(2).replace('.', ','),
-            valores.diferenca.toFixed(2).replace('.', ','),
+            valores.orcado.toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.'),
+            valores.realizado.toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.'),
+            valores.diferenca.toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.'),
             valores.variacao.toFixed(1).replace('.', ',') + '%'
           ].join(';'));
         } else {
@@ -261,9 +261,9 @@ export default function ComparativoPage() {
             const valores = getValores(item.id);
             rows.push([
               '  ' + sub.nome + ' > ' + item.nome,
-              valores.orcado.toFixed(2).replace('.', ','),
-              valores.realizado.toFixed(2).replace('.', ','),
-              valores.diferenca.toFixed(2).replace('.', ','),
+              valores.orcado.toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.'),
+              valores.realizado.toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.'),
+              valores.diferenca.toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.'),
               valores.variacao.toFixed(1).replace('.', ',') + '%'
             ].join(';'));
           });
@@ -273,9 +273,9 @@ export default function ComparativoPage() {
     
     rows.push([
       'RESULTADO',
-      resultadoOrcado.toFixed(2).replace('.', ','),
-      resultadoRealizado.toFixed(2).replace('.', ','),
-      (resultadoRealizado - resultadoOrcado).toFixed(2).replace('.', ','),
+      resultadoOrcado.toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.'),
+      resultadoRealizado.toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.'),
+      (resultadoRealizado - resultadoOrcado).toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.'),
       (resultadoOrcado !== 0 ? ((resultadoRealizado - resultadoOrcado) / Math.abs(resultadoOrcado)) * 100 : 0).toFixed(1).replace('.', ',') + '%'
     ].join(';'));
     

@@ -248,9 +248,9 @@ export default function RelatoriosPage() {
     
     Object.entries(CATEGORIAS_CONFIG).forEach(([catId, config]) => {
       const totais = calcularTotaisCategoria(catId);
-      const row = [config.label, totais.valor1.toFixed(2).replace('.', ',')];
+      const row = [config.label, totais.valor1.toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.')];
       if (mostrarAV) row.push(calcularAV(totais.valor1, totaisReceitas.valor1).toFixed(1).replace('.', ',') + '%');
-      row.push(totais.valor2.toFixed(2).replace('.', ','));
+      row.push(totais.valor2.toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.'));
       if (mostrarAV) row.push(calcularAV(totais.valor2, totaisReceitas.valor2).toFixed(1).replace('.', ',') + '%');
       if (mostrarAH) row.push(calcularAH(totais.valor2, totais.valor1).toFixed(1).replace('.', ',') + '%');
       rows.push(row.join(';'));
@@ -261,9 +261,9 @@ export default function RelatoriosPage() {
         if (itens.length === 0) {
           const valores = getValores(sub.id);
           if (valores.valor1 > 0 || valores.valor2 > 0) {
-            const row = ['  ' + sub.nome, valores.valor1.toFixed(2).replace('.', ',')];
+            const row = ['  ' + sub.nome, valores.valor1.toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.')];
             if (mostrarAV) row.push(calcularAV(valores.valor1, totaisReceitas.valor1).toFixed(1).replace('.', ',') + '%');
-            row.push(valores.valor2.toFixed(2).replace('.', ','));
+            row.push(valores.valor2.toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.'));
             if (mostrarAV) row.push(calcularAV(valores.valor2, totaisReceitas.valor2).toFixed(1).replace('.', ',') + '%');
             if (mostrarAH) row.push(calcularAH(valores.valor2, valores.valor1).toFixed(1).replace('.', ',') + '%');
             rows.push(row.join(';'));
@@ -272,9 +272,9 @@ export default function RelatoriosPage() {
           itens.forEach(item => {
             const valores = getValores(item.id);
             if (valores.valor1 > 0 || valores.valor2 > 0) {
-              const row = ['    ' + item.nome, valores.valor1.toFixed(2).replace('.', ',')];
+              const row = ['    ' + item.nome, valores.valor1.toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.')];
               if (mostrarAV) row.push(calcularAV(valores.valor1, totaisReceitas.valor1).toFixed(1).replace('.', ',') + '%');
-              row.push(valores.valor2.toFixed(2).replace('.', ','));
+              row.push(valores.valor2.toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.'));
               if (mostrarAV) row.push(calcularAV(valores.valor2, totaisReceitas.valor2).toFixed(1).replace('.', ',') + '%');
               if (mostrarAH) row.push(calcularAH(valores.valor2, valores.valor1).toFixed(1).replace('.', ',') + '%');
               rows.push(row.join(';'));
@@ -284,9 +284,9 @@ export default function RelatoriosPage() {
       });
     });
     
-    const rowResult = ['RESULTADO', resultado1.toFixed(2).replace('.', ',')];
+    const rowResult = ['RESULTADO', resultado1.toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.')];
     if (mostrarAV) rowResult.push(calcularAV(resultado1, totaisReceitas.valor1).toFixed(1).replace('.', ',') + '%');
-    rowResult.push(resultado2.toFixed(2).replace('.', ','));
+    rowResult.push(resultado2.toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.'));
     if (mostrarAV) rowResult.push(calcularAV(resultado2, totaisReceitas.valor2).toFixed(1).replace('.', ',') + '%');
     if (mostrarAH) rowResult.push(calcularAH(resultado2, resultado1).toFixed(1).replace('.', ',') + '%');
     rows.push(rowResult.join(';'));

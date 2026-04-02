@@ -19,6 +19,8 @@ const formatCurrency = (value) => {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: 'BRL',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
   }).format(value);
 };
 
@@ -45,7 +47,7 @@ const IndicatorCard = memo(({ title, value, percentage, icon: Icon, borderColor,
         </p>
         {percentage !== undefined && (
           <p className={`text-xs font-semibold mt-1 ${percentColor}`}>
-            {percentage.toFixed(2)}%
+            {percentage.toFixed(0)}%
           </p>
         )}
       </div>

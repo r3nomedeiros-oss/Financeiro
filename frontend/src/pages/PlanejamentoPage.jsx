@@ -363,8 +363,8 @@ export default function PlanejamentoPage() {
       const totais = calcularTotalCategoria(catId);
       rows.push([
         config.label,
-        ...MESES.map(m => (totais.meses[m.num] || 0).toFixed(2).replace('.', ',')),
-        totais.total.toFixed(2).replace('.', ',')
+        ...MESES.map(m => (totais.meses[m.num] || 0).toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.')),
+        totais.total.toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.')
       ].join(';'));
       
       const cat = hierarquia[catId];
@@ -373,15 +373,15 @@ export default function PlanejamentoPage() {
         if (itens.length === 0) {
           rows.push([
             '  ' + sub.nome,
-            ...MESES.map(m => getValor(sub.id, m.num).toFixed(2).replace('.', ',')),
-            calcularTotalLinha(sub.id).toFixed(2).replace('.', ',')
+            ...MESES.map(m => getValor(sub.id, m.num).toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.')),
+            calcularTotalLinha(sub.id).toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.')
           ].join(';'));
         } else {
           itens.forEach(item => {
             rows.push([
               '  ' + sub.nome + ' > ' + item.nome,
-              ...MESES.map(m => getValor(item.id, m.num).toFixed(2).replace('.', ',')),
-              calcularTotalLinha(item.id).toFixed(2).replace('.', ',')
+              ...MESES.map(m => getValor(item.id, m.num).toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.')),
+              calcularTotalLinha(item.id).toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.')
             ].join(';'));
           });
         }

@@ -181,7 +181,7 @@ export default function DREPage() {
   // Gerar dados para exportação baseado no estado de expansão atual
   const gerarDadosExportacao = () => {
     const rows = [];
-    const formatVal = (v) => v ? v.toFixed(2).replace('.', ',') : '0,00';
+    const formatVal = (v) => v ? v.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, '.') : '0';
     const formatPct = (v) => v ? v.toFixed(0) + '%' : '0%';
     
     const addCategoriaRows = (catId, catConfig) => {
@@ -275,7 +275,7 @@ export default function DREPage() {
     if (!dre || !totais) return;
     
     const rows = [];
-    const formatVal = (v) => v ? v.toFixed(2).replace('.', ',') : '0,00';
+    const formatVal = (v) => v ? v.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, '.') : '0';
     const formatPct = (v) => v ? v.toFixed(0) + '%' : '0%';
     
     // Header
@@ -317,8 +317,8 @@ export default function DREPage() {
     const formatVal = (v) => {
       if (v === null || v === undefined || v === 0) return '-';
       return new Intl.NumberFormat('pt-BR', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
       }).format(v);
     };
     const formatPct = (v) => v ? `${v.toFixed(0)}%` : '0%';
@@ -398,8 +398,8 @@ export default function DREPage() {
     if (value === null || value === undefined || value === 0) return '-';
     const isNegative = value < 0;
     const formatted = new Intl.NumberFormat('pt-BR', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
     }).format(Math.abs(value));
     return isNegative ? `-${formatted}` : formatted;
   };
