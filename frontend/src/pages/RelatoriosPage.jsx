@@ -211,13 +211,13 @@ export default function RelatoriosPage() {
   };
 
   // Análise Horizontal (AH) - variação entre períodos
-  // Fórmula: AH = [(Valor Período 2 / Valor Período 1) - 1] × 100
-  // Período 1 é a base, Período 2 é o atual
+  // Fórmula: AH = [(Valor Período 2 - Valor Período 1) / |Valor Período 1|] × 100
+  // Usa valor absoluto no denominador para lidar com mudanças de sinal
   const calcularAH = (valorPeriodo2, valorPeriodo1) => {
     if (!valorPeriodo1 || valorPeriodo1 === 0) {
       return valorPeriodo2 > 0 ? 100 : (valorPeriodo2 < 0 ? -100 : 0);
     }
-    return ((valorPeriodo2 / valorPeriodo1) - 1) * 100;
+    return ((valorPeriodo2 - valorPeriodo1) / Math.abs(valorPeriodo1)) * 100;
   };
 
   const formatarPeriodo = (inicio, fim) => {
