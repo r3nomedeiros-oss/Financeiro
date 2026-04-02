@@ -422,7 +422,7 @@ export default function RelatoriosPage() {
     const isExpanded = expandedState[catId]?.expanded;
     const subcategorias = cat?.subcategorias || [];
     const totais = calcularTotaisCategoria(catId);
-    const ah = calcularAH(totais.valor1, totais.valor2);
+    const ah = calcularAH(totais.valor2, totais.valor1);
 
     return (
       <React.Fragment key={catId}>
