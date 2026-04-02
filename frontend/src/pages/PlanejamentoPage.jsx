@@ -730,14 +730,14 @@ export default function PlanejamentoPage() {
                 {MESES.map(mes => (
                   <td 
                     key={mes.key} 
-                    className={`p-2 text-right text-sm border-r border-gray-300 ${
+                    className={`p-2 text-right text-sm border-r border-gray-300 whitespace-nowrap ${
                       calcularResultado.meses[mes.num] >= 0 ? 'text-green-700' : 'text-red-600'
                     }`}
                   >
                     {formatCurrency(calcularResultado.meses[mes.num])}
                   </td>
                 ))}
-                <td className={`p-3 text-right text-base bg-gray-300 ${
+                <td className={`p-3 text-right text-base bg-gray-300 whitespace-nowrap ${
                   calcularResultado.total >= 0 ? 'text-green-700' : 'text-red-600'
                 }`}>
                   {formatCurrency(calcularResultado.total)}
