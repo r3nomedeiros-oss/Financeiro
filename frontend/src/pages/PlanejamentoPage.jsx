@@ -243,8 +243,11 @@ export default function PlanejamentoPage() {
     setSaving(true);
     try {
       for (const [key, valor] of Object.entries(pendingChanges)) {
-        const [itemId, mesStr] = key.split('-');
-        const mes = parseInt(mesStr);
+        // UUID tem formato: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+        // Separador entre itemId e mes é o último '-' seguido de número do mês
+        const lastDashIndex = key.lastIndexOf('-');
+        const itemId = key.substring(0, lastDashIndex);
+        const mes = parseInt(key.substring(lastDashIndex + 1));
         
         const existente = valoresMap[itemId]?.planejamentos[mes];
         
