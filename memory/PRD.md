@@ -1,108 +1,80 @@
-# Sistema Financeiro Industrial - PRD
+# Sistema Financeiro Industrial (SFI) - PRD
 
-## Visão Geral
-Sistema financeiro completo para gestão industrial com DRE, fluxo de caixa, planejamento orçamentário e relatórios comparativos.
+## Problema Original
+Sistema de controle financeiro industrial que precisava de:
+1. Otimizações de performance para carregamento mais rápido
+2. Correção de bug na página de Planejamento Orçamentário (ficava em branco)
 
-## Stack Tecnológica
-- **Frontend**: React 18 + Vite + TailwindCSS
-- **Backend**: FastAPI (Python)
-- **Database**: Supabase (PostgreSQL)
-- **Charts**: Recharts
-- **PDF Export**: jsPDF + jsPDF-autotable (COM CORES)
+## Arquitetura
+- **Backend:** FastAPI + Supabase (PostgreSQL externo)
+- **Frontend:** React 18 + Vite + TailwindCSS
+- **Autenticação:** JWT
 
-## Funcionalidades Implementadas
+## Funcionalidades Principais
+- Dashboard com visão geral financeira
+- DRE (Demonstrativo de Resultado do Exercício)
+- Movimentações financeiras
+- Planejamento Orçamentário
+- Relatórios Comparativos
+- Fluxo de Caixa
+- Configurações de usuário
 
-### Autenticação
-- [x] Login/Registro com JWT
-- [x] Persistência de sessão via localStorage
+## User Personas
+- **Gestor Financeiro:** Analisa DRE, relatórios comparativos
+- **Operador:** Lança movimentações diárias
+- **Diretor:** Visualiza dashboard e planejamento
 
-### Dashboard
-- [x] Visão geral de receitas, margens e lucros
-- [x] Gráficos de entradas x saídas (barras)
-- [x] Gráfico de saídas por plano (barras horizontais com legenda)
-- [x] Saldo das contas bancárias
-- [x] Filtros por mês/ano
-- [x] Cards compactos com cores dinâmicas
+## O que foi implementado (02/04/2026)
 
-### Movimentações Financeiras
-- [x] CRUD completo de movimentações
-- [x] Vinculação com plano de contas hierárquico
-- [x] Vinculação com contas bancárias
-- [x] Atualização automática de saldos
+### Bug Fix
+- Instalado módulo `postgrest` que estava faltando (causava página em branco no Planejamento)
+- Corrigida estrutura de carregamento da página PlanejamentoPage.jsx
 
-### DRE (Demonstrativo de Resultado)
-- [x] Visualização anual com estrutura hierárquica
-- [x] Expansão/recolhimento de categorias
-- [x] Exportação para Excel (CSV)
-- [x] Exportação para PDF COM CORES
+### Otimizações de Performance
 
-### Fluxo de Caixa
-- [x] Resumo mensal por semana
-- [x] Detalhamento diário por período
-- [x] Exportação para Excel e PDF
+1. **Lazy Loading de PDFs/Excel:**
+   - jsPDF e jspdf-autotable agora carregam sob demanda
+   - Reduz bundle inicial significativamente (~300KB menos)
 
-### Planejamento Orçamentário (ATUALIZADO)
-- [x] Estrutura hierárquica igual ao DRE
-- [x] Interface estilo planilha (Jan-Dez + Total)
-- [x] Edição inline - clique na célula para editar
-- [x] Botão "Aplicar para todos os meses"
-- [x] **Barra superior fixa** com controles
-- [x] **Botões Expandir/Recolher Tudo**
-- [x] Salvamento sequencial
-- [x] Exportação PDF COM CORES
-- [x] Exportação Excel
+2. **Skeleton Loaders:**
+   - Adicionados em PlanejamentoPage para feedback visual imediato
+   - Melhora percepção de velocidade
 
-### Orçado x Realizado (ATUALIZADO)
-- [x] **Estrutura hierárquica igual ao DRE**
-- [x] **Cards compactos**
-- [x] **Botões Expandir/Recolher Tudo**
-- [x] **Percentuais corrigidos** (variação real vs orçado)
-- [x] Exportação PDF COM CORES
-- [x] Exportação Excel
+3. **Carregamento Sequencial Otimizado:**
+   - Hierarquia carrega primeiro (estrutura visível mais rápida)
+   - Dados secundários carregam em background
 
-### Relatórios Comparativos (ATUALIZADO)
-- [x] **Estrutura hierárquica igual ao DRE**
-- [x] Comparação de dois períodos
-- [x] Análise Vertical (AV%)
-- [x] Análise Horizontal (AH%) 
-- [x] **Botões Expandir/Recolher Tudo**
-- [x] Exportação PDF COM CORES
-- [x] Exportação Excel
+4. **Cache de API:**
+   - TTL aumentado para 60 segundos
+   - Timeout aumentado para 30s (operações pesadas)
 
-### Configurações
-- [x] Gestão de contas bancárias
-- [x] Plano de contas hierárquico (3 níveis)
-
-## Correções (29/03/2026)
-
-### PDFs e Excel
-- ✅ Todos os relatórios agora exportam COM CORES
-- ✅ Cabeçalhos coloridos por categoria
-- ✅ Valores positivos/negativos com cores distintas
-
-### Planejamento Orçamentário
-- ✅ Barra superior fixa
-- ✅ Botões expandir/recolher tudo
-
-### Orçado x Realizado
-- ✅ Cards compactos
-- ✅ Estrutura DRE
-- ✅ Percentuais corrigidos
-
-### Relatórios Comparativos
-- ✅ Estrutura DRE hierárquica
-- ✅ Exportações com cores
-
-## Backlog (P1)
-- [ ] Resolver erro de Network ao salvar (verificar ambiente de produção)
-- [ ] Importação de dados via CSV
-
-## Backlog (P2)
-- [ ] Notificações de vencimentos
-- [ ] Multi-empresa
+5. **Paginação no Backend:**
+   - Endpoint `/api/movimentacoes` agora suporta paginação
+   - Parâmetros: `page` e `limit` (padrão: 100 itens)
 
 ## Credenciais de Teste
-Ver `/app/memory/test_credentials.md`
+- Email: admin@sfi.com
+- Senha: admin123
 
----
-Última atualização: 29/03/2026
+## Backlog Priorizado
+
+### P0 (Crítico)
+- [x] Bug Planejamento em branco - RESOLVIDO
+
+### P1 (Alto)
+- [ ] Otimizar endpoint "Criar Plano de Contas Padrão" (timeout)
+- [ ] Virtualização de tabelas longas com react-window
+
+### P2 (Médio)
+- [ ] Migração para TanStack Query para cache avançado
+- [ ] Code splitting mais granular por rotas
+- [ ] Prefetch de dados nas transições de página
+
+### P3 (Baixo)
+- [ ] Optimistic updates para ações CRUD
+- [ ] Service Worker para cache offline
+
+## Próximas Tarefas
+1. Verificar se há mais páginas com problemas de carregamento
+2. Implementar virtualização nas tabelas de DRE e Planejamento
+3. Monitorar performance em produção
