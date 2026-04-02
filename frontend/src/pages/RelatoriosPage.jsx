@@ -210,12 +210,14 @@ export default function RelatoriosPage() {
     return (valor / totalReceita) * 100;
   };
 
-  // Análise Horizontal (AH) - variação entre períodos (P1 vs P2)
-  const calcularAH = (valorAtual, valorAnterior) => {
-    if (!valorAnterior || valorAnterior === 0) {
-      return valorAtual > 0 ? 100 : (valorAtual < 0 ? -100 : 0);
+  // Análise Horizontal (AH) - variação entre períodos
+  // Fórmula: AH = [(Valor Período 2 / Valor Período 1) - 1] × 100
+  // Período 1 é a base, Período 2 é o atual
+  const calcularAH = (valorPeriodo2, valorPeriodo1) => {
+    if (!valorPeriodo1 || valorPeriodo1 === 0) {
+      return valorPeriodo2 > 0 ? 100 : (valorPeriodo2 < 0 ? -100 : 0);
     }
-    return ((valorAtual - valorAnterior) / Math.abs(valorAnterior)) * 100;
+    return ((valorPeriodo2 / valorPeriodo1) - 1) * 100;
   };
 
   const formatarPeriodo = (inicio, fim) => {
@@ -250,7 +252,7 @@ export default function RelatoriosPage() {
       if (mostrarAV) row.push(calcularAV(totais.valor1, totaisReceitas.valor1).toFixed(1).replace('.', ',') + '%');
       row.push(totais.valor2.toFixed(2).replace('.', ','));
       if (mostrarAV) row.push(calcularAV(totais.valor2, totaisReceitas.valor2).toFixed(1).replace('.', ',') + '%');
-      if (mostrarAH) row.push(calcularAH(totais.valor1, totais.valor2).toFixed(1).replace('.', ',') + '%');
+      if (mostrarAH) row.push(calcularAH(totais.valor2, totais.valor1).toFixed(1).replace('.', ',') + '%');
       rows.push(row.join(';'));
       
       const cat = hierarquia[catId];
@@ -263,7 +265,7 @@ export default function RelatoriosPage() {
             if (mostrarAV) row.push(calcularAV(valores.valor1, totaisReceitas.valor1).toFixed(1).replace('.', ',') + '%');
             row.push(valores.valor2.toFixed(2).replace('.', ','));
             if (mostrarAV) row.push(calcularAV(valores.valor2, totaisReceitas.valor2).toFixed(1).replace('.', ',') + '%');
-            if (mostrarAH) row.push(calcularAH(valores.valor1, valores.valor2).toFixed(1).replace('.', ',') + '%');
+            if (mostrarAH) row.push(calcularAH(valores.valor2, valores.valor1).toFixed(1).replace('.', ',') + '%');
             rows.push(row.join(';'));
           }
         } else {
@@ -274,7 +276,7 @@ export default function RelatoriosPage() {
               if (mostrarAV) row.push(calcularAV(valores.valor1, totaisReceitas.valor1).toFixed(1).replace('.', ',') + '%');
               row.push(valores.valor2.toFixed(2).replace('.', ','));
               if (mostrarAV) row.push(calcularAV(valores.valor2, totaisReceitas.valor2).toFixed(1).replace('.', ',') + '%');
-              if (mostrarAH) row.push(calcularAH(valores.valor1, valores.valor2).toFixed(1).replace('.', ',') + '%');
+              if (mostrarAH) row.push(calcularAH(valores.valor2, valores.valor1).toFixed(1).replace('.', ',') + '%');
               rows.push(row.join(';'));
             }
           });
@@ -286,7 +288,7 @@ export default function RelatoriosPage() {
     if (mostrarAV) rowResult.push(calcularAV(resultado1, totaisReceitas.valor1).toFixed(1).replace('.', ',') + '%');
     rowResult.push(resultado2.toFixed(2).replace('.', ','));
     if (mostrarAV) rowResult.push(calcularAV(resultado2, totaisReceitas.valor2).toFixed(1).replace('.', ',') + '%');
-    if (mostrarAH) rowResult.push(calcularAH(resultado1, resultado2).toFixed(1).replace('.', ',') + '%');
+    if (mostrarAH) rowResult.push(calcularAH(resultado2, resultado1).toFixed(1).replace('.', ',') + '%');
     rows.push(rowResult.join(';'));
     
     const csvContent = '\uFEFF' + rows.join('\n');
@@ -317,7 +319,7 @@ export default function RelatoriosPage() {
     
     Object.entries(CATEGORIAS_CONFIG).forEach(([catId, config]) => {
       const totais = calcularTotaisCategoria(catId);
-      const ah = calcularAH(totais.valor1, totais.valor2);
+      const ah = calcularAH(totais.valor2, totais.valor1);
       
       const row = [
         { content: config.label, styles: { fontStyle: 'bold', fillColor: config.rgbHeader, textColor: config.rgbText } },
@@ -335,7 +337,7 @@ export default function RelatoriosPage() {
         if (itens.length === 0) {
           const valores = getValores(sub.id);
           if (valores.valor1 > 0 || valores.valor2 > 0) {
-            const ahItem = calcularAH(valores.valor1, valores.valor2);
+            const ahItem = calcularAH(valores.valor2, valores.valor1);
             const rowItem = [
               { content: '  ' + sub.nome },
               { content: formatCurrency(valores.valor1), styles: { halign: 'right' } }
@@ -350,7 +352,7 @@ export default function RelatoriosPage() {
           itens.forEach(item => {
             const valores = getValores(item.id);
             if (valores.valor1 > 0 || valores.valor2 > 0) {
-              const ahItem = calcularAH(valores.valor1, valores.valor2);
+              const ahItem = calcularAH(valores.valor2, valores.valor1);
               const rowItem = [
                 { content: '    ' + item.nome },
                 { content: formatCurrency(valores.valor1), styles: { halign: 'right' } }
@@ -367,7 +369,7 @@ export default function RelatoriosPage() {
     });
     
     // Resultado
-    const ahResultado = calcularAH(resultado1, resultado2);
+    const ahResultado = calcularAH(resultado2, resultado1);
     const rowResult = [
       { content: 'RESULTADO', styles: { fontStyle: 'bold', fillColor: [200, 200, 200] } },
       { content: formatCurrency(resultado1), styles: { halign: 'right', fontStyle: 'bold', fillColor: [200, 200, 200], textColor: resultado1 >= 0 ? [22, 163, 74] : [220, 38, 38] } }
@@ -398,7 +400,7 @@ export default function RelatoriosPage() {
     if (valores.valor1 === 0 && valores.valor2 === 0) return null;
     
     const paddingLeft = nivel === 2 ? 'pl-8' : 'pl-14';
-    const ah = calcularAH(valores.valor1, valores.valor2);
+    const ah = calcularAH(valores.valor2, valores.valor1);
     
     return (
       <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50">
@@ -464,7 +466,7 @@ export default function RelatoriosPage() {
           
           if (subValor1 === 0 && subValor2 === 0) return null;
           
-          const subAh = calcularAH(subValor1, subValor2);
+          const subAh = calcularAH(subValor2, subValor1);
 
           return (
             <React.Fragment key={sub.id}>
@@ -593,7 +595,7 @@ export default function RelatoriosPage() {
                 {mostrarAV && <td className="p-2 text-right bg-green-100">{formatPercent(calcularAV(resultado1, totaisReceitas.valor1))}</td>}
                 <td className={`p-2 text-right ${resultado2 >= 0 ? 'text-green-700' : 'text-red-700'}`}>{formatCurrency(resultado2)}</td>
                 {mostrarAV && <td className="p-2 text-right bg-green-100">{formatPercent(calcularAV(resultado2, totaisReceitas.valor2))}</td>}
-                {mostrarAH && <td className={`p-2 text-right bg-purple-100 ${calcularAH(resultado1, resultado2) >= 0 ? 'text-green-700' : 'text-red-700'}`}>{formatPercent(calcularAH(resultado1, resultado2))}</td>}
+                {mostrarAH && <td className={`p-2 text-right bg-purple-100 ${calcularAH(resultado2, resultado1) >= 0 ? 'text-green-700' : 'text-red-700'}`}>{formatPercent(calcularAH(resultado2, resultado1))}</td>}
               </tr>
             </tbody>
           </table>

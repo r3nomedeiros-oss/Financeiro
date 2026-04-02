@@ -544,58 +544,6 @@ export default function ComparativoPage() {
         </div>
       </div>
 
-      {/* Cards de Resumo - COMPACTOS */}
-      <div className="grid grid-cols-4 gap-3">
-        <div className="bg-white rounded-lg shadow p-3 border-l-4 border-cyan-500">
-          <p className="text-xs text-gray-500">Receitas</p>
-          <div className="flex justify-between items-baseline mt-1">
-            <div>
-              <p className="text-[10px] text-gray-400">Orç</p>
-              <p className="text-sm font-semibold text-gray-700">{formatCurrency(totaisReceitas.orcado)}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-[10px] text-gray-400">Real</p>
-              <p className={`text-sm font-bold ${totaisReceitas.realizado >= totaisReceitas.orcado ? 'text-green-600' : 'text-red-600'}`}>
-                {formatCurrency(totaisReceitas.realizado)}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-3 border-l-4 border-red-500">
-          <p className="text-xs text-gray-500">Despesas</p>
-          <div className="flex justify-between items-baseline mt-1">
-            <div>
-              <p className="text-[10px] text-gray-400">Orç</p>
-              <p className="text-sm font-semibold text-gray-700">{formatCurrency(totaisDespesas.orcado)}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-[10px] text-gray-400">Real</p>
-              <p className={`text-sm font-bold ${totaisDespesas.realizado <= totaisDespesas.orcado ? 'text-green-600' : 'text-red-600'}`}>
-                {formatCurrency(totaisDespesas.realizado)}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-3 border-l-4 border-blue-500">
-          <p className="text-xs text-gray-500">Resultado Orçado</p>
-          <p className={`text-lg font-bold mt-1 ${resultadoOrcado >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
-            {formatCurrency(resultadoOrcado)}
-          </p>
-        </div>
-
-        <div className={`rounded-lg shadow p-3 border-l-4 ${resultadoRealizado >= resultadoOrcado ? 'border-green-500 bg-green-50' : 'border-red-500 bg-red-50'}`}>
-          <p className="text-xs text-gray-500">Resultado Real</p>
-          <p className={`text-lg font-bold mt-1 ${resultadoRealizado >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-            {formatCurrency(resultadoRealizado)}
-          </p>
-          <p className={`text-[10px] ${resultadoRealizado >= resultadoOrcado ? 'text-green-600' : 'text-red-600'}`}>
-            {resultadoRealizado >= resultadoOrcado ? '✓ Acima' : '✗ Abaixo'}
-          </p>
-        </div>
-      </div>
-
       {/* Tabela Detalhada - Estrutura DRE */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <table className="w-full text-sm">

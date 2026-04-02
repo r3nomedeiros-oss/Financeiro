@@ -320,6 +320,27 @@ export default function PlanejamentoPage() {
     return totais;
   }, [hierarquia, getValor]);
 
+  // Calcular resultado total (Receitas - Despesas)
+  const calcularResultado = useMemo(() => {
+    const receitas = calcularTotalCategoria('receita_bruta');
+    const deducoes = calcularTotalCategoria('deducoes_vendas');
+    const variaveis = calcularTotalCategoria('custos_variaveis');
+    const fixos = calcularTotalCategoria('custos_fixos');
+    const naoOp = calcularTotalCategoria('resultado_nao_operacional');
+    
+    const resultado = { meses: {}, total: 0 };
+    MESES.forEach(mes => {
+      const receitaMes = receitas.meses[mes.num] || 0;
+      const despesasMes = (deducoes.meses[mes.num] || 0) + 
+                          (variaveis.meses[mes.num] || 0) + 
+                          (fixos.meses[mes.num] || 0) + 
+                          (naoOp.meses[mes.num] || 0);
+      resultado.meses[mes.num] = receitaMes - despesasMes;
+    });
+    resultado.total = receitas.total - deducoes.total - variaveis.total - fixos.total - naoOp.total;
+    return resultado;
+  }, [calcularTotalCategoria]);
+
   // Cores
   const getCorClasse = (cor, isHeader = false) => {
     const cores = {
@@ -698,6 +719,27 @@ export default function PlanejamentoPage() {
               {Object.entries(CATEGORIAS_CONFIG).map(([catId, config]) => 
                 renderCategoriaHierarquica(catId, config)
               )}
+              {/* Linha de RESULTADO */}
+              <tr className="bg-gray-200 border-t-2 border-gray-400 font-bold">
+                <td className="p-3 sticky left-0 bg-gray-200 z-10 border-r border-gray-400 text-base">
+                  RESULTADO
+                </td>
+                {MESES.map(mes => (
+                  <td 
+                    key={mes.key} 
+                    className={`p-2 text-right text-sm border-r border-gray-300 ${
+                      calcularResultado.meses[mes.num] >= 0 ? 'text-green-700' : 'text-red-600'
+                    }`}
+                  >
+                    {formatCurrency(calcularResultado.meses[mes.num])}
+                  </td>
+                ))}
+                <td className={`p-3 text-right text-base bg-gray-300 ${
+                  calcularResultado.total >= 0 ? 'text-green-700' : 'text-red-600'
+                }`}>
+                  {formatCurrency(calcularResultado.total)}
+                </td>
+              </tr>
             </tbody>
           </table>
         </div>
