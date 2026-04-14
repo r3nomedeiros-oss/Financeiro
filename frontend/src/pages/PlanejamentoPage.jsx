@@ -236,36 +236,30 @@ export default function PlanejamentoPage() {
     return valor * 12;
   };
 
-  // Salvar alterações
+  // Salvar alterações - BATCH (muito mais rápido)
   const salvarAlteracoes = async () => {
     if (Object.keys(pendingChanges).length === 0) return;
     
     setSaving(true);
     try {
+      // Construir array de items para batch
+      const batchItems = [];
+      
       for (const [key, valor] of Object.entries(pendingChanges)) {
-        // UUID tem formato: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-        // Separador entre itemId e mes é o último '-' seguido de número do mês
         const lastDashIndex = key.lastIndexOf('-');
         const itemId = key.substring(0, lastDashIndex);
         const mes = parseInt(key.substring(lastDashIndex + 1));
         
-        const existente = valoresMap[itemId]?.planejamentos[mes];
-        
-        if (existente) {
-          if (valor > 0) {
-            await planejamentoAPI.update(existente.id, { valor_planejado: valor });
-          } else {
-            await planejamentoAPI.delete(existente.id);
-          }
-        } else if (valor > 0) {
-          await planejamentoAPI.create({
-            plano_contas_id: itemId,
-            mes,
-            ano,
-            valor_planejado: valor
-          });
-        }
+        batchItems.push({
+          plano_contas_id: itemId,
+          mes,
+          ano,
+          valor_planejado: valor
+        });
       }
+      
+      // Uma única chamada API ao invés de dezenas
+      await planejamentoAPI.batch(batchItems);
       
       setPendingChanges({});
       await carregarDados();

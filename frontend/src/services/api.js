@@ -174,6 +174,7 @@ export const planejamentoAPI = {
   create: (data) => api.post('/api/planejamento', data),
   update: (id, data) => api.put(`/api/planejamento/${id}`, data),
   delete: (id) => api.delete(`/api/planejamento/${id}`),
+  batch: (items) => api.post('/api/planejamento/batch', items),
 };
 
 export default api;

@@ -122,6 +122,74 @@ class FinanceAPITester:
         
         return success1 and success2, {"all": response1, "2024": response2}
 
+    def test_planejamento_batch_endpoint(self):
+        """Test the new batch planejamento endpoint that was created to fix slow saving"""
+        self.log("🚀 Testing NEW BATCH planejamento endpoint...")
+        
+        # First get plano de contas to have valid IDs
+        plano_success, plano_data = self.test_get_plano_contas()
+        if not plano_success or not plano_data:
+            self.log("❌ Cannot test batch endpoint - no plano de contas available")
+            return False, {}
+        
+        # Get first few plano IDs for testing
+        plano_ids = [p['id'] for p in plano_data[:3]] if plano_data else []
+        if not plano_ids:
+            self.log("❌ Cannot test batch endpoint - no plano IDs available")
+            return False, {}
+        
+        # Create batch data for testing
+        batch_items = []
+        for i, plano_id in enumerate(plano_ids):
+            for mes in [1, 2, 3]:  # Test 3 months
+                batch_items.append({
+                    "plano_contas_id": plano_id,
+                    "mes": mes,
+                    "ano": 2024,
+                    "valor_planejado": (i + 1) * 1000 * mes  # Different values for testing
+                })
+        
+        # Test batch endpoint
+        success, response = self.run_test(
+            "Planejamento Batch Save", 
+            "POST", 
+            "/api/planejamento/batch", 
+            200, 
+            batch_items
+        )
+        
+        if success:
+            self.log(f"   Batch saved: {response.get('inserts', 0)} inserts, {response.get('updates', 0)} updates")
+            
+            # Verify data was saved by getting planejamento again
+            verify_success, verify_data = self.run_test("Verify Batch Save", "GET", "/api/planejamento?ano=2024", 200)
+            if verify_success and verify_data:
+                self.log(f"   Verification: Found {len(verify_data)} planejamento records")
+                return True, {"batch_response": response, "verification": verify_data}
+        
+        return success, response
+
+    def test_planejamento_single_endpoint(self):
+        """Test that single planejamento endpoint still works after batch implementation"""
+        # Get plano de contas for valid ID
+        plano_success, plano_data = self.test_get_plano_contas()
+        if not plano_success or not plano_data:
+            return False, {}
+        
+        plano_id = plano_data[0]['id'] if plano_data else None
+        if not plano_id:
+            return False, {}
+        
+        # Test single create
+        single_data = {
+            "plano_contas_id": plano_id,
+            "mes": 12,
+            "ano": 2024,
+            "valor_planejado": 5000.0
+        }
+        
+        return self.run_test("Single Planejamento Create", "POST", "/api/planejamento", 200, single_data)
+
     def test_dre_anual(self, year=2024):
         """Test DRE annual endpoint"""
         return self.run_test(f"DRE Annual {year}", "GET", f"/api/dre/anual/{year}", 200)
@@ -245,6 +313,14 @@ def main():
     # Test Planejamento endpoints (the main issue that was fixed)
     tester.log("📋 Testing Planejamento Orçamentário endpoints...")
     tester.test_planejamento_endpoints()
+    
+    # Test the NEW BATCH endpoint specifically
+    tester.log("🚀 Testing NEW BATCH planejamento endpoint...")
+    batch_success, batch_data = tester.test_planejamento_batch_endpoint()
+    
+    # Test that single endpoint still works
+    tester.log("🔄 Testing single planejamento endpoint still works...")
+    single_success, single_data = tester.test_planejamento_single_endpoint()
     
     # Test DRE endpoints
     tester.test_dre_anual(2024)

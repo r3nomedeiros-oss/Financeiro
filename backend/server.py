@@ -946,6 +946,70 @@ async def create_planejamento(plan: PlanejamentoCreate, user_id: str = Depends(g
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao salvar planejamento: {str(e)}")
 
+@app.post("/api/planejamento/batch")
+async def batch_planejamento(items: List[PlanejamentoCreate], user_id: str = Depends(get_current_user)):
+    """Salva múltiplos planejamentos de uma vez (batch) - muito mais rápido"""
+    try:
+        supabase = get_supabase()
+        
+        # Buscar todos os planejamentos existentes do ano de uma vez
+        anos = set(item.ano for item in items)
+        existing_map = {}
+        for ano in anos:
+            existing = supabase.table("planejamento_orcamentario").select("id, mes, ano, plano_contas_id").eq("user_id", user_id).eq("ano", ano).execute()
+            for e in existing.data:
+                key = f"{e['plano_contas_id']}-{e['mes']}-{e['ano']}"
+                existing_map[key] = e["id"]
+        
+        # Separar em inserts, updates e deletes
+        to_insert = []
+        updates_done = 0
+        deletes_done = 0
+        
+        for item in items:
+            key = f"{item.plano_contas_id}-{item.mes}-{item.ano}"
+            existing_id = existing_map.get(key)
+            
+            if existing_id:
+                if item.valor_planejado > 0:
+                    supabase.table("planejamento_orcamentario").update({
+                        "valor_planejado": item.valor_planejado
+                    }).eq("id", existing_id).execute()
+                    updates_done += 1
+                else:
+                    supabase.table("planejamento_orcamentario").delete().eq("id", existing_id).execute()
+                    deletes_done += 1
+            elif item.valor_planejado > 0:
+                to_insert.append({
+                    "id": str(uuid.uuid4()),
+                    "user_id": user_id,
+                    "mes": item.mes,
+                    "ano": item.ano,
+                    "plano_contas_id": item.plano_contas_id,
+                    "valor_planejado": item.valor_planejado,
+                    "created_at": datetime.utcnow().isoformat()
+                })
+        
+        # Inserir todos de uma vez (batch insert)
+        inserts_done = 0
+        if to_insert:
+            # Supabase suporta batch insert
+            batch_size = 50
+            for i in range(0, len(to_insert), batch_size):
+                batch = to_insert[i:i + batch_size]
+                supabase.table("planejamento_orcamentario").insert(batch).execute()
+                inserts_done += len(batch)
+        
+        return {
+            "message": f"Batch salvo com sucesso",
+            "inserts": inserts_done,
+            "updates": updates_done,
+            "deletes": deletes_done,
+            "total": inserts_done + updates_done + deletes_done
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao salvar batch: {str(e)}")
+
 @app.put("/api/planejamento/{plan_id}")
 async def update_planejamento(plan_id: str, plan: PlanejamentoUpdate, user_id: str = Depends(get_current_user)):
     supabase = get_supabase()
