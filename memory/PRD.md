@@ -9,46 +9,42 @@ Sistema de controle financeiro industrial que precisava de:
 - **Backend:** FastAPI + Supabase (PostgreSQL externo)
 - **Frontend:** React 18 + Vite + TailwindCSS
 - **Autenticação:** JWT
+- **Deploy:** Vercel (frontend) + Railway (backend) + Supabase (DB)
 
 ## Funcionalidades Principais
 - Dashboard com visão geral financeira
 - DRE (Demonstrativo de Resultado do Exercício)
 - Movimentações financeiras
 - Planejamento Orçamentário
-- Relatórios Comparativos
+- Relatórios Comparativos (Orçado x Realizado)
 - Fluxo de Caixa
-- Configurações de usuário
+- Configurações de usuário (Plano de Contas + Contas Bancárias)
 
 ## User Personas
 - **Gestor Financeiro:** Analisa DRE, relatórios comparativos
 - **Operador:** Lança movimentações diárias
 - **Diretor:** Visualiza dashboard e planejamento
 
-## O que foi implementado (02/04/2026)
+## O que foi implementado
 
-### Bug Fixes
+### Sessão 1 (02/04/2026)
 1. Instalado módulo `postgrest` que estava faltando
-2. **CORRIGIDO:** Erro de Hooks no PlanejamentoPage.jsx
-   - Problema: `useEffect` estava após `return` condicional, violando regras de Hooks do React
-   - Solução: Movido `useEffect` para antes do return e `SkeletonRow` para fora do componente
+2. Corrigido erro de Hooks no PlanejamentoPage.jsx
+3. Lazy Loading de PDFs/Excel
+4. Skeleton Loaders
+5. Cache de API (TTL 60s)
+6. Paginação no backend para movimentações
 
-### Otimizações de Performance
+### Sessão 2 (15/01/2026) - Bug Fix Performance
+**Problema:** Salvamento no Planejamento Orçamentário extremamente lento (chamadas API sequenciais - cada item com "Aplicar a todos os meses" = 24+ queries ao Supabase)
 
-1. **Lazy Loading de PDFs/Excel:**
-   - jsPDF e jspdf-autotable agora carregam sob demanda
-   - Reduz bundle inicial significativamente (~300KB menos)
-
-2. **Skeleton Loaders:**
-   - Adicionados em PlanejamentoPage para feedback visual imediato
-   - Melhora percepção de velocidade
-
-3. **Cache de API:**
-   - TTL aumentado para 60 segundos
-   - Timeout aumentado para 30s (operações pesadas)
-
-4. **Paginação no Backend:**
-   - Endpoint `/api/movimentacoes` agora suporta paginação
-   - Parâmetros: `page` e `limit` (padrão: 100 itens)
+**Solução implementada:**
+1. **Novo endpoint batch:** `POST /api/planejamento/batch` - aceita array de itens e salva todos de uma vez
+   - Busca todos os planejamentos existentes do ano em uma única query
+   - Batch insert para novos itens (até 50 por vez)
+   - Resultado: 12 meses salvos em < 1 segundo (antes ~10-30 segundos)
+2. **Frontend otimizado:** `salvarAlteracoes()` agora usa `planejamentoAPI.batch()` em vez de chamadas sequenciais
+3. **Esclarecimento DRE:** DRE mostra movimentações reais (entradas/saídas), não planejamento. Valores planejados aparecem em "Orçado x Realizado"
 
 ## Credenciais de Teste
 - Email: admin@sfi.com
@@ -58,15 +54,17 @@ Sistema de controle financeiro industrial que precisava de:
 
 ### P0 (Crítico)
 - [x] Bug Planejamento em branco - RESOLVIDO
+- [x] Salvamento lento no Planejamento - RESOLVIDO
 
 ### P1 (Alto)
-- [ ] Otimizar endpoint "Criar Plano de Contas Padrão" (timeout)
 - [ ] Virtualização de tabelas longas com react-window
+- [ ] Endpoint batch para criação de plano de contas padrão (atualmente sequencial)
 
 ### P2 (Médio)
 - [ ] Migração para TanStack Query para cache avançado
 - [ ] Code splitting mais granular por rotas
+- [ ] Dashboard com gráfico de tendência mensal
 
 ## Próximas Tarefas
-1. Monitorar outras páginas para problemas similares
-2. Implementar virtualização nas tabelas de DRE
+1. Monitorar performance do batch endpoint com volumes maiores
+2. Considerar adicionar coluna de "Planejado" na DRE para comparação rápida
