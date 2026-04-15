@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
-import { planejamentoAPI, planoContasAPI } from '../services/api';
+import { planejamentoAPI, planoContasAPI, invalidateCache } from '../services/api';
 import { Save, Copy, ChevronDown, ChevronRight, Download, FileSpreadsheet, Check, X, ChevronsDown, ChevronsUp } from 'lucide-react';
 
 // Lazy load de bibliotecas pesadas para PDF/Excel
@@ -260,6 +260,9 @@ export default function PlanejamentoPage() {
       
       // Uma única chamada API ao invés de dezenas
       await planejamentoAPI.batch(batchItems);
+      
+      // Limpar cache antes de recarregar para garantir dados frescos
+      invalidateCache('/api/planejamento');
       
       setPendingChanges({});
       await carregarDados();
