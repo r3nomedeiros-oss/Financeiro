@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { movimentacoesAPI, planoContasAPI, contasAPI } from '../services/api';
-import { Plus, Edit2, Trash2, X, Search } from 'lucide-react';
+import { movimentacoesAPI, planoContasAPI, contasAPI, invalidateCache } from '../services/api';
+import { Plus, Edit2, Trash2, X, Search, Filter } from 'lucide-react';
 
 export default function MovimentacoesPage() {
   const [movimentacoes, setMovimentacoes] = useState([]);
@@ -9,6 +9,12 @@ export default function MovimentacoesPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  
+  // Filtros
+  const [filtroMes, setFiltroMes] = useState(new Date().getMonth() + 1);
+  const [filtroAno, setFiltroAno] = useState(new Date().getFullYear());
+  const [filtroTipo, setFiltroTipo] = useState('todos');
+  const [filtroBusca, setFiltroBusca] = useState('');
   
   // Estado para busca do Item/Conta
   const [buscaItem, setBuscaItem] = useState('');
@@ -28,13 +34,13 @@ export default function MovimentacoesPage() {
 
   useEffect(() => {
     carregarDados();
-  }, []);
+  }, [filtroMes, filtroAno]);
 
-  const carregarDados = async () => {
+  const carregarDados = async (showLoading = true) => {
     try {
-      setLoading(true);
+      if (showLoading && movimentacoes.length === 0) setLoading(true);
       const [movRes, hierRes, contasRes] = await Promise.all([
-        movimentacoesAPI.getAll(),
+        movimentacoesAPI.getAll({ mes: filtroMes, ano: filtroAno }),
         planoContasAPI.getHierarquico(),
         contasAPI.getAll(),
       ]);
@@ -44,7 +50,6 @@ export default function MovimentacoesPage() {
       setContas(contasRes.data);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
-      alert('Erro ao carregar dados');
     } finally {
       setLoading(false);
     }
@@ -169,7 +174,9 @@ export default function MovimentacoesPage() {
       
       setShowModal(false);
       resetForm();
-      carregarDados();
+      invalidateCache('/api/movimentacoes');
+      invalidateCache('/api/contas-bancarias');
+      carregarDados(false);
     } catch (error) {
       console.error('Erro ao salvar:', error);
       alert(error.response?.data?.detail || 'Erro ao salvar movimentação');
@@ -208,7 +215,12 @@ export default function MovimentacoesPage() {
     
     try {
       await movimentacoesAPI.delete(id);
-      carregarDados();
+      // Remover da tela imediatamente
+      setMovimentacoes(prev => prev.filter(m => m.id !== id));
+      // Invalidar cache e recarregar saldos atualizados
+      invalidateCache('/api/movimentacoes');
+      invalidateCache('/api/contas-bancarias');
+      contasAPI.getAll().then(res => setContas(res.data));
     } catch (error) {
       console.error('Erro ao excluir:', error);
       alert('Erro ao excluir movimentação');
@@ -242,6 +254,19 @@ export default function MovimentacoesPage() {
     return new Date(dateString + 'T00:00:00').toLocaleDateString('pt-BR');
   };
 
+  // Filtragem local (tipo + busca por texto)
+  const movimentacoesFiltradas = movimentacoes.filter(mov => {
+    if (filtroTipo !== 'todos' && mov.tipo !== filtroTipo) return false;
+    if (filtroBusca) {
+      const texto = filtroBusca.toLowerCase();
+      const nome = (mov.plano_contas?.nome || '').toLowerCase();
+      const complemento = (mov.complemento || '').toLowerCase();
+      const banco = (mov.contas_bancarias?.nome || '').toLowerCase();
+      if (!nome.includes(texto) && !complemento.includes(texto) && !banco.includes(texto)) return false;
+    }
+    return true;
+  });
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -272,6 +297,64 @@ export default function MovimentacoesPage() {
         </button>
       </div>
 
+      {/* Filtros */}
+      <div className="bg-white rounded-xl shadow-md p-4 flex flex-wrap items-center gap-3" data-testid="filtros-movimentacoes">
+        <div className="flex items-center gap-2">
+          <Filter size={18} className="text-gray-400" />
+          <select
+            value={filtroMes}
+            onChange={(e) => setFiltroMes(parseInt(e.target.value))}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            data-testid="filtro-mes"
+          >
+            {Array.from({ length: 12 }, (_, i) => i + 1).map((mes) => (
+              <option key={mes} value={mes}>
+                {new Date(2000, mes - 1).toLocaleDateString('pt-BR', { month: 'long' })}
+              </option>
+            ))}
+          </select>
+          <select
+            value={filtroAno}
+            onChange={(e) => setFiltroAno(parseInt(e.target.value))}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            data-testid="filtro-ano"
+          >
+            {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map((ano) => (
+              <option key={ano} value={ano}>{ano}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="h-6 w-px bg-gray-200"></div>
+
+        <select
+          value={filtroTipo}
+          onChange={(e) => setFiltroTipo(e.target.value)}
+          className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          data-testid="filtro-tipo"
+        >
+          <option value="todos">Todos os tipos</option>
+          <option value="entrada">Entradas</option>
+          <option value="saida">Saídas</option>
+        </select>
+
+        <div className="flex-1 min-w-[200px] relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+          <input
+            type="text"
+            value={filtroBusca}
+            onChange={(e) => setFiltroBusca(e.target.value)}
+            placeholder="Buscar por item, complemento ou banco..."
+            className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            data-testid="filtro-busca"
+          />
+        </div>
+
+        <span className="text-xs text-gray-500">
+          {movimentacoesFiltradas.length} de {movimentacoes.length} registros
+        </span>
+      </div>
+
       {/* Tabela */}
       <div className="bg-white rounded-xl shadow-md overflow-hidden">
         <div className="overflow-x-auto">
@@ -288,8 +371,8 @@ export default function MovimentacoesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {movimentacoes.length > 0 ? (
-                movimentacoes.map((mov) => (
+              {movimentacoesFiltradas.length > 0 ? (
+                movimentacoesFiltradas.map((mov) => (
                   <tr key={mov.id} className="hover:bg-gray-50 transition">
                     <td className="px-6 py-4 text-sm text-gray-800">{formatDate(mov.data)}</td>
                     <td className="px-6 py-4">
