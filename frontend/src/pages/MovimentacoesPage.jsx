@@ -11,8 +11,12 @@ export default function MovimentacoesPage() {
   const [editingId, setEditingId] = useState(null);
   
   // Filtros
-  const [filtroMes, setFiltroMes] = useState(new Date().getMonth() + 1);
-  const [filtroAno, setFiltroAno] = useState(new Date().getFullYear());
+  const [filtroDataInicio, setFiltroDataInicio] = useState(
+    new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]
+  );
+  const [filtroDataFim, setFiltroDataFim] = useState(
+    new Date().toISOString().split('T')[0]
+  );
   const [filtroTipo, setFiltroTipo] = useState('todos');
   const [filtroBusca, setFiltroBusca] = useState('');
   
@@ -34,13 +38,13 @@ export default function MovimentacoesPage() {
 
   useEffect(() => {
     carregarDados();
-  }, [filtroMes, filtroAno]);
+  }, [filtroDataInicio, filtroDataFim]);
 
   const carregarDados = async (showLoading = true) => {
     try {
       if (showLoading && movimentacoes.length === 0) setLoading(true);
       const [movRes, hierRes, contasRes] = await Promise.all([
-        movimentacoesAPI.getAll({ mes: filtroMes, ano: filtroAno }),
+        movimentacoesAPI.getAll({ data_inicio: filtroDataInicio, data_fim: filtroDataFim }),
         planoContasAPI.getHierarquico(),
         contasAPI.getAll(),
       ]);
@@ -301,28 +305,22 @@ export default function MovimentacoesPage() {
       <div className="bg-white rounded-xl shadow-md p-4 flex flex-wrap items-center gap-3" data-testid="filtros-movimentacoes">
         <div className="flex items-center gap-2">
           <Filter size={18} className="text-gray-400" />
-          <select
-            value={filtroMes}
-            onChange={(e) => setFiltroMes(parseInt(e.target.value))}
+          <label className="text-sm text-gray-600">De:</label>
+          <input
+            type="date"
+            value={filtroDataInicio}
+            onChange={(e) => setFiltroDataInicio(e.target.value)}
             className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            data-testid="filtro-mes"
-          >
-            {Array.from({ length: 12 }, (_, i) => i + 1).map((mes) => (
-              <option key={mes} value={mes}>
-                {new Date(2000, mes - 1).toLocaleDateString('pt-BR', { month: 'long' })}
-              </option>
-            ))}
-          </select>
-          <select
-            value={filtroAno}
-            onChange={(e) => setFiltroAno(parseInt(e.target.value))}
+            data-testid="filtro-data-inicio"
+          />
+          <label className="text-sm text-gray-600">Até:</label>
+          <input
+            type="date"
+            value={filtroDataFim}
+            onChange={(e) => setFiltroDataFim(e.target.value)}
             className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            data-testid="filtro-ano"
-          >
-            {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map((ano) => (
-              <option key={ano} value={ano}>{ano}</option>
-            ))}
-          </select>
+            data-testid="filtro-data-fim"
+          />
         </div>
 
         <div className="h-6 w-px bg-gray-200"></div>
