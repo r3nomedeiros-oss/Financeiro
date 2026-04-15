@@ -272,23 +272,13 @@ export default function ConfiguracoesPage() {
       {/* Plano de Contas Tab - Tree View */}
       {activeTab === 'plano-contas' && (
         <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <p className="text-sm text-gray-600">
-                Estrutura hierárquica: <strong>Categoria (fixa)</strong> → <strong>Subcategoria</strong> → <strong>Item/Conta</strong>
-              </p>
-              <p className="text-xs text-gray-500">
-                Categorias são fixas. Você pode adicionar, editar e excluir subcategorias e itens.
-              </p>
-            </div>
-            <button
-              onClick={criarPlanoPadrao}
-              disabled={criandoPlano}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm disabled:opacity-50"
-              data-testid="criar-plano-padrao-btn"
-            >
-              {criandoPlano ? 'Criando...' : 'Criar Plano Padrão DRE'}
-            </button>
+          <div>
+            <p className="text-sm text-gray-600">
+              Estrutura hierárquica: <strong>Categoria (fixa)</strong> → <strong>Subcategoria</strong> → <strong>Item/Conta</strong>
+            </p>
+            <p className="text-xs text-gray-500">
+              Categorias são fixas. Você pode adicionar, editar e excluir subcategorias e itens.
+            </p>
           </div>
 
           {/* Tree View do Plano de Contas */}
