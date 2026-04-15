@@ -74,9 +74,9 @@ export default function PlanejamentoPage() {
     carregarDados();
   }, [ano]);
 
-  const carregarDados = async () => {
+  const carregarDados = async (showLoading = true) => {
     try {
-      setLoading(true);
+      if (showLoading) setLoading(true);
       const [hierRes, planRes] = await Promise.all([
         planoContasAPI.getHierarquico(),
         planejamentoAPI.getAll({ ano }),
@@ -264,8 +264,9 @@ export default function PlanejamentoPage() {
       // Limpar cache antes de recarregar para garantir dados frescos
       invalidateCache('/api/planejamento');
       
+      // Recarregar dados ANTES de limpar pendingChanges para manter valores visíveis
+      await carregarDados(false);
       setPendingChanges({});
-      await carregarDados();
       alert('Alterações salvas com sucesso!');
     } catch (error) {
       console.error('Erro ao salvar:', error);
