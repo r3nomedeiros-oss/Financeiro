@@ -73,7 +73,9 @@ class PlanejamentoCreate(BaseModel):
 class PlanejamentoUpdate(BaseModel):
     valor_planejado: Optional[float] = None
 
-# Dashboard Filters
+class ReorderItem(BaseModel):
+    id: str
+    ordem: int
 class DashboardFilters(BaseModel):
     mes: Optional[int] = None
     ano: Optional[int] = None

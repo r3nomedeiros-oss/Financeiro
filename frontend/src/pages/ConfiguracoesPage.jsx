@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { planoContasAPI, contasAPI, dreAPI } from '../services/api';
+import React, { useState, useEffect, useRef } from 'react';
+import { planoContasAPI, contasAPI, dreAPI, invalidateCache } from '../services/api';
+import { GripVertical } from 'lucide-react';
 
 // Ícones
 const ChevronRight = () => (
@@ -38,9 +39,12 @@ export default function ConfiguracoesPage() {
   const [showContaModal, setShowContaModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [editingConta, setEditingConta] = useState(null);
-  const [criandoPlano, setCriandoPlano] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState({});
   const [expandedSubcats, setExpandedSubcats] = useState({});
+  
+  // Drag & Drop
+  const [dragState, setDragState] = useState({ dragId: null, dragCatId: null, overId: null });
+  const dragRef = useRef(null);
   
   const [formData, setFormData] = useState({
     nome: '',
@@ -145,28 +149,85 @@ export default function ConfiguracoesPage() {
   const handleSavePlano = async () => {
     try {
       if (editingItem) {
-        await planoContasAPI.update(editingItem.id, formData);
+        await planoContasAPI.update(editingItem.id, { nome: formData.nome, tipo: formData.tipo });
       } else {
         await planoContasAPI.create(formData);
       }
       setShowModal(false);
       setEditingItem(null);
+      invalidateCache('/api/plano-contas');
       carregarDados();
     } catch (error) {
       console.error('Erro ao salvar:', error);
-      alert('Erro ao salvar plano de contas');
+      alert(error.response?.data?.detail || 'Erro ao salvar plano de contas');
     }
   };
 
   const handleDeletePlano = async (id, nome) => {
-    if (!confirm(`Tem certeza que deseja excluir "${nome}"?`)) return;
+    if (!confirm(`Tem certeza que deseja excluir "${nome}" e todos os itens vinculados?`)) return;
     try {
       await planoContasAPI.delete(id);
+      invalidateCache('/api/plano-contas');
       carregarDados();
     } catch (error) {
       console.error('Erro ao excluir:', error);
-      alert(error.response?.data?.detail || 'Erro ao excluir. Este item pode ter dependências.');
+      alert(error.response?.data?.detail || 'Erro ao excluir.');
     }
+  };
+
+  // ========== DRAG & DROP ==========
+  const handleDragStart = (catId, subcatId) => (e) => {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', subcatId);
+    dragRef.current = { dragId: subcatId, dragCatId: catId };
+    setDragState({ dragId: subcatId, dragCatId: catId, overId: null });
+  };
+
+  const handleDragOver = (catId, subcatId) => (e) => {
+    e.preventDefault();
+    if (!dragRef.current || dragRef.current.dragCatId !== catId || dragRef.current.dragId === subcatId) return;
+    e.dataTransfer.dropEffect = 'move';
+    setDragState(prev => ({ ...prev, overId: subcatId }));
+  };
+
+  const handleDrop = (catId) => async (e) => {
+    e.preventDefault();
+    const ds = dragRef.current;
+    const overId = dragState.overId;
+    if (!ds || ds.dragCatId !== catId || !overId || ds.dragId === overId) {
+      setDragState({ dragId: null, dragCatId: null, overId: null });
+      dragRef.current = null;
+      return;
+    }
+
+    const subcats = [...(hierarquia[catId]?.subcategorias || [])];
+    const dragIndex = subcats.findIndex(s => s.id === ds.dragId);
+    const overIndex = subcats.findIndex(s => s.id === overId);
+    if (dragIndex === -1 || overIndex === -1) return;
+
+    const [moved] = subcats.splice(dragIndex, 1);
+    subcats.splice(overIndex, 0, moved);
+
+    setHierarquia(prev => ({
+      ...prev,
+      [catId]: { ...prev[catId], subcategorias: subcats }
+    }));
+    setDragState({ dragId: null, dragCatId: null, overId: null });
+    dragRef.current = null;
+
+    // Persistir ordem
+    const reorderData = subcats.map((s, i) => ({ id: s.id, ordem: i }));
+    try {
+      await planoContasAPI.reorder(reorderData);
+      invalidateCache('/api/plano-contas');
+    } catch (err) {
+      console.error('Erro ao reordenar:', err);
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDragState({ dragId: null, dragCatId: null, overId: null });
+    dragRef.current = null;
   };
 
   // CRUD Contas Bancárias
@@ -314,7 +375,7 @@ export default function ConfiguracoesPage() {
                     </button>
                   </div>
 
-                  {/* Subcategorias (Nível 2) */}
+                  {/* Subcategorias (Nível 2) - Com Drag & Drop */}
                   {isExpanded && (
                     <div className="bg-white">
                       {subcategorias.length === 0 ? (
@@ -325,16 +386,27 @@ export default function ConfiguracoesPage() {
                         subcategorias.map((subcat) => {
                           const isSubExpanded = expandedSubcats[subcat.id];
                           const itens = subcat.itens || [];
+                          const isDragging = dragState.dragId === subcat.id;
+                          const isDragOver = dragState.overId === subcat.id && dragState.dragCatId === catId;
 
                           return (
-                            <div key={subcat.id} className="border-t border-gray-100">
+                            <div 
+                              key={subcat.id} 
+                              className={`border-t border-gray-100 transition-all duration-150 ${isDragging ? 'opacity-30' : ''} ${isDragOver ? 'border-t-2 border-t-blue-500' : ''}`}
+                              draggable
+                              onDragStart={handleDragStart(catId, subcat.id)}
+                              onDragOver={handleDragOver(catId, subcat.id)}
+                              onDrop={handleDrop(catId)}
+                              onDragEnd={handleDragEnd}
+                            >
                               {/* Subcategoria */}
                               <div 
-                                className="flex items-center justify-between p-3 pl-8 hover:bg-gray-50 cursor-pointer"
-                                onClick={() => toggleSubcat(subcat.id)}
+                                className="flex items-center justify-between p-3 pl-4 hover:bg-gray-50 group"
+                                style={{ cursor: 'grab' }}
                                 data-testid={`subcategoria-${subcat.id}`}
                               >
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2" onClick={() => toggleSubcat(subcat.id)} style={{ cursor: 'pointer' }}>
+                                  <GripVertical size={14} className="text-gray-300 group-hover:text-gray-500 flex-shrink-0" />
                                   <span className="transition-transform duration-200">
                                     {itens.length > 0 && (isSubExpanded ? <ChevronDown /> : <ChevronRight />)}
                                     {itens.length === 0 && <span className="w-4"></span>}

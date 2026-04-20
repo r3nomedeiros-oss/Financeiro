@@ -126,6 +126,7 @@ export const planoContasAPI = {
   create: (data) => api.post('/api/plano-contas', data),
   update: (id, data) => api.put(`/api/plano-contas/${id}`, data),
   delete: (id) => api.delete(`/api/plano-contas/${id}`),
+  reorder: (items) => api.post('/api/plano-contas/reorder', items),
 };
 
 // ============================================

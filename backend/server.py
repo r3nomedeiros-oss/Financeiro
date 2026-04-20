@@ -10,7 +10,8 @@ from models import (
     ContaBancariaCreate, ContaBancariaUpdate,
     PlanoContasCreate, PlanoContasUpdate,
     MovimentacaoCreate, MovimentacaoUpdate,
-    PlanejamentoCreate, PlanejamentoUpdate
+    PlanejamentoCreate, PlanejamentoUpdate,
+    ReorderItem
 )
 
 app = FastAPI(title="Sistema Financeiro Industrial")
@@ -236,19 +237,23 @@ async def get_plano_contas_hierarquico(user_id: str = Depends(get_current_user))
             
             if nivel == "2":
                 # Subcategoria
+                ordem = int(partes[3]) if len(partes) > 3 and partes[3].isdigit() else 999
                 subcategorias[p["id"]] = {
                     **p,
                     "categoria": cat_dre,
                     "nivel": 2,
+                    "ordem": ordem,
                     "itens": []
                 }
             elif nivel == "3":
                 # Item
+                ordem = int(partes[3]) if len(partes) > 3 and partes[3].isdigit() else 999
                 itens.append({
                     **p,
                     "categoria": cat_dre,
                     "nivel": 3,
-                    "parent_id": parent_id
+                    "parent_id": parent_id,
+                    "ordem": ordem
                 })
     
     # Adicionar itens às subcategorias
@@ -257,11 +262,19 @@ async def get_plano_contas_hierarquico(user_id: str = Depends(get_current_user))
         if parent_id and parent_id in subcategorias:
             subcategorias[parent_id]["itens"].append(item)
     
+    # Ordenar itens dentro de cada subcategoria
+    for subcat_id in subcategorias:
+        subcategorias[subcat_id]["itens"].sort(key=lambda x: x.get("ordem", 999))
+    
     # Adicionar subcategorias às categorias do DRE
     for subcat_id, subcat in subcategorias.items():
         cat_dre = subcat["categoria"]
         if cat_dre in arvore:
             arvore[cat_dre]["subcategorias"].append(subcat)
+    
+    # Ordenar subcategorias dentro de cada categoria
+    for cat_id in arvore:
+        arvore[cat_id]["subcategorias"].sort(key=lambda x: x.get("ordem", 999))
     
     return arvore
 
@@ -298,6 +311,9 @@ async def update_plano_contas(plano_id: str, plano: PlanoContasUpdate, user_id: 
         raise HTTPException(status_code=404, detail="Plano de contas não encontrado")
     
     update_data = plano.dict(exclude_unset=True)
+    # Remover campos que não existem na tabela do Supabase
+    update_data.pop("nivel", None)
+    update_data.pop("parent_id", None)
     result = supabase.table("plano_contas").update(update_data).eq("id", plano_id).execute()
     return result.data[0]
 
@@ -310,17 +326,48 @@ async def delete_plano_contas(plano_id: str, user_id: str = Depends(get_current_
     if not result.data:
         raise HTTPException(status_code=404, detail="Plano de contas não encontrado")
     
-    # Verificar se tem filhos (itens vinculados a esta subcategoria)
-    # Buscar todos que tem este id como parent no campo categoria
-    all_planos = supabase.table("plano_contas").select("id, categoria").eq("user_id", user_id).execute()
-    
+    # Buscar filhos (itens vinculados a esta subcategoria)
+    all_planos = supabase.table("plano_contas").select("id, nome, categoria").eq("user_id", user_id).execute()
+    children_ids = []
     for p in all_planos.data:
         cat = p.get("categoria", "")
-        if f"|{plano_id}" in cat:  # Este plano é pai de outro
-            raise HTTPException(status_code=400, detail="Não é possível excluir. Existem itens vinculados a esta subcategoria.")
+        if f"|{plano_id}" in cat:
+            children_ids.append(p["id"])
     
+    # Verificar se filhos ou o próprio item têm movimentações
+    ids_to_check = children_ids + [plano_id]
+    for check_id in ids_to_check:
+        movs = supabase.table("movimentacoes").select("id").eq("plano_contas_id", check_id).limit(1).execute()
+        if movs.data:
+            raise HTTPException(status_code=400, detail="Não é possível excluir. Existem movimentações vinculadas. Exclua as movimentações primeiro.")
+    
+    # Excluir filhos primeiro (cascade)
+    for child_id in children_ids:
+        supabase.table("plano_contas").delete().eq("id", child_id).execute()
+    
+    # Excluir o item
     supabase.table("plano_contas").delete().eq("id", plano_id).execute()
-    return {"message": "Plano de contas excluído com sucesso"}
+    return {"message": "Excluído com sucesso"}
+
+@app.post("/api/plano-contas/reorder")
+async def reorder_plano_contas(items: List[ReorderItem], user_id: str = Depends(get_current_user)):
+    """Atualiza a ordem das subcategorias/itens"""
+    supabase = get_supabase()
+    
+    for item in items:
+        result = supabase.table("plano_contas").select("categoria").eq("id", item.id).eq("user_id", user_id).execute()
+        if result.data:
+            categoria = result.data[0]["categoria"]
+            partes = categoria.split("|")
+            if len(partes) >= 3:
+                nova_categoria = f"{partes[0]}|{partes[1]}|{partes[2]}|{item.ordem}"
+            elif len(partes) >= 2:
+                nova_categoria = f"{partes[0]}|{partes[1]}||{item.ordem}"
+            else:
+                continue
+            supabase.table("plano_contas").update({"categoria": nova_categoria}).eq("id", item.id).execute()
+    
+    return {"message": "Ordem atualizada"}
 
 # ============================================
 # ROTAS DE MOVIMENTAÇÕES
