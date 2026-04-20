@@ -2,7 +2,9 @@ import os
 from supabase import create_client, Client
 from dotenv import load_dotenv
 
-load_dotenv()
+# Carregar .env do diretório backend (funciona local e no Vercel)
+_dir = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(_dir, '.env'))
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")

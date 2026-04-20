@@ -5,7 +5,8 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from dotenv import load_dotenv
 
-load_dotenv()
+_dir = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(_dir, '.env'))
 
 JWT_SECRET = os.getenv("JWT_SECRET")
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
