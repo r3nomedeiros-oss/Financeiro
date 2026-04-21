@@ -180,6 +180,9 @@ export default function MovimentacoesPage() {
       resetForm();
       invalidateCache('/api/movimentacoes');
       invalidateCache('/api/contas-bancarias');
+      invalidateCache('/api/dashboard');
+      invalidateCache('/api/dre');
+      invalidateCache('/api/fluxo-caixa');
       carregarDados(false);
     } catch (error) {
       console.error('Erro ao salvar:', error);
@@ -224,6 +227,9 @@ export default function MovimentacoesPage() {
       // Invalidar cache e recarregar saldos atualizados
       invalidateCache('/api/movimentacoes');
       invalidateCache('/api/contas-bancarias');
+      invalidateCache('/api/dashboard');
+      invalidateCache('/api/dre');
+      invalidateCache('/api/fluxo-caixa');
       contasAPI.getAll().then(res => setContas(res.data));
     } catch (error) {
       console.error('Erro ao excluir:', error);
