@@ -177,18 +177,24 @@ export default function ComparativoPage() {
 
   // Totais gerais
   const totaisReceitas = useMemo(() => calcularTotaisCategoria('receita_bruta'), [calcularTotaisCategoria]);
-  
+  const totaisDeducoes = useMemo(() => calcularTotaisCategoria('deducoes_vendas'), [calcularTotaisCategoria]);
+  const totaisVariaveis = useMemo(() => calcularTotaisCategoria('custos_variaveis'), [calcularTotaisCategoria]);
+  const totaisFixos = useMemo(() => calcularTotaisCategoria('custos_fixos'), [calcularTotaisCategoria]);
+
+  // Margem de Contribuição = Receita Bruta - Deduções - Custos Variáveis
+  const margemContribuicaoOrcado = totaisReceitas.orcado - totaisDeducoes.orcado - totaisVariaveis.orcado;
+  const margemContribuicaoRealizado = totaisReceitas.realizado - totaisDeducoes.realizado - totaisVariaveis.realizado;
+
+  // % Margem de Contribuição
+  const margemContribuicaoPctOrcado = totaisReceitas.orcado > 0 ? (margemContribuicaoOrcado / totaisReceitas.orcado) * 100 : 0;
+  const margemContribuicaoPctRealizado = totaisReceitas.realizado > 0 ? (margemContribuicaoRealizado / totaisReceitas.realizado) * 100 : 0;
+
   // Despesas operacionais (NÃO inclui resultado_nao_operacional — ele entra depois como valor líquido)
   const totaisDespesas = useMemo(() => {
-    const deducoes = calcularTotaisCategoria('deducoes_vendas');
-    const variaveis = calcularTotaisCategoria('custos_variaveis');
-    const fixos = calcularTotaisCategoria('custos_fixos');
-    
-    const orcado = deducoes.orcado + variaveis.orcado + fixos.orcado;
-    const realizado = deducoes.realizado + variaveis.realizado + fixos.realizado;
-    
+    const orcado = totaisDeducoes.orcado + totaisVariaveis.orcado + totaisFixos.orcado;
+    const realizado = totaisDeducoes.realizado + totaisVariaveis.realizado + totaisFixos.realizado;
     return { orcado, realizado, diferenca: realizado - orcado, variacao: orcado > 0 ? ((realizado - orcado) / orcado) * 100 : 0 };
-  }, [calcularTotaisCategoria]);
+  }, [totaisDeducoes, totaisVariaveis, totaisFixos]);
 
   // Resultado Operacional = Receita Bruta - Deduções - Custos Variáveis - Custos Fixos
   const resultadoOperacionalOrcado = totaisReceitas.orcado - totaisDespesas.orcado;
@@ -283,7 +289,27 @@ export default function ComparativoPage() {
       });
     };
     
-    ['receita_bruta', 'deducoes_vendas', 'custos_variaveis', 'custos_fixos'].forEach(renderCatExcel);
+    ['receita_bruta', 'deducoes_vendas', 'custos_variaveis'].forEach(renderCatExcel);
+    
+    // (=) Margem de Contribuição
+    rows.push([
+      '(=) Margem de Contribuição',
+      margemContribuicaoOrcado.toFixed(0),
+      margemContribuicaoRealizado.toFixed(0),
+      (margemContribuicaoRealizado - margemContribuicaoOrcado).toFixed(0),
+      (margemContribuicaoOrcado !== 0 ? ((margemContribuicaoRealizado - margemContribuicaoOrcado) / Math.abs(margemContribuicaoOrcado)) * 100 : 0).toFixed(1).replace('.', ',') + '%'
+    ].join(';'));
+    
+    // (=) % Margem de Contribuição
+    rows.push([
+      '(=) % Margem de Contribuição',
+      margemContribuicaoPctOrcado.toFixed(1).replace('.', ',') + '%',
+      margemContribuicaoPctRealizado.toFixed(1).replace('.', ',') + '%',
+      (margemContribuicaoPctRealizado - margemContribuicaoPctOrcado).toFixed(1).replace('.', ',') + ' p.p.',
+      '-'
+    ].join(';'));
+    
+    renderCatExcel('custos_fixos');
     
     // (=) Resultado Operacional
     rows.push([
@@ -366,7 +392,28 @@ export default function ComparativoPage() {
       });
     };
     
-    ['receita_bruta', 'deducoes_vendas', 'custos_variaveis', 'custos_fixos'].forEach(renderCatPDF);
+    ['receita_bruta', 'deducoes_vendas', 'custos_variaveis'].forEach(renderCatPDF);
+    
+    // (=) Margem de Contribuição
+    const varMargemC = margemContribuicaoOrcado !== 0 ? ((margemContribuicaoRealizado - margemContribuicaoOrcado) / Math.abs(margemContribuicaoOrcado)) * 100 : 0;
+    body.push([
+      { content: '(=) Margem de Contribuição', styles: { fontStyle: 'bold', fillColor: [207, 250, 254], textColor: [21, 94, 117] } },
+      { content: formatCurrency(margemContribuicaoOrcado), styles: { halign: 'right', fontStyle: 'bold', fillColor: [207, 250, 254], textColor: [21, 94, 117] } },
+      { content: formatCurrency(margemContribuicaoRealizado), styles: { halign: 'right', fontStyle: 'bold', fillColor: [207, 250, 254], textColor: margemContribuicaoRealizado >= 0 ? [22, 163, 74] : [220, 38, 38] } },
+      { content: formatCurrency(margemContribuicaoRealizado - margemContribuicaoOrcado), styles: { halign: 'right', fontStyle: 'bold', fillColor: [207, 250, 254], textColor: (margemContribuicaoRealizado - margemContribuicaoOrcado) >= 0 ? [22, 163, 74] : [220, 38, 38] } },
+      { content: formatPercent(varMargemC), styles: { halign: 'right', fontStyle: 'bold', fillColor: [207, 250, 254], textColor: varMargemC >= 0 ? [22, 163, 74] : [220, 38, 38] } }
+    ]);
+    
+    // (=) % Margem de Contribuição
+    body.push([
+      { content: '(=) % Margem de Contribuição', styles: { fontStyle: 'bold', fillColor: [219, 234, 254], textColor: [30, 64, 175] } },
+      { content: margemContribuicaoPctOrcado.toFixed(1) + '%', styles: { halign: 'right', fontStyle: 'bold', fillColor: [219, 234, 254], textColor: [30, 64, 175] } },
+      { content: margemContribuicaoPctRealizado.toFixed(1) + '%', styles: { halign: 'right', fontStyle: 'bold', fillColor: [219, 234, 254], textColor: [30, 64, 175] } },
+      { content: (margemContribuicaoPctRealizado - margemContribuicaoPctOrcado).toFixed(1) + ' p.p.', styles: { halign: 'right', fontStyle: 'bold', fillColor: [219, 234, 254], textColor: (margemContribuicaoPctRealizado - margemContribuicaoPctOrcado) >= 0 ? [22, 163, 74] : [220, 38, 38] } },
+      { content: '-', styles: { halign: 'right', fillColor: [219, 234, 254] } }
+    ]);
+    
+    renderCatPDF('custos_fixos');
     
     // (=) Resultado Operacional
     const varResOp = resultadoOperacionalOrcado !== 0 ? ((resultadoOperacionalRealizado - resultadoOperacionalOrcado) / Math.abs(resultadoOperacionalOrcado)) * 100 : 0;
@@ -597,10 +644,57 @@ export default function ComparativoPage() {
             </tr>
           </thead>
           <tbody>
-            {/* Receita Bruta, Deduções, Custos Variáveis, Custos Fixos */}
-            {['receita_bruta', 'deducoes_vendas', 'custos_variaveis', 'custos_fixos'].map(catId =>
+            {/* Receita Bruta, Deduções, Custos Variáveis */}
+            {['receita_bruta', 'deducoes_vendas', 'custos_variaveis'].map(catId =>
               renderCategoriaHierarquica(catId, CATEGORIAS_CONFIG[catId])
             )}
+
+            {/* (=) Margem de Contribuição */}
+            <tr className="bg-cyan-50 font-semibold border-y border-cyan-200">
+              <td className="p-2 text-cyan-800">(=) Margem de Contribuição</td>
+              <td className={`p-2 text-right ${margemContribuicaoOrcado >= 0 ? 'text-cyan-800' : 'text-red-700'}`}>
+                {formatCurrency(margemContribuicaoOrcado)}
+              </td>
+              <td className={`p-2 text-right ${margemContribuicaoRealizado >= 0 ? 'text-cyan-800' : 'text-red-700'}`}>
+                {formatCurrency(margemContribuicaoRealizado)}
+              </td>
+              <td className={`p-2 text-right ${(margemContribuicaoRealizado - margemContribuicaoOrcado) >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                {formatCurrency(margemContribuicaoRealizado - margemContribuicaoOrcado)}
+              </td>
+              <td className={`p-2 text-right ${margemContribuicaoRealizado >= margemContribuicaoOrcado ? 'text-green-700' : 'text-red-700'}`}>
+                {formatPercent(margemContribuicaoOrcado !== 0 ? ((margemContribuicaoRealizado - margemContribuicaoOrcado) / Math.abs(margemContribuicaoOrcado)) * 100 : 0)}
+              </td>
+              <td className="p-2 text-center">
+                {margemContribuicaoRealizado >= margemContribuicaoOrcado
+                  ? <TrendingUp className="text-green-500 mx-auto" size={16} />
+                  : <TrendingDown className="text-red-500 mx-auto" size={16} />
+                }
+              </td>
+            </tr>
+
+            {/* (=) % Margem de Contribuição */}
+            <tr className="bg-blue-50 font-semibold border-b border-blue-200">
+              <td className="p-2 text-blue-800">(=) % Margem de Contribuição</td>
+              <td className={`p-2 text-right ${margemContribuicaoPctOrcado >= 0 ? 'text-blue-800' : 'text-red-700'}`}>
+                {margemContribuicaoPctOrcado.toFixed(1)}%
+              </td>
+              <td className={`p-2 text-right ${margemContribuicaoPctRealizado >= 0 ? 'text-blue-800' : 'text-red-700'}`}>
+                {margemContribuicaoPctRealizado.toFixed(1)}%
+              </td>
+              <td className={`p-2 text-right ${(margemContribuicaoPctRealizado - margemContribuicaoPctOrcado) >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                {(margemContribuicaoPctRealizado - margemContribuicaoPctOrcado).toFixed(1)} p.p.
+              </td>
+              <td className="p-2 text-right text-gray-400">-</td>
+              <td className="p-2 text-center">
+                {margemContribuicaoPctRealizado >= margemContribuicaoPctOrcado
+                  ? <TrendingUp className="text-green-500 mx-auto" size={16} />
+                  : <TrendingDown className="text-red-500 mx-auto" size={16} />
+                }
+              </td>
+            </tr>
+
+            {/* Custos Fixos */}
+            {renderCategoriaHierarquica('custos_fixos', CATEGORIAS_CONFIG.custos_fixos)}
 
             {/* (=) Resultado Operacional (linha calculada) */}
             <tr className="bg-cyan-50 font-semibold border-y-2 border-cyan-200">

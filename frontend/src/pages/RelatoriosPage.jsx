@@ -191,18 +191,23 @@ export default function RelatoriosPage() {
 
   // Totais gerais
   const totaisReceitas = useMemo(() => calcularTotaisCategoria('receita_bruta'), [calcularTotaisCategoria]);
+  const totaisDeducoes = useMemo(() => calcularTotaisCategoria('deducoes_vendas'), [calcularTotaisCategoria]);
+  const totaisVariaveis = useMemo(() => calcularTotaisCategoria('custos_variaveis'), [calcularTotaisCategoria]);
+  const totaisFixos = useMemo(() => calcularTotaisCategoria('custos_fixos'), [calcularTotaisCategoria]);
+
+  // Margem de Contribuição = Receita - Deduções - Custos Variáveis
+  const margemContribValor1 = totaisReceitas.valor1 - totaisDeducoes.valor1 - totaisVariaveis.valor1;
+  const margemContribValor2 = totaisReceitas.valor2 - totaisDeducoes.valor2 - totaisVariaveis.valor2;
+
+  // % Margem de Contribuição
+  const margemContribPct1 = totaisReceitas.valor1 > 0 ? (margemContribValor1 / totaisReceitas.valor1) * 100 : 0;
+  const margemContribPct2 = totaisReceitas.valor2 > 0 ? (margemContribValor2 / totaisReceitas.valor2) * 100 : 0;
   
   // Despesas operacionais (NÃO inclui resultado_nao_operacional)
-  const totaisDespesas = useMemo(() => {
-    const deducoes = calcularTotaisCategoria('deducoes_vendas');
-    const variaveis = calcularTotaisCategoria('custos_variaveis');
-    const fixos = calcularTotaisCategoria('custos_fixos');
-    
-    return {
-      valor1: deducoes.valor1 + variaveis.valor1 + fixos.valor1,
-      valor2: deducoes.valor2 + variaveis.valor2 + fixos.valor2
-    };
-  }, [calcularTotaisCategoria]);
+  const totaisDespesas = useMemo(() => ({
+    valor1: totaisDeducoes.valor1 + totaisVariaveis.valor1 + totaisFixos.valor1,
+    valor2: totaisDeducoes.valor2 + totaisVariaveis.valor2 + totaisFixos.valor2
+  }), [totaisDeducoes, totaisVariaveis, totaisFixos]);
 
   // Resultado Operacional = Receita - Deduções - Variáveis - Fixos
   const resOpValor1 = totaisReceitas.valor1 - totaisDespesas.valor1;
@@ -296,7 +301,25 @@ export default function RelatoriosPage() {
       });
     };
     
-    ['receita_bruta', 'deducoes_vendas', 'custos_variaveis', 'custos_fixos'].forEach(renderCatCsv);
+    ['receita_bruta', 'deducoes_vendas', 'custos_variaveis'].forEach(renderCatCsv);
+    
+    // (=) Margem de Contribuição
+    const rowMC = ['(=) Margem de Contribuição', margemContribValor1.toFixed(0)];
+    if (mostrarAV) rowMC.push(calcularAV(margemContribValor1, totaisReceitas.valor1).toFixed(1).replace('.', ',') + '%');
+    rowMC.push(margemContribValor2.toFixed(0));
+    if (mostrarAV) rowMC.push(calcularAV(margemContribValor2, totaisReceitas.valor2).toFixed(1).replace('.', ',') + '%');
+    if (mostrarAH) rowMC.push(calcularAH(margemContribValor2, margemContribValor1).toFixed(1).replace('.', ',') + '%');
+    rows.push(rowMC.join(';'));
+    
+    // (=) % Margem de Contribuição
+    const rowMCPct = ['(=) % Margem de Contribuição', margemContribPct1.toFixed(1).replace('.', ',') + '%'];
+    if (mostrarAV) rowMCPct.push('-');
+    rowMCPct.push(margemContribPct2.toFixed(1).replace('.', ',') + '%');
+    if (mostrarAV) rowMCPct.push('-');
+    if (mostrarAH) rowMCPct.push((margemContribPct2 - margemContribPct1).toFixed(1).replace('.', ',') + ' p.p.');
+    rows.push(rowMCPct.join(';'));
+    
+    renderCatCsv('custos_fixos');
     
     // (=) Resultado Operacional
     const rowResOp = ['(=) Resultado Operacional', resOpValor1.toFixed(0)];
@@ -394,7 +417,32 @@ export default function RelatoriosPage() {
       });
     };
     
-    ['receita_bruta', 'deducoes_vendas', 'custos_variaveis', 'custos_fixos'].forEach(renderCatPdf);
+    ['receita_bruta', 'deducoes_vendas', 'custos_variaveis'].forEach(renderCatPdf);
+    
+    // (=) Margem de Contribuição
+    const ahMC = calcularAH(margemContribValor2, margemContribValor1);
+    const rowMCPdf = [
+      { content: '(=) Margem de Contribuição', styles: { fontStyle: 'bold', fillColor: [207, 250, 254], textColor: [21, 94, 117] } },
+      { content: formatCurrency(margemContribValor1), styles: { halign: 'right', fontStyle: 'bold', fillColor: [207, 250, 254], textColor: [21, 94, 117] } }
+    ];
+    if (mostrarAV) rowMCPdf.push({ content: formatPercent(calcularAV(margemContribValor1, totaisReceitas.valor1)), styles: { halign: 'right', fillColor: [207, 250, 254] } });
+    rowMCPdf.push({ content: formatCurrency(margemContribValor2), styles: { halign: 'right', fontStyle: 'bold', fillColor: [207, 250, 254], textColor: [21, 94, 117] } });
+    if (mostrarAV) rowMCPdf.push({ content: formatPercent(calcularAV(margemContribValor2, totaisReceitas.valor2)), styles: { halign: 'right', fillColor: [207, 250, 254] } });
+    if (mostrarAH) rowMCPdf.push({ content: formatPercent(ahMC), styles: { halign: 'right', fillColor: [207, 250, 254], textColor: ahMC >= 0 ? [22, 163, 74] : [220, 38, 38] } });
+    body.push(rowMCPdf);
+    
+    // (=) % Margem de Contribuição
+    const rowMCPctPdf = [
+      { content: '(=) % Margem de Contribuição', styles: { fontStyle: 'bold', fillColor: [219, 234, 254], textColor: [30, 64, 175] } },
+      { content: margemContribPct1.toFixed(1) + '%', styles: { halign: 'right', fontStyle: 'bold', fillColor: [219, 234, 254], textColor: [30, 64, 175] } }
+    ];
+    if (mostrarAV) rowMCPctPdf.push({ content: '-', styles: { halign: 'right', fillColor: [219, 234, 254] } });
+    rowMCPctPdf.push({ content: margemContribPct2.toFixed(1) + '%', styles: { halign: 'right', fontStyle: 'bold', fillColor: [219, 234, 254], textColor: [30, 64, 175] } });
+    if (mostrarAV) rowMCPctPdf.push({ content: '-', styles: { halign: 'right', fillColor: [219, 234, 254] } });
+    if (mostrarAH) rowMCPctPdf.push({ content: (margemContribPct2 - margemContribPct1).toFixed(1) + ' p.p.', styles: { halign: 'right', fillColor: [219, 234, 254], textColor: (margemContribPct2 - margemContribPct1) >= 0 ? [22, 163, 74] : [220, 38, 38] } });
+    body.push(rowMCPctPdf);
+    
+    renderCatPdf('custos_fixos');
     
     // (=) Resultado Operacional
     const ahResOp = calcularAH(resOpValor2, resOpValor1);
@@ -626,10 +674,33 @@ export default function RelatoriosPage() {
               </tr>
             </thead>
             <tbody>
-              {/* Receita Bruta, Deduções, Custos Variáveis, Custos Fixos */}
-              {['receita_bruta', 'deducoes_vendas', 'custos_variaveis', 'custos_fixos'].map(catId =>
+              {/* Receita Bruta, Deduções, Custos Variáveis */}
+              {['receita_bruta', 'deducoes_vendas', 'custos_variaveis'].map(catId =>
                 renderCategoriaHierarquica(catId, CATEGORIAS_CONFIG[catId])
               )}
+
+              {/* (=) Margem de Contribuição */}
+              <tr className="bg-cyan-50 border-y border-cyan-200 font-semibold">
+                <td className="p-2 text-cyan-800">(=) Margem de Contribuição</td>
+                <td className={`p-2 text-right ${margemContribValor1 >= 0 ? 'text-cyan-800' : 'text-red-700'}`}>{formatCurrency(margemContribValor1)}</td>
+                {mostrarAV && <td className="p-2 text-right bg-green-50">{formatPercent(calcularAV(margemContribValor1, totaisReceitas.valor1))}</td>}
+                <td className={`p-2 text-right ${margemContribValor2 >= 0 ? 'text-cyan-800' : 'text-red-700'}`}>{formatCurrency(margemContribValor2)}</td>
+                {mostrarAV && <td className="p-2 text-right bg-green-50">{formatPercent(calcularAV(margemContribValor2, totaisReceitas.valor2))}</td>}
+                {mostrarAH && <td className={`p-2 text-right bg-purple-50 ${calcularAH(margemContribValor2, margemContribValor1) >= 0 ? 'text-green-700' : 'text-red-700'}`}>{formatPercent(calcularAH(margemContribValor2, margemContribValor1))}</td>}
+              </tr>
+
+              {/* (=) % Margem de Contribuição */}
+              <tr className="bg-blue-50 border-b border-blue-200 font-semibold">
+                <td className="p-2 text-blue-800">(=) % Margem de Contribuição</td>
+                <td className={`p-2 text-right ${margemContribPct1 >= 0 ? 'text-blue-800' : 'text-red-700'}`}>{margemContribPct1.toFixed(1)}%</td>
+                {mostrarAV && <td className="p-2 text-right bg-green-50 text-gray-400">-</td>}
+                <td className={`p-2 text-right ${margemContribPct2 >= 0 ? 'text-blue-800' : 'text-red-700'}`}>{margemContribPct2.toFixed(1)}%</td>
+                {mostrarAV && <td className="p-2 text-right bg-green-50 text-gray-400">-</td>}
+                {mostrarAH && <td className={`p-2 text-right bg-purple-50 ${(margemContribPct2 - margemContribPct1) >= 0 ? 'text-green-700' : 'text-red-700'}`}>{(margemContribPct2 - margemContribPct1).toFixed(1)} p.p.</td>}
+              </tr>
+
+              {/* Custos Fixos */}
+              {renderCategoriaHierarquica('custos_fixos', CATEGORIAS_CONFIG.custos_fixos)}
 
               {/* (=) Resultado Operacional (linha calculada) */}
               <tr className="bg-cyan-50 border-y-2 border-cyan-200 font-semibold">

@@ -329,6 +329,32 @@ export default function PlanejamentoPage() {
     return totais;
   }, [hierarquia, getValor]);
 
+  // Calcular Margem de Contribuição (Receita - Deduções - Custos Variáveis)
+  const calcularMargemContribuicao = useMemo(() => {
+    const receitas = calcularTotalCategoria('receita_bruta');
+    const deducoes = calcularTotalCategoria('deducoes_vendas');
+    const variaveis = calcularTotalCategoria('custos_variaveis');
+    
+    const margem = { meses: {}, total: 0 };
+    MESES.forEach(mes => {
+      margem.meses[mes.num] = (receitas.meses[mes.num] || 0) - (deducoes.meses[mes.num] || 0) - (variaveis.meses[mes.num] || 0);
+    });
+    margem.total = receitas.total - deducoes.total - variaveis.total;
+    return margem;
+  }, [calcularTotalCategoria]);
+
+  // % Margem de Contribuição (sobre receita)
+  const calcularMargemContribuicaoPct = useMemo(() => {
+    const receitas = calcularTotalCategoria('receita_bruta');
+    const pct = { meses: {}, total: 0 };
+    MESES.forEach(mes => {
+      const r = receitas.meses[mes.num] || 0;
+      pct.meses[mes.num] = r > 0 ? ((calcularMargemContribuicao.meses[mes.num] || 0) / r) * 100 : 0;
+    });
+    pct.total = receitas.total > 0 ? (calcularMargemContribuicao.total / receitas.total) * 100 : 0;
+    return pct;
+  }, [calcularTotalCategoria, calcularMargemContribuicao]);
+
   // Calcular Resultado Operacional (Receita - Deduções - Custos Variáveis - Custos Fixos)
   const calcularResultadoOperacional = useMemo(() => {
     const receitas = calcularTotalCategoria('receita_bruta');
@@ -404,7 +430,23 @@ export default function PlanejamentoPage() {
       });
     };
     
-    ['receita_bruta', 'deducoes_vendas', 'custos_variaveis', 'custos_fixos'].forEach(renderCatCsv);
+    ['receita_bruta', 'deducoes_vendas', 'custos_variaveis'].forEach(renderCatCsv);
+    
+    // (=) Margem de Contribuição
+    rows.push([
+      '(=) Margem de Contribuição',
+      ...MESES.map(m => (calcularMargemContribuicao.meses[m.num] || 0).toFixed(0)),
+      calcularMargemContribuicao.total.toFixed(0)
+    ].join(';'));
+    
+    // (=) % Margem de Contribuição
+    rows.push([
+      '(=) % Margem de Contribuição',
+      ...MESES.map(m => (calcularMargemContribuicaoPct.meses[m.num] || 0).toFixed(1).replace('.', ',') + '%'),
+      calcularMargemContribuicaoPct.total.toFixed(1).replace('.', ',') + '%'
+    ].join(';'));
+    
+    renderCatCsv('custos_fixos');
     
     // (=) Resultado Operacional
     rows.push([
@@ -479,7 +521,23 @@ export default function PlanejamentoPage() {
       });
     };
     
-    ['receita_bruta', 'deducoes_vendas', 'custos_variaveis', 'custos_fixos'].forEach(renderCatPdf);
+    ['receita_bruta', 'deducoes_vendas', 'custos_variaveis'].forEach(renderCatPdf);
+    
+    // (=) Margem de Contribuição
+    body.push([
+      { content: '(=) Margem de Contribuição', styles: { fontStyle: 'bold', fillColor: [207, 250, 254], textColor: [21, 94, 117] } },
+      ...MESES.map(m => ({ content: formatCurrency(calcularMargemContribuicao.meses[m.num] || 0), styles: { halign: 'right', fontStyle: 'bold', fillColor: [207, 250, 254], textColor: [21, 94, 117] } })),
+      { content: formatCurrency(calcularMargemContribuicao.total), styles: { halign: 'right', fontStyle: 'bold', fillColor: [207, 250, 254], textColor: [21, 94, 117] } }
+    ]);
+    
+    // (=) % Margem de Contribuição
+    body.push([
+      { content: '(=) % Margem de Contribuição', styles: { fontStyle: 'bold', fillColor: [219, 234, 254], textColor: [30, 64, 175] } },
+      ...MESES.map(m => ({ content: (calcularMargemContribuicaoPct.meses[m.num] || 0).toFixed(1) + '%', styles: { halign: 'right', fontStyle: 'bold', fillColor: [219, 234, 254], textColor: [30, 64, 175] } })),
+      { content: calcularMargemContribuicaoPct.total.toFixed(1) + '%', styles: { halign: 'right', fontStyle: 'bold', fillColor: [219, 234, 254], textColor: [30, 64, 175] } }
+    ]);
+    
+    renderCatPdf('custos_fixos');
     
     // (=) Resultado Operacional
     body.push([
@@ -771,10 +829,57 @@ export default function PlanejamentoPage() {
               </tr>
             </thead>
             <tbody>
-              {/* Receita Bruta, Deduções, Custos Variáveis, Custos Fixos */}
-              {['receita_bruta', 'deducoes_vendas', 'custos_variaveis', 'custos_fixos'].map(catId =>
+              {/* Receita Bruta, Deduções, Custos Variáveis */}
+              {['receita_bruta', 'deducoes_vendas', 'custos_variaveis'].map(catId =>
                 renderCategoriaHierarquica(catId, CATEGORIAS_CONFIG[catId])
               )}
+
+              {/* (=) Margem de Contribuição */}
+              <tr className="bg-cyan-50 border-y border-cyan-200 font-semibold">
+                <td className="p-2 sticky left-0 bg-cyan-50 z-10 border-r border-cyan-200 text-cyan-800">
+                  (=) Margem de Contribuição
+                </td>
+                {MESES.map(mes => (
+                  <td
+                    key={mes.key}
+                    className={`p-2 text-right text-sm border-r border-cyan-100 whitespace-nowrap ${
+                      calcularMargemContribuicao.meses[mes.num] >= 0 ? 'text-cyan-800' : 'text-red-600'
+                    }`}
+                  >
+                    {formatCurrency(calcularMargemContribuicao.meses[mes.num])}
+                  </td>
+                ))}
+                <td className={`p-2 text-right font-bold bg-cyan-100 whitespace-nowrap ${
+                  calcularMargemContribuicao.total >= 0 ? 'text-cyan-800' : 'text-red-600'
+                }`}>
+                  {formatCurrency(calcularMargemContribuicao.total)}
+                </td>
+              </tr>
+
+              {/* (=) % Margem de Contribuição */}
+              <tr className="bg-blue-50 border-b border-blue-200 font-semibold">
+                <td className="p-2 sticky left-0 bg-blue-50 z-10 border-r border-blue-200 text-blue-800">
+                  (=) % Margem de Contribuição
+                </td>
+                {MESES.map(mes => (
+                  <td
+                    key={mes.key}
+                    className={`p-2 text-right text-sm border-r border-blue-100 whitespace-nowrap ${
+                      calcularMargemContribuicaoPct.meses[mes.num] >= 0 ? 'text-blue-800' : 'text-red-600'
+                    }`}
+                  >
+                    {calcularMargemContribuicaoPct.meses[mes.num].toFixed(1)}%
+                  </td>
+                ))}
+                <td className={`p-2 text-right font-bold bg-blue-100 whitespace-nowrap ${
+                  calcularMargemContribuicaoPct.total >= 0 ? 'text-blue-800' : 'text-red-600'
+                }`}>
+                  {calcularMargemContribuicaoPct.total.toFixed(1)}%
+                </td>
+              </tr>
+
+              {/* Custos Fixos */}
+              {renderCategoriaHierarquica('custos_fixos', CATEGORIAS_CONFIG.custos_fixos)}
 
               {/* (=) Resultado Operacional (linha calculada) */}
               <tr className="bg-cyan-50 border-y-2 border-cyan-200 font-semibold">
