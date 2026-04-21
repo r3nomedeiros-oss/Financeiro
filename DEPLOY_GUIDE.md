@@ -1,67 +1,62 @@
-# Guia de Deploy - Sistema Financeiro Industrial
+# Deploy no Vercel — Guia Definitivo (100% gratuito)
 
-## 1. Deploy do Backend no Railway
-
-### Passo 1: Criar projeto no Railway
-1. Acesse [railway.app](https://railway.app)
-2. Clique em "New Project" → "Deploy from GitHub"
-3. Selecione seu repositório
-
-### Passo 2: Configurar variáveis de ambiente
-No painel do Railway, vá em **Variables** e adicione:
-
-```
-SUPABASE_URL=https://seu-projeto.supabase.co
-SUPABASE_KEY=sua-chave-anon-aqui
-JWT_SECRET=sua_chave_secreta_jwt_2025_super_segura
-JWT_ALGORITHM=HS256
-JWT_EXPIRATION_HOURS=24
-PORT=8001
-```
-
-### Passo 3: Configurar o build
-O Railway deve detectar automaticamente o `railway.toml`. Se não:
-- Root Directory: `/backend`
-- Start Command: `python -m uvicorn server:app --host 0.0.0.0 --port $PORT`
-
-### Passo 4: Obter URL do backend
-Após o deploy, copie a URL gerada (ex: `https://seu-app.up.railway.app`)
+Arquitetura final:
+- **Frontend (Vite)** + **Backend (FastAPI Serverless)** no mesmo projeto Vercel
+- **Database**: Supabase (já existe, não muda)
 
 ---
 
-## 2. Deploy do Frontend no Vercel
+## 1. Configuração no painel Vercel
 
-### Passo 1: Criar projeto no Vercel
-1. Acesse [vercel.com](https://vercel.com)
-2. Clique em "Add New" → "Project"
-3. Importe seu repositório do GitHub
+### 1.1 Settings → General → Root Directory
+**DEIXE EM BRANCO** (apague o "frontend" que estava lá). Depois clique em **Save**.
 
-### Passo 2: Configurar o build
-- Framework Preset: **Vite**
-- Root Directory: `frontend`
-- Build Command: `npm run build`
-- Output Directory: `dist`
+> Motivo: o `vercel.json` na raiz é quem define o build. Com Root Directory = frontend, o Vercel nem vê a pasta `/api` nem o `vercel.json`.
 
-### Passo 3: Configurar variáveis de ambiente
-Em **Settings → Environment Variables**, adicione:
+### 1.2 Settings → General → Framework Preset
+Deixe como **Other** (ou "No preset"). O `vercel.json` já cuida de tudo.
 
-```
-VITE_BACKEND_URL=https://seu-app.up.railway.app
-```
+### 1.3 Settings → Environment Variables
+Adicione as 5 variáveis abaixo (Production + Preview + Development):
 
-⚠️ **IMPORTANTE**: Substitua pela URL real do seu backend no Railway!
+| Nome | Valor |
+|---|---|
+| `SUPABASE_URL` | `https://enpvmhcxlcvapplcuwoa.supabase.co` |
+| `SUPABASE_KEY` | `<sua anon key do Supabase>` |
+| `JWT_SECRET` | `sua_chave_secreta_jwt_financeiro_2025_super_segura` |
+| `JWT_ALGORITHM` | `HS256` |
+| `JWT_EXPIRATION_HOURS` | `24` |
 
-### Passo 4: Fazer redeploy
-Após adicionar a variável, clique em "Redeploy" para aplicar.
+> ⚠️ **Não** precisa definir `VITE_BACKEND_URL` — frontend e backend ficam no mesmo domínio.
+
+### 1.4 Deployments → Redeploy
+Clique em **Redeploy** no último deploy. Marque **"Use existing Build Cache" = OFF** para garantir build limpo.
 
 ---
 
-## Verificação
+## 2. O que foi corrigido no código
 
-1. Acesse a URL do Vercel
-2. Faça login com: `admin@sfi.com` / `admin123`
-3. Teste salvar um planejamento
+- `vercel.json` → adicionada config de `functions` com `includeFiles: "backend/**"` para o serverless Python conseguir importar `backend/server.py`.
+- `api/index.py` → limpo, importa o `app` do FastAPI via `sys.path`.
+- `api/requirements.txt` → versões fixadas compatíveis com Vercel Python 3.12.
 
-Se der erro, verifique:
-- Console do navegador (F12 → Console)
-- Logs do Railway
+---
+
+## 3. Teste pós-deploy
+
+1. Abra a URL do Vercel
+2. Chame `https://<sua-url>.vercel.app/api/` (deve retornar JSON do FastAPI ou 404 esperado)
+3. Faça login na tela → se carregar o dashboard, está tudo funcionando
+
+### Se der erro 500 na API:
+- Veja os logs em Vercel → Deployment → Functions → `api/index.py`
+- Causa mais comum: alguma env var faltando
+
+---
+
+## 4. Arquivos que podem ser deletados (eram do Railway)
+- `railway.json`
+- `railway.toml`
+- `Procfile`
+
+Já foram removidos neste repositório.
