@@ -291,19 +291,27 @@ export default function PlanejamentoPage() {
     return total;
   }, [getValor]);
 
+  // Calcular totais da categoria
+  // Para categoria mista (resultado_nao_operacional): receitas somam, despesas subtraem (valor líquido, igual DRE)
   const calcularTotalCategoria = useCallback((catId) => {
     const cat = hierarquia[catId];
-    if (!cat) return { meses: {}, total: 0 };
+    if (!cat) {
+      const zeros = { meses: {}, total: 0 };
+      MESES.forEach(mes => { zeros.meses[mes.num] = 0; });
+      return zeros;
+    }
     
+    const isMisto = catId === 'resultado_nao_operacional';
     const totais = { meses: {}, total: 0 };
     MESES.forEach(mes => {
       totais.meses[mes.num] = 0;
     });
     
     (cat.subcategorias || []).forEach(sub => {
+      const signal = isMisto && sub.tipo === 'despesa' ? -1 : 1;
       (sub.itens || []).forEach(item => {
         MESES.forEach(mes => {
-          const valor = getValor(item.id, mes.num);
+          const valor = getValor(item.id, mes.num) * signal;
           totais.meses[mes.num] += valor;
           totais.total += valor;
         });
@@ -311,7 +319,7 @@ export default function PlanejamentoPage() {
       
       if (!sub.itens || sub.itens.length === 0) {
         MESES.forEach(mes => {
-          const valor = getValor(sub.id, mes.num);
+          const valor = getValor(sub.id, mes.num) * signal;
           totais.meses[mes.num] += valor;
           totais.total += valor;
         });
@@ -321,26 +329,35 @@ export default function PlanejamentoPage() {
     return totais;
   }, [hierarquia, getValor]);
 
-  // Calcular resultado total (Receitas - Despesas)
-  const calcularResultado = useMemo(() => {
+  // Calcular Resultado Operacional (Receita - Deduções - Custos Variáveis - Custos Fixos)
+  const calcularResultadoOperacional = useMemo(() => {
     const receitas = calcularTotalCategoria('receita_bruta');
     const deducoes = calcularTotalCategoria('deducoes_vendas');
     const variaveis = calcularTotalCategoria('custos_variaveis');
     const fixos = calcularTotalCategoria('custos_fixos');
+    
+    const resultado = { meses: {}, total: 0 };
+    MESES.forEach(mes => {
+      resultado.meses[mes.num] = (receitas.meses[mes.num] || 0) 
+                                  - (deducoes.meses[mes.num] || 0)
+                                  - (variaveis.meses[mes.num] || 0)
+                                  - (fixos.meses[mes.num] || 0);
+    });
+    resultado.total = receitas.total - deducoes.total - variaveis.total - fixos.total;
+    return resultado;
+  }, [calcularTotalCategoria]);
+
+  // Lucro Líquido = Resultado Operacional + Resultado Não Operacional (já líquido)
+  const calcularResultado = useMemo(() => {
     const naoOp = calcularTotalCategoria('resultado_nao_operacional');
     
     const resultado = { meses: {}, total: 0 };
     MESES.forEach(mes => {
-      const receitaMes = receitas.meses[mes.num] || 0;
-      const despesasMes = (deducoes.meses[mes.num] || 0) + 
-                          (variaveis.meses[mes.num] || 0) + 
-                          (fixos.meses[mes.num] || 0) + 
-                          (naoOp.meses[mes.num] || 0);
-      resultado.meses[mes.num] = receitaMes - despesasMes;
+      resultado.meses[mes.num] = (calcularResultadoOperacional.meses[mes.num] || 0) + (naoOp.meses[mes.num] || 0);
     });
-    resultado.total = receitas.total - deducoes.total - variaveis.total - fixos.total - naoOp.total;
+    resultado.total = calcularResultadoOperacional.total + naoOp.total;
     return resultado;
-  }, [calcularTotalCategoria]);
+  }, [calcularTotalCategoria, calcularResultadoOperacional]);
 
   // Cores
   const getCorClasse = (cor, isHeader = false) => {
@@ -357,7 +374,8 @@ export default function PlanejamentoPage() {
     const rows = [];
     rows.push(['Descrição', ...MESES.map(m => m.label), 'Total'].join(';'));
     
-    Object.entries(CATEGORIAS_CONFIG).forEach(([catId, config]) => {
+    const renderCatCsv = (catId) => {
+      const config = CATEGORIAS_CONFIG[catId];
       const totais = calcularTotalCategoria(catId);
       rows.push([
         config.label,
@@ -384,7 +402,25 @@ export default function PlanejamentoPage() {
           });
         }
       });
-    });
+    };
+    
+    ['receita_bruta', 'deducoes_vendas', 'custos_variaveis', 'custos_fixos'].forEach(renderCatCsv);
+    
+    // (=) Resultado Operacional
+    rows.push([
+      '(=) Resultado Operacional',
+      ...MESES.map(m => (calcularResultadoOperacional.meses[m.num] || 0).toFixed(0)),
+      calcularResultadoOperacional.total.toFixed(0)
+    ].join(';'));
+    
+    renderCatCsv('resultado_nao_operacional');
+    
+    // (=) Lucro Líquido
+    rows.push([
+      '(=) Lucro Líquido',
+      ...MESES.map(m => (calcularResultado.meses[m.num] || 0).toFixed(0)),
+      calcularResultado.total.toFixed(0)
+    ].join(';'));
     
     const csvContent = '\uFEFF' + rows.join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -405,10 +441,10 @@ export default function PlanejamentoPage() {
     const headers = ['Descrição', ...MESES.map(m => m.label), 'Total'];
     const body = [];
     
-    Object.entries(CATEGORIAS_CONFIG).forEach(([catId, config]) => {
+    const renderCatPdf = (catId) => {
+      const config = CATEGORIAS_CONFIG[catId];
       const totais = calcularTotalCategoria(catId);
       
-      // Linha da categoria com cor
       const catRow = [
         { content: config.label, styles: { fontStyle: 'bold', fillColor: config.rgbHeader, textColor: config.rgbText } },
         ...MESES.map(m => ({ content: formatCurrency(totais.meses[m.num] || 0), styles: { halign: 'right', fontStyle: 'bold', fillColor: config.rgbHeader } })),
@@ -441,7 +477,25 @@ export default function PlanejamentoPage() {
           });
         }
       });
-    });
+    };
+    
+    ['receita_bruta', 'deducoes_vendas', 'custos_variaveis', 'custos_fixos'].forEach(renderCatPdf);
+    
+    // (=) Resultado Operacional
+    body.push([
+      { content: '(=) Resultado Operacional', styles: { fontStyle: 'bold', fillColor: [207, 250, 254], textColor: [21, 94, 117] } },
+      ...MESES.map(m => ({ content: formatCurrency(calcularResultadoOperacional.meses[m.num] || 0), styles: { halign: 'right', fontStyle: 'bold', fillColor: [207, 250, 254], textColor: [21, 94, 117] } })),
+      { content: formatCurrency(calcularResultadoOperacional.total), styles: { halign: 'right', fontStyle: 'bold', fillColor: [207, 250, 254], textColor: [21, 94, 117] } }
+    ]);
+    
+    renderCatPdf('resultado_nao_operacional');
+    
+    // (=) Lucro Líquido
+    body.push([
+      { content: '(=) Lucro Líquido', styles: { fontStyle: 'bold', fillColor: [220, 252, 231], textColor: [22, 101, 52] } },
+      ...MESES.map(m => ({ content: formatCurrency(calcularResultado.meses[m.num] || 0), styles: { halign: 'right', fontStyle: 'bold', fillColor: [220, 252, 231], textColor: [22, 101, 52] } })),
+      { content: formatCurrency(calcularResultado.total), styles: { halign: 'right', fontStyle: 'bold', fillColor: [220, 252, 231], textColor: [22, 101, 52] } }
+    ]);
     
     autoTable(doc, {
       head: [headers],
@@ -717,26 +771,53 @@ export default function PlanejamentoPage() {
               </tr>
             </thead>
             <tbody>
-              {Object.entries(CATEGORIAS_CONFIG).map(([catId, config]) => 
-                renderCategoriaHierarquica(catId, config)
+              {/* Receita Bruta, Deduções, Custos Variáveis, Custos Fixos */}
+              {['receita_bruta', 'deducoes_vendas', 'custos_variaveis', 'custos_fixos'].map(catId =>
+                renderCategoriaHierarquica(catId, CATEGORIAS_CONFIG[catId])
               )}
-              {/* Linha de RESULTADO */}
-              <tr className="bg-gray-200 border-t-2 border-gray-400 font-bold">
-                <td className="p-3 sticky left-0 bg-gray-200 z-10 border-r border-gray-400 text-base">
-                  RESULTADO
+
+              {/* (=) Resultado Operacional (linha calculada) */}
+              <tr className="bg-cyan-50 border-y-2 border-cyan-200 font-semibold">
+                <td className="p-2 sticky left-0 bg-cyan-50 z-10 border-r border-cyan-200 text-cyan-800">
+                  (=) Resultado Operacional
+                </td>
+                {MESES.map(mes => (
+                  <td
+                    key={mes.key}
+                    className={`p-2 text-right text-sm border-r border-cyan-100 whitespace-nowrap ${
+                      calcularResultadoOperacional.meses[mes.num] >= 0 ? 'text-cyan-800' : 'text-red-600'
+                    }`}
+                  >
+                    {formatCurrency(calcularResultadoOperacional.meses[mes.num])}
+                  </td>
+                ))}
+                <td className={`p-2 text-right font-bold bg-cyan-100 whitespace-nowrap ${
+                  calcularResultadoOperacional.total >= 0 ? 'text-cyan-800' : 'text-red-600'
+                }`}>
+                  {formatCurrency(calcularResultadoOperacional.total)}
+                </td>
+              </tr>
+
+              {/* Resultado Não Operacional (valor líquido: receitas - despesas) */}
+              {renderCategoriaHierarquica('resultado_nao_operacional', CATEGORIAS_CONFIG.resultado_nao_operacional)}
+
+              {/* Linha de Lucro Líquido */}
+              <tr className="bg-green-100 border-t-2 border-green-300 font-bold">
+                <td className="p-3 sticky left-0 bg-green-100 z-10 border-r border-green-300 text-base text-green-900">
+                  (=) Lucro Líquido
                 </td>
                 {MESES.map(mes => (
                   <td 
                     key={mes.key} 
-                    className={`p-2 text-right text-sm border-r border-gray-300 whitespace-nowrap ${
-                      calcularResultado.meses[mes.num] >= 0 ? 'text-green-700' : 'text-red-600'
+                    className={`p-2 text-right text-sm border-r border-green-200 whitespace-nowrap ${
+                      calcularResultado.meses[mes.num] >= 0 ? 'text-green-800' : 'text-red-600'
                     }`}
                   >
                     {formatCurrency(calcularResultado.meses[mes.num])}
                   </td>
                 ))}
-                <td className={`p-3 text-right text-base bg-gray-300 whitespace-nowrap ${
-                  calcularResultado.total >= 0 ? 'text-green-700' : 'text-red-600'
+                <td className={`p-3 text-right text-base bg-green-200 whitespace-nowrap ${
+                  calcularResultado.total >= 0 ? 'text-green-800' : 'text-red-600'
                 }`}>
                   {formatCurrency(calcularResultado.total)}
                 </td>

@@ -137,24 +137,27 @@ export default function ComparativoPage() {
   }, [planejamentos, movimentacoes, mes]);
 
   // Calcular totais da categoria
+  // Para categoria mista (resultado_nao_operacional): receitas somam, despesas subtraem (valor líquido, igual DRE)
   const calcularTotaisCategoria = useCallback((catId) => {
     const cat = hierarquia[catId];
     if (!cat) return { orcado: 0, realizado: 0, diferenca: 0, variacao: 0 };
     
+    const isMisto = catId === 'resultado_nao_operacional';
     let orcado = 0;
     let realizado = 0;
     
     (cat.subcategorias || []).forEach(sub => {
+      const signal = isMisto && sub.tipo === 'despesa' ? -1 : 1;
       (sub.itens || []).forEach(item => {
         const valores = getValores(item.id);
-        orcado += valores.orcado;
-        realizado += valores.realizado;
+        orcado += valores.orcado * signal;
+        realizado += valores.realizado * signal;
       });
       
       if (!sub.itens || sub.itens.length === 0) {
         const valores = getValores(sub.id);
-        orcado += valores.orcado;
-        realizado += valores.realizado;
+        orcado += valores.orcado * signal;
+        realizado += valores.realizado * signal;
       }
     });
     
@@ -175,20 +178,28 @@ export default function ComparativoPage() {
   // Totais gerais
   const totaisReceitas = useMemo(() => calcularTotaisCategoria('receita_bruta'), [calcularTotaisCategoria]);
   
+  // Despesas operacionais (NÃO inclui resultado_nao_operacional — ele entra depois como valor líquido)
   const totaisDespesas = useMemo(() => {
     const deducoes = calcularTotaisCategoria('deducoes_vendas');
     const variaveis = calcularTotaisCategoria('custos_variaveis');
     const fixos = calcularTotaisCategoria('custos_fixos');
-    const naoOp = calcularTotaisCategoria('resultado_nao_operacional');
     
-    const orcado = deducoes.orcado + variaveis.orcado + fixos.orcado + naoOp.orcado;
-    const realizado = deducoes.realizado + variaveis.realizado + fixos.realizado + naoOp.realizado;
+    const orcado = deducoes.orcado + variaveis.orcado + fixos.orcado;
+    const realizado = deducoes.realizado + variaveis.realizado + fixos.realizado;
     
     return { orcado, realizado, diferenca: realizado - orcado, variacao: orcado > 0 ? ((realizado - orcado) / orcado) * 100 : 0 };
   }, [calcularTotaisCategoria]);
 
-  const resultadoOrcado = totaisReceitas.orcado - totaisDespesas.orcado;
-  const resultadoRealizado = totaisReceitas.realizado - totaisDespesas.realizado;
+  // Resultado Operacional = Receita Bruta - Deduções - Custos Variáveis - Custos Fixos
+  const resultadoOperacionalOrcado = totaisReceitas.orcado - totaisDespesas.orcado;
+  const resultadoOperacionalRealizado = totaisReceitas.realizado - totaisDespesas.realizado;
+
+  // Resultado Não Operacional (já vem líquido: receitas - despesas)
+  const totaisNaoOperacional = useMemo(() => calcularTotaisCategoria('resultado_nao_operacional'), [calcularTotaisCategoria]);
+
+  // Lucro Líquido = Resultado Operacional + Resultado Não Operacional (net)
+  const resultadoOrcado = resultadoOperacionalOrcado + totaisNaoOperacional.orcado;
+  const resultadoRealizado = resultadoOperacionalRealizado + totaisNaoOperacional.realizado;
 
   const getCorClasse = (cor, isHeader = false) => {
     const cores = {
@@ -234,7 +245,8 @@ export default function ComparativoPage() {
     const rows = [];
     rows.push(['Descrição', 'Orçado', 'Realizado', 'Diferença', 'Variação %'].join(';'));
     
-    Object.entries(CATEGORIAS_CONFIG).forEach(([catId, config]) => {
+    const renderCatExcel = (catId) => {
+      const config = CATEGORIAS_CONFIG[catId];
       const totais = calcularTotaisCategoria(catId);
       rows.push([
         config.label,
@@ -269,10 +281,23 @@ export default function ComparativoPage() {
           });
         }
       });
-    });
+    };
+    
+    ['receita_bruta', 'deducoes_vendas', 'custos_variaveis', 'custos_fixos'].forEach(renderCatExcel);
+    
+    // (=) Resultado Operacional
+    rows.push([
+      '(=) Resultado Operacional',
+      resultadoOperacionalOrcado.toFixed(0),
+      resultadoOperacionalRealizado.toFixed(0),
+      (resultadoOperacionalRealizado - resultadoOperacionalOrcado).toFixed(0),
+      (resultadoOperacionalOrcado !== 0 ? ((resultadoOperacionalRealizado - resultadoOperacionalOrcado) / Math.abs(resultadoOperacionalOrcado)) * 100 : 0).toFixed(1).replace('.', ',') + '%'
+    ].join(';'));
+    
+    renderCatExcel('resultado_nao_operacional');
     
     rows.push([
-      'RESULTADO',
+      '(=) Lucro Líquido',
       resultadoOrcado.toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.'),
       resultadoRealizado.toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.'),
       (resultadoRealizado - resultadoOrcado).toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.'),
@@ -298,10 +323,10 @@ export default function ComparativoPage() {
     const headers = ['Descrição', 'Orçado', 'Realizado', 'Diferença', 'Var %'];
     const body = [];
     
-    Object.entries(CATEGORIAS_CONFIG).forEach(([catId, config]) => {
+    const renderCatPDF = (catId) => {
+      const config = CATEGORIAS_CONFIG[catId];
       const totais = calcularTotaisCategoria(catId);
       
-      // Linha da categoria com cor
       body.push([
         { content: config.label, styles: { fontStyle: 'bold', fillColor: config.rgbHeader, textColor: config.rgbText } },
         { content: formatCurrency(totais.orcado), styles: { halign: 'right', fillColor: config.rgbHeader } },
@@ -339,16 +364,30 @@ export default function ComparativoPage() {
           });
         }
       });
-    });
+    };
     
-    // Linha de Resultado
+    ['receita_bruta', 'deducoes_vendas', 'custos_variaveis', 'custos_fixos'].forEach(renderCatPDF);
+    
+    // (=) Resultado Operacional
+    const varResOp = resultadoOperacionalOrcado !== 0 ? ((resultadoOperacionalRealizado - resultadoOperacionalOrcado) / Math.abs(resultadoOperacionalOrcado)) * 100 : 0;
+    body.push([
+      { content: '(=) Resultado Operacional', styles: { fontStyle: 'bold', fillColor: [207, 250, 254], textColor: [21, 94, 117] } },
+      { content: formatCurrency(resultadoOperacionalOrcado), styles: { halign: 'right', fontStyle: 'bold', fillColor: [207, 250, 254], textColor: [21, 94, 117] } },
+      { content: formatCurrency(resultadoOperacionalRealizado), styles: { halign: 'right', fontStyle: 'bold', fillColor: [207, 250, 254], textColor: resultadoOperacionalRealizado >= 0 ? [22, 163, 74] : [220, 38, 38] } },
+      { content: formatCurrency(resultadoOperacionalRealizado - resultadoOperacionalOrcado), styles: { halign: 'right', fontStyle: 'bold', fillColor: [207, 250, 254], textColor: (resultadoOperacionalRealizado - resultadoOperacionalOrcado) >= 0 ? [22, 163, 74] : [220, 38, 38] } },
+      { content: formatPercent(varResOp), styles: { halign: 'right', fontStyle: 'bold', fillColor: [207, 250, 254], textColor: varResOp >= 0 ? [22, 163, 74] : [220, 38, 38] } }
+    ]);
+    
+    renderCatPDF('resultado_nao_operacional');
+    
+    // Linha de Lucro Líquido
     const varResultado = resultadoOrcado !== 0 ? ((resultadoRealizado - resultadoOrcado) / Math.abs(resultadoOrcado)) * 100 : 0;
     body.push([
-      { content: 'RESULTADO', styles: { fontStyle: 'bold', fillColor: [200, 200, 200] } },
-      { content: formatCurrency(resultadoOrcado), styles: { halign: 'right', fontStyle: 'bold', fillColor: [200, 200, 200] } },
-      { content: formatCurrency(resultadoRealizado), styles: { halign: 'right', fontStyle: 'bold', fillColor: [200, 200, 200], textColor: resultadoRealizado >= 0 ? [22, 163, 74] : [220, 38, 38] } },
-      { content: formatCurrency(resultadoRealizado - resultadoOrcado), styles: { halign: 'right', fontStyle: 'bold', fillColor: [200, 200, 200], textColor: (resultadoRealizado - resultadoOrcado) >= 0 ? [22, 163, 74] : [220, 38, 38] } },
-      { content: formatPercent(varResultado), styles: { halign: 'right', fontStyle: 'bold', fillColor: [200, 200, 200], textColor: varResultado >= 0 ? [22, 163, 74] : [220, 38, 38] } }
+      { content: '(=) Lucro Líquido', styles: { fontStyle: 'bold', fillColor: [220, 252, 231], textColor: [22, 101, 52] } },
+      { content: formatCurrency(resultadoOrcado), styles: { halign: 'right', fontStyle: 'bold', fillColor: [220, 252, 231], textColor: [22, 101, 52] } },
+      { content: formatCurrency(resultadoRealizado), styles: { halign: 'right', fontStyle: 'bold', fillColor: [220, 252, 231], textColor: resultadoRealizado >= 0 ? [22, 163, 74] : [220, 38, 38] } },
+      { content: formatCurrency(resultadoRealizado - resultadoOrcado), styles: { halign: 'right', fontStyle: 'bold', fillColor: [220, 252, 231], textColor: (resultadoRealizado - resultadoOrcado) >= 0 ? [22, 163, 74] : [220, 38, 38] } },
+      { content: formatPercent(varResultado), styles: { halign: 'right', fontStyle: 'bold', fillColor: [220, 252, 231], textColor: varResultado >= 0 ? [22, 163, 74] : [220, 38, 38] } }
     ]);
     
     autoTable(doc, {
@@ -558,23 +597,50 @@ export default function ComparativoPage() {
             </tr>
           </thead>
           <tbody>
-            {Object.entries(CATEGORIAS_CONFIG).map(([catId, config]) => 
-              renderCategoriaHierarquica(catId, config)
+            {/* Receita Bruta, Deduções, Custos Variáveis, Custos Fixos */}
+            {['receita_bruta', 'deducoes_vendas', 'custos_variaveis', 'custos_fixos'].map(catId =>
+              renderCategoriaHierarquica(catId, CATEGORIAS_CONFIG[catId])
             )}
 
-            {/* Linha de Resultado */}
-            <tr className="bg-gray-200 font-bold">
-              <td className="p-2">RESULTADO</td>
-              <td className={`p-2 text-right ${resultadoOrcado >= 0 ? 'text-blue-700' : 'text-red-700'}`}>
+            {/* (=) Resultado Operacional (linha calculada) */}
+            <tr className="bg-cyan-50 font-semibold border-y-2 border-cyan-200">
+              <td className="p-2 text-cyan-800">(=) Resultado Operacional</td>
+              <td className={`p-2 text-right ${resultadoOperacionalOrcado >= 0 ? 'text-cyan-800' : 'text-red-700'}`}>
+                {formatCurrency(resultadoOperacionalOrcado)}
+              </td>
+              <td className={`p-2 text-right ${resultadoOperacionalRealizado >= 0 ? 'text-cyan-800' : 'text-red-700'}`}>
+                {formatCurrency(resultadoOperacionalRealizado)}
+              </td>
+              <td className={`p-2 text-right ${(resultadoOperacionalRealizado - resultadoOperacionalOrcado) >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                {formatCurrency(resultadoOperacionalRealizado - resultadoOperacionalOrcado)}
+              </td>
+              <td className={`p-2 text-right ${resultadoOperacionalRealizado >= resultadoOperacionalOrcado ? 'text-green-700' : 'text-red-700'}`}>
+                {formatPercent(resultadoOperacionalOrcado !== 0 ? ((resultadoOperacionalRealizado - resultadoOperacionalOrcado) / Math.abs(resultadoOperacionalOrcado)) * 100 : 0)}
+              </td>
+              <td className="p-2 text-center">
+                {resultadoOperacionalRealizado >= resultadoOperacionalOrcado
+                  ? <TrendingUp className="text-green-500 mx-auto" size={16} />
+                  : <TrendingDown className="text-red-500 mx-auto" size={16} />
+                }
+              </td>
+            </tr>
+
+            {/* Resultado Não Operacional (valor líquido: receitas - despesas) */}
+            {renderCategoriaHierarquica('resultado_nao_operacional', CATEGORIAS_CONFIG.resultado_nao_operacional)}
+
+            {/* Linha de Lucro Líquido */}
+            <tr className="bg-green-100 font-bold border-t-2 border-green-300">
+              <td className="p-2 text-green-900">(=) Lucro Líquido</td>
+              <td className={`p-2 text-right ${resultadoOrcado >= 0 ? 'text-green-800' : 'text-red-700'}`}>
                 {formatCurrency(resultadoOrcado)}
               </td>
-              <td className={`p-2 text-right ${resultadoRealizado >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+              <td className={`p-2 text-right ${resultadoRealizado >= 0 ? 'text-green-800' : 'text-red-700'}`}>
                 {formatCurrency(resultadoRealizado)}
               </td>
-              <td className={`p-2 text-right ${resultadoRealizado - resultadoOrcado >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+              <td className={`p-2 text-right ${resultadoRealizado - resultadoOrcado >= 0 ? 'text-green-800' : 'text-red-700'}`}>
                 {formatCurrency(resultadoRealizado - resultadoOrcado)}
               </td>
-              <td className={`p-2 text-right ${resultadoRealizado >= resultadoOrcado ? 'text-green-700' : 'text-red-700'}`}>
+              <td className={`p-2 text-right ${resultadoRealizado >= resultadoOrcado ? 'text-green-800' : 'text-red-700'}`}>
                 {formatPercent(resultadoOrcado !== 0 ? ((resultadoRealizado - resultadoOrcado) / Math.abs(resultadoOrcado)) * 100 : 0)}
               </td>
               <td className="p-2 text-center">

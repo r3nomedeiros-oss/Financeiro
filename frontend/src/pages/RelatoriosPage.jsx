@@ -162,24 +162,27 @@ export default function RelatoriosPage() {
   }, [dadosPeriodo1, dadosPeriodo2]);
 
   // Calcular totais da categoria
+  // Para categoria mista (resultado_nao_operacional): receitas somam, despesas subtraem (valor líquido, igual DRE)
   const calcularTotaisCategoria = useCallback((catId) => {
     const cat = hierarquia[catId];
     if (!cat) return { valor1: 0, valor2: 0 };
     
+    const isMisto = catId === 'resultado_nao_operacional';
     let valor1 = 0;
     let valor2 = 0;
     
     (cat.subcategorias || []).forEach(sub => {
+      const signal = isMisto && sub.tipo === 'despesa' ? -1 : 1;
       (sub.itens || []).forEach(item => {
         const valores = getValores(item.id);
-        valor1 += valores.valor1;
-        valor2 += valores.valor2;
+        valor1 += valores.valor1 * signal;
+        valor2 += valores.valor2 * signal;
       });
       
       if (!sub.itens || sub.itens.length === 0) {
         const valores = getValores(sub.id);
-        valor1 += valores.valor1;
-        valor2 += valores.valor2;
+        valor1 += valores.valor1 * signal;
+        valor2 += valores.valor2 * signal;
       }
     });
     
@@ -189,20 +192,28 @@ export default function RelatoriosPage() {
   // Totais gerais
   const totaisReceitas = useMemo(() => calcularTotaisCategoria('receita_bruta'), [calcularTotaisCategoria]);
   
+  // Despesas operacionais (NÃO inclui resultado_nao_operacional)
   const totaisDespesas = useMemo(() => {
     const deducoes = calcularTotaisCategoria('deducoes_vendas');
     const variaveis = calcularTotaisCategoria('custos_variaveis');
     const fixos = calcularTotaisCategoria('custos_fixos');
-    const naoOp = calcularTotaisCategoria('resultado_nao_operacional');
     
     return {
-      valor1: deducoes.valor1 + variaveis.valor1 + fixos.valor1 + naoOp.valor1,
-      valor2: deducoes.valor2 + variaveis.valor2 + fixos.valor2 + naoOp.valor2
+      valor1: deducoes.valor1 + variaveis.valor1 + fixos.valor1,
+      valor2: deducoes.valor2 + variaveis.valor2 + fixos.valor2
     };
   }, [calcularTotaisCategoria]);
 
-  const resultado1 = totaisReceitas.valor1 - totaisDespesas.valor1;
-  const resultado2 = totaisReceitas.valor2 - totaisDespesas.valor2;
+  // Resultado Operacional = Receita - Deduções - Variáveis - Fixos
+  const resOpValor1 = totaisReceitas.valor1 - totaisDespesas.valor1;
+  const resOpValor2 = totaisReceitas.valor2 - totaisDespesas.valor2;
+
+  // Resultado Não Operacional (valor líquido: receitas - despesas)
+  const totaisNaoOp = useMemo(() => calcularTotaisCategoria('resultado_nao_operacional'), [calcularTotaisCategoria]);
+
+  // Lucro Líquido = Resultado Operacional + Resultado Não Operacional
+  const resultado1 = resOpValor1 + totaisNaoOp.valor1;
+  const resultado2 = resOpValor2 + totaisNaoOp.valor2;
 
   // Análise Vertical (AV) - % sobre receita total
   const calcularAV = (valor, totalReceita) => {
@@ -246,7 +257,8 @@ export default function RelatoriosPage() {
     
     rows.push(headers.join(';'));
     
-    Object.entries(CATEGORIAS_CONFIG).forEach(([catId, config]) => {
+    const renderCatCsv = (catId) => {
+      const config = CATEGORIAS_CONFIG[catId];
       const totais = calcularTotaisCategoria(catId);
       const row = [config.label, totais.valor1.toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.')];
       if (mostrarAV) row.push(calcularAV(totais.valor1, totaisReceitas.valor1).toFixed(1).replace('.', ',') + '%');
@@ -261,30 +273,43 @@ export default function RelatoriosPage() {
         if (itens.length === 0) {
           const valores = getValores(sub.id);
           if (valores.valor1 > 0 || valores.valor2 > 0) {
-            const row = ['  ' + sub.nome, valores.valor1.toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.')];
-            if (mostrarAV) row.push(calcularAV(valores.valor1, totaisReceitas.valor1).toFixed(1).replace('.', ',') + '%');
-            row.push(valores.valor2.toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.'));
-            if (mostrarAV) row.push(calcularAV(valores.valor2, totaisReceitas.valor2).toFixed(1).replace('.', ',') + '%');
-            if (mostrarAH) row.push(calcularAH(valores.valor2, valores.valor1).toFixed(1).replace('.', ',') + '%');
-            rows.push(row.join(';'));
+            const r = ['  ' + sub.nome, valores.valor1.toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.')];
+            if (mostrarAV) r.push(calcularAV(valores.valor1, totaisReceitas.valor1).toFixed(1).replace('.', ',') + '%');
+            r.push(valores.valor2.toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.'));
+            if (mostrarAV) r.push(calcularAV(valores.valor2, totaisReceitas.valor2).toFixed(1).replace('.', ',') + '%');
+            if (mostrarAH) r.push(calcularAH(valores.valor2, valores.valor1).toFixed(1).replace('.', ',') + '%');
+            rows.push(r.join(';'));
           }
         } else {
           itens.forEach(item => {
             const valores = getValores(item.id);
             if (valores.valor1 > 0 || valores.valor2 > 0) {
-              const row = ['    ' + item.nome, valores.valor1.toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.')];
-              if (mostrarAV) row.push(calcularAV(valores.valor1, totaisReceitas.valor1).toFixed(1).replace('.', ',') + '%');
-              row.push(valores.valor2.toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.'));
-              if (mostrarAV) row.push(calcularAV(valores.valor2, totaisReceitas.valor2).toFixed(1).replace('.', ',') + '%');
-              if (mostrarAH) row.push(calcularAH(valores.valor2, valores.valor1).toFixed(1).replace('.', ',') + '%');
-              rows.push(row.join(';'));
+              const r = ['    ' + item.nome, valores.valor1.toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.')];
+              if (mostrarAV) r.push(calcularAV(valores.valor1, totaisReceitas.valor1).toFixed(1).replace('.', ',') + '%');
+              r.push(valores.valor2.toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.'));
+              if (mostrarAV) r.push(calcularAV(valores.valor2, totaisReceitas.valor2).toFixed(1).replace('.', ',') + '%');
+              if (mostrarAH) r.push(calcularAH(valores.valor2, valores.valor1).toFixed(1).replace('.', ',') + '%');
+              rows.push(r.join(';'));
             }
           });
         }
       });
-    });
+    };
     
-    const rowResult = ['RESULTADO', resultado1.toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.')];
+    ['receita_bruta', 'deducoes_vendas', 'custos_variaveis', 'custos_fixos'].forEach(renderCatCsv);
+    
+    // (=) Resultado Operacional
+    const rowResOp = ['(=) Resultado Operacional', resOpValor1.toFixed(0)];
+    if (mostrarAV) rowResOp.push(calcularAV(resOpValor1, totaisReceitas.valor1).toFixed(1).replace('.', ',') + '%');
+    rowResOp.push(resOpValor2.toFixed(0));
+    if (mostrarAV) rowResOp.push(calcularAV(resOpValor2, totaisReceitas.valor2).toFixed(1).replace('.', ',') + '%');
+    if (mostrarAH) rowResOp.push(calcularAH(resOpValor2, resOpValor1).toFixed(1).replace('.', ',') + '%');
+    rows.push(rowResOp.join(';'));
+    
+    renderCatCsv('resultado_nao_operacional');
+    
+    // (=) Lucro Líquido
+    const rowResult = ['(=) Lucro Líquido', resultado1.toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.')];
     if (mostrarAV) rowResult.push(calcularAV(resultado1, totaisReceitas.valor1).toFixed(1).replace('.', ',') + '%');
     rowResult.push(resultado2.toFixed(0).replace(/B(?=(d{3})+(?!d))/g, '.'));
     if (mostrarAV) rowResult.push(calcularAV(resultado2, totaisReceitas.valor2).toFixed(1).replace('.', ',') + '%');
@@ -317,7 +342,8 @@ export default function RelatoriosPage() {
     
     const body = [];
     
-    Object.entries(CATEGORIAS_CONFIG).forEach(([catId, config]) => {
+    const renderCatPdf = (catId) => {
+      const config = CATEGORIAS_CONFIG[catId];
       const totais = calcularTotaisCategoria(catId);
       const ah = calcularAH(totais.valor2, totais.valor1);
       
@@ -366,18 +392,34 @@ export default function RelatoriosPage() {
           });
         }
       });
-    });
+    };
     
-    // Resultado
+    ['receita_bruta', 'deducoes_vendas', 'custos_variaveis', 'custos_fixos'].forEach(renderCatPdf);
+    
+    // (=) Resultado Operacional
+    const ahResOp = calcularAH(resOpValor2, resOpValor1);
+    const rowResOp = [
+      { content: '(=) Resultado Operacional', styles: { fontStyle: 'bold', fillColor: [207, 250, 254], textColor: [21, 94, 117] } },
+      { content: formatCurrency(resOpValor1), styles: { halign: 'right', fontStyle: 'bold', fillColor: [207, 250, 254], textColor: [21, 94, 117] } }
+    ];
+    if (mostrarAV) rowResOp.push({ content: formatPercent(calcularAV(resOpValor1, totaisReceitas.valor1)), styles: { halign: 'right', fillColor: [207, 250, 254] } });
+    rowResOp.push({ content: formatCurrency(resOpValor2), styles: { halign: 'right', fontStyle: 'bold', fillColor: [207, 250, 254], textColor: [21, 94, 117] } });
+    if (mostrarAV) rowResOp.push({ content: formatPercent(calcularAV(resOpValor2, totaisReceitas.valor2)), styles: { halign: 'right', fillColor: [207, 250, 254] } });
+    if (mostrarAH) rowResOp.push({ content: formatPercent(ahResOp), styles: { halign: 'right', fillColor: [207, 250, 254], textColor: ahResOp >= 0 ? [22, 163, 74] : [220, 38, 38] } });
+    body.push(rowResOp);
+    
+    renderCatPdf('resultado_nao_operacional');
+    
+    // (=) Lucro Líquido
     const ahResultado = calcularAH(resultado2, resultado1);
     const rowResult = [
-      { content: 'RESULTADO', styles: { fontStyle: 'bold', fillColor: [200, 200, 200] } },
-      { content: formatCurrency(resultado1), styles: { halign: 'right', fontStyle: 'bold', fillColor: [200, 200, 200], textColor: resultado1 >= 0 ? [22, 163, 74] : [220, 38, 38] } }
+      { content: '(=) Lucro Líquido', styles: { fontStyle: 'bold', fillColor: [220, 252, 231], textColor: [22, 101, 52] } },
+      { content: formatCurrency(resultado1), styles: { halign: 'right', fontStyle: 'bold', fillColor: [220, 252, 231], textColor: resultado1 >= 0 ? [22, 163, 74] : [220, 38, 38] } }
     ];
-    if (mostrarAV) rowResult.push({ content: formatPercent(calcularAV(resultado1, totaisReceitas.valor1)), styles: { halign: 'right', fillColor: [200, 200, 200] } });
-    rowResult.push({ content: formatCurrency(resultado2), styles: { halign: 'right', fontStyle: 'bold', fillColor: [200, 200, 200], textColor: resultado2 >= 0 ? [22, 163, 74] : [220, 38, 38] } });
-    if (mostrarAV) rowResult.push({ content: formatPercent(calcularAV(resultado2, totaisReceitas.valor2)), styles: { halign: 'right', fillColor: [200, 200, 200] } });
-    if (mostrarAH) rowResult.push({ content: formatPercent(ahResultado), styles: { halign: 'right', fillColor: [200, 200, 200], textColor: ahResultado >= 0 ? [22, 163, 74] : [220, 38, 38] } });
+    if (mostrarAV) rowResult.push({ content: formatPercent(calcularAV(resultado1, totaisReceitas.valor1)), styles: { halign: 'right', fillColor: [220, 252, 231] } });
+    rowResult.push({ content: formatCurrency(resultado2), styles: { halign: 'right', fontStyle: 'bold', fillColor: [220, 252, 231], textColor: resultado2 >= 0 ? [22, 163, 74] : [220, 38, 38] } });
+    if (mostrarAV) rowResult.push({ content: formatPercent(calcularAV(resultado2, totaisReceitas.valor2)), styles: { halign: 'right', fillColor: [220, 252, 231] } });
+    if (mostrarAH) rowResult.push({ content: formatPercent(ahResultado), styles: { halign: 'right', fillColor: [220, 252, 231], textColor: ahResultado >= 0 ? [22, 163, 74] : [220, 38, 38] } });
     body.push(rowResult);
     
     autoTable(doc, {
@@ -584,17 +626,31 @@ export default function RelatoriosPage() {
               </tr>
             </thead>
             <tbody>
-              {Object.entries(CATEGORIAS_CONFIG).map(([catId, config]) => 
-                renderCategoriaHierarquica(catId, config)
+              {/* Receita Bruta, Deduções, Custos Variáveis, Custos Fixos */}
+              {['receita_bruta', 'deducoes_vendas', 'custos_variaveis', 'custos_fixos'].map(catId =>
+                renderCategoriaHierarquica(catId, CATEGORIAS_CONFIG[catId])
               )}
 
-              {/* Resultado */}
-              <tr className="bg-gray-200 font-bold">
-                <td className="p-2">RESULTADO</td>
-                <td className={`p-2 text-right ${resultado1 >= 0 ? 'text-green-700' : 'text-red-700'}`}>{formatCurrency(resultado1)}</td>
-                {mostrarAV && <td className="p-2 text-right bg-green-100">{formatPercent(calcularAV(resultado1, totaisReceitas.valor1))}</td>}
-                <td className={`p-2 text-right ${resultado2 >= 0 ? 'text-green-700' : 'text-red-700'}`}>{formatCurrency(resultado2)}</td>
-                {mostrarAV && <td className="p-2 text-right bg-green-100">{formatPercent(calcularAV(resultado2, totaisReceitas.valor2))}</td>}
+              {/* (=) Resultado Operacional (linha calculada) */}
+              <tr className="bg-cyan-50 border-y-2 border-cyan-200 font-semibold">
+                <td className="p-2 text-cyan-800">(=) Resultado Operacional</td>
+                <td className={`p-2 text-right ${resOpValor1 >= 0 ? 'text-cyan-800' : 'text-red-700'}`}>{formatCurrency(resOpValor1)}</td>
+                {mostrarAV && <td className="p-2 text-right bg-green-50">{formatPercent(calcularAV(resOpValor1, totaisReceitas.valor1))}</td>}
+                <td className={`p-2 text-right ${resOpValor2 >= 0 ? 'text-cyan-800' : 'text-red-700'}`}>{formatCurrency(resOpValor2)}</td>
+                {mostrarAV && <td className="p-2 text-right bg-green-50">{formatPercent(calcularAV(resOpValor2, totaisReceitas.valor2))}</td>}
+                {mostrarAH && <td className={`p-2 text-right bg-purple-50 ${calcularAH(resOpValor2, resOpValor1) >= 0 ? 'text-green-700' : 'text-red-700'}`}>{formatPercent(calcularAH(resOpValor2, resOpValor1))}</td>}
+              </tr>
+
+              {/* Resultado Não Operacional (valor líquido) */}
+              {renderCategoriaHierarquica('resultado_nao_operacional', CATEGORIAS_CONFIG.resultado_nao_operacional)}
+
+              {/* (=) Lucro Líquido */}
+              <tr className="bg-green-100 font-bold border-t-2 border-green-300">
+                <td className="p-2 text-green-900">(=) Lucro Líquido</td>
+                <td className={`p-2 text-right ${resultado1 >= 0 ? 'text-green-800' : 'text-red-700'}`}>{formatCurrency(resultado1)}</td>
+                {mostrarAV && <td className="p-2 text-right bg-green-200">{formatPercent(calcularAV(resultado1, totaisReceitas.valor1))}</td>}
+                <td className={`p-2 text-right ${resultado2 >= 0 ? 'text-green-800' : 'text-red-700'}`}>{formatCurrency(resultado2)}</td>
+                {mostrarAV && <td className="p-2 text-right bg-green-200">{formatPercent(calcularAV(resultado2, totaisReceitas.valor2))}</td>}
                 {mostrarAH && <td className={`p-2 text-right bg-purple-100 ${calcularAH(resultado2, resultado1) >= 0 ? 'text-green-700' : 'text-red-700'}`}>{formatPercent(calcularAH(resultado2, resultado1))}</td>}
               </tr>
             </tbody>
