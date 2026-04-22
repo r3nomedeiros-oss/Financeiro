@@ -128,31 +128,55 @@ export default function MovimentacoesPage() {
     setShowItemDropdown(false);
   };
 
-  // Formatar valor como moeda brasileira COM centavos
-  // Padrão: usuário digita apenas números, que vão preenchendo da direita p/ esquerda como centavos
-  // Ex.: "12345" -> R$ 123,45 | "7" -> R$ 0,07 | "150" -> R$ 1,50
-  const formatarValorInput = (numerosString) => {
-    const numeros = (numerosString || '').replace(/\D/g, '');
-    if (!numeros) return '';
-    const valor = parseInt(numeros, 10) / 100;
-    return new Intl.NumberFormat('pt-BR', {
+  // Digitação natural: usuário digita números, vírgula (ou ponto) separa centavos.
+  // Ex.: "100000" -> R$ 100.000,00 (ao sair do campo)
+  //      "100000,5" -> R$ 100.000,50 (ao sair do campo)
+  //      "1234,56" -> R$ 1.234,56
+  const handleValorChange = (e) => {
+    let input = e.target.value;
+    // Aceita apenas dígitos, vírgula e ponto (ponto é convertido em vírgula)
+    input = input.replace(/[^\d,.]/g, '').replace(/\./g, ',');
+
+    // Mantém apenas a primeira vírgula (se houver mais)
+    const primeiraVirgula = input.indexOf(',');
+    if (primeiraVirgula !== -1) {
+      input = input.slice(0, primeiraVirgula + 1) + input.slice(primeiraVirgula + 1).replace(/,/g, '');
+    }
+
+    const partes = input.split(',');
+    let inteira = (partes[0] || '').replace(/^0+(?=\d)/, ''); // remove zeros à esquerda
+    const decimalInformado = partes.length > 1;
+    let decimal = decimalInformado ? partes[1].slice(0, 2) : '';
+
+    // Formata parte inteira com separador de milhares
+    const inteiraFormatada = inteira ? parseInt(inteira, 10).toLocaleString('pt-BR') : '';
+
+    let valorFormatado = '';
+    if (inteira || decimalInformado) {
+      valorFormatado = `R$ ${inteiraFormatada || '0'}`;
+      if (decimalInformado) valorFormatado += `,${decimal}`;
+    }
+
+    const valorNumerico = parseFloat(`${inteira || '0'}.${decimal || '0'}`) || 0;
+
+    setFormData({
+      ...formData,
+      valor: valorNumerico.toString(),
+      valorFormatado
+    });
+  };
+
+  // Ao sair do campo, completa os centavos (",5" -> ",50" | sem vírgula -> ",00")
+  const handleValorBlur = () => {
+    if (!formData.valorFormatado) return;
+    const valor = parseFloat(formData.valor) || 0;
+    const formatado = new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     }).format(valor);
-  };
-
-  const handleValorChange = (e) => {
-    const inputValue = e.target.value;
-    const numeros = inputValue.replace(/\D/g, '');
-    const valorNumerico = numeros ? parseInt(numeros, 10) / 100 : 0;
-
-    setFormData({
-      ...formData,
-      valor: valorNumerico.toString(),
-      valorFormatado: numeros ? formatarValorInput(numeros) : ''
-    });
+    setFormData((prev) => ({ ...prev, valorFormatado: formatado }));
   };
 
   const handleSubmit = async (e) => {
@@ -580,6 +604,7 @@ export default function MovimentacoesPage() {
                   type="text"
                   value={formData.valorFormatado}
                   onChange={handleValorChange}
+                  onBlur={handleValorBlur}
                   required
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg font-semibold"
                   placeholder="R$ 0,00"
