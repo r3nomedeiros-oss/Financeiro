@@ -128,32 +128,30 @@ export default function MovimentacoesPage() {
     setShowItemDropdown(false);
   };
 
-  // Formatar valor como moeda brasileira (sem centavos)
-  const formatarValorInput = (valor) => {
-    // Remove tudo que não é número
-    const numeros = valor.replace(/\D/g, '');
-    
-    // Converte para inteiro (sem centavos)
-    const inteiro = parseInt(numeros) || 0;
-    
-    // Formata como moeda sem centavos
+  // Formatar valor como moeda brasileira COM centavos
+  // Padrão: usuário digita apenas números, que vão preenchendo da direita p/ esquerda como centavos
+  // Ex.: "12345" -> R$ 123,45 | "7" -> R$ 0,07 | "150" -> R$ 1,50
+  const formatarValorInput = (numerosString) => {
+    const numeros = (numerosString || '').replace(/\D/g, '');
+    if (!numeros) return '';
+    const valor = parseInt(numeros, 10) / 100;
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(inteiro);
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(valor);
   };
 
   const handleValorChange = (e) => {
     const inputValue = e.target.value;
     const numeros = inputValue.replace(/\D/g, '');
-    const valorNumerico = parseInt(numeros) || 0;
-    
+    const valorNumerico = numeros ? parseInt(numeros, 10) / 100 : 0;
+
     setFormData({
       ...formData,
       valor: valorNumerico.toString(),
-      valorFormatado: numeros ? formatarValorInput(inputValue) : ''
+      valorFormatado: numeros ? formatarValorInput(numeros) : ''
     });
   };
 
@@ -195,8 +193,8 @@ export default function MovimentacoesPage() {
     const valorFormatado = new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
     }).format(mov.valor);
     
     // Buscar nome do item para preencher o campo de busca
@@ -255,8 +253,8 @@ export default function MovimentacoesPage() {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
     }).format(value);
   };
 
@@ -584,7 +582,7 @@ export default function MovimentacoesPage() {
                   onChange={handleValorChange}
                   required
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg font-semibold"
-                  placeholder="R$ 0"
+                  placeholder="R$ 0,00"
                   data-testid="valor-input"
                 />
               </div>
