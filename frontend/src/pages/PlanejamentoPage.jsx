@@ -548,11 +548,18 @@ export default function PlanejamentoPage() {
     
     renderCatPdf('resultado_nao_operacional');
     
-    // (=) Lucro Líquido
+    // (=) Lucro Líquido (texto vermelho quando negativo)
+    const luFill = [220, 252, 231];
+    const luPos = [22, 101, 52];
+    const luNeg = [185, 28, 28];
+    const luCor = (v) => ((v || 0) < 0 ? luNeg : luPos);
     body.push([
-      { content: '(=) Lucro Líquido', styles: { fontStyle: 'bold', fillColor: [220, 252, 231], textColor: [22, 101, 52] } },
-      ...MESES.map(m => ({ content: formatCurrency(calcularResultado.meses[m.num] || 0), styles: { halign: 'right', fontStyle: 'bold', fillColor: [220, 252, 231], textColor: [22, 101, 52] } })),
-      { content: formatCurrency(calcularResultado.total), styles: { halign: 'right', fontStyle: 'bold', fillColor: [220, 252, 231], textColor: [22, 101, 52] } }
+      { content: '(=) Lucro Líquido', styles: { fontStyle: 'bold', fillColor: luFill, textColor: luPos } },
+      ...MESES.map(m => {
+        const v = calcularResultado.meses[m.num] || 0;
+        return { content: formatCurrency(v), styles: { halign: 'right', fontStyle: 'bold', fillColor: luFill, textColor: luCor(v) } };
+      }),
+      { content: formatCurrency(calcularResultado.total), styles: { halign: 'right', fontStyle: 'bold', fillColor: luFill, textColor: luCor(calcularResultado.total) } }
     ]);
     
     autoTable(doc, {
