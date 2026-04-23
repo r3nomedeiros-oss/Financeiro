@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { movimentacoesAPI, planoContasAPI, contasAPI, invalidateCache } from '../services/api';
-import { Plus, Edit2, Trash2, X, Search, Filter, GripVertical } from 'lucide-react';
+import { Plus, Edit2, Trash2, X, Search, Filter, GripVertical, Download, FileSpreadsheet } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 export default function MovimentacoesPage() {
   const [movimentacoes, setMovimentacoes] = useState([]);
@@ -264,6 +266,111 @@ export default function MovimentacoesPage() {
     }
   };
 
+  // ============================================
+  // EXPORTAÇÃO (Excel / PDF)
+  // ============================================
+  const exportToExcel = () => {
+    const rows = [];
+    rows.push(['Data', 'Tipo', 'Item/Conta', 'Complemento', 'Banco', 'Valor (R$)'].join(';'));
+
+    movimentacoesFiltradas.forEach((mov) => {
+      rows.push([
+        formatDate(mov.data),
+        mov.tipo === 'entrada' ? 'Entrada' : 'Saída',
+        (mov.plano_contas?.nome || '-').replace(/;/g, ','),
+        (mov.complemento || '-').replace(/;/g, ',').replace(/\r?\n/g, ' '),
+        (mov.contas_bancarias?.nome || '-').replace(/;/g, ','),
+        Number(mov.valor).toFixed(2).replace('.', ',')
+      ].join(';'));
+    });
+
+    // Totais
+    const totalEntradas = movimentacoesFiltradas
+      .filter((m) => m.tipo === 'entrada')
+      .reduce((s, m) => s + Number(m.valor), 0);
+    const totalSaidas = movimentacoesFiltradas
+      .filter((m) => m.tipo === 'saida')
+      .reduce((s, m) => s + Number(m.valor), 0);
+
+    rows.push('');
+    rows.push(['', '', '', '', 'Total Entradas', totalEntradas.toFixed(2).replace('.', ',')].join(';'));
+    rows.push(['', '', '', '', 'Total Saídas', totalSaidas.toFixed(2).replace('.', ',')].join(';'));
+    rows.push(['', '', '', '', 'Saldo', (totalEntradas - totalSaidas).toFixed(2).replace('.', ',')].join(';'));
+
+    const csvContent = '\uFEFF' + rows.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `Movimentacoes_${filtroDataInicio}_${filtroDataFim}.csv`;
+    link.click();
+  };
+
+  const exportToPDF = () => {
+    const doc = new jsPDF('landscape', 'mm', 'a4');
+
+    const inicioFmt = new Date(filtroDataInicio + 'T00:00:00').toLocaleDateString('pt-BR');
+    const fimFmt = new Date(filtroDataFim + 'T00:00:00').toLocaleDateString('pt-BR');
+
+    doc.setFontSize(14);
+    doc.text('Movimentação Financeira', doc.internal.pageSize.width / 2, 12, { align: 'center' });
+    doc.setFontSize(10);
+    doc.text(`Período: ${inicioFmt} a ${fimFmt}`, doc.internal.pageSize.width / 2, 18, { align: 'center' });
+
+    const headers = [['Data', 'Tipo', 'Item/Conta', 'Complemento', 'Banco', 'Valor']];
+    const body = movimentacoesFiltradas.map((mov) => [
+      formatDate(mov.data),
+      mov.tipo === 'entrada' ? 'Entrada' : 'Saída',
+      mov.plano_contas?.nome || '-',
+      mov.complemento || '-',
+      mov.contas_bancarias?.nome || '-',
+      formatCurrency(mov.valor)
+    ]);
+
+    const totalEntradas = movimentacoesFiltradas
+      .filter((m) => m.tipo === 'entrada')
+      .reduce((s, m) => s + Number(m.valor), 0);
+    const totalSaidas = movimentacoesFiltradas
+      .filter((m) => m.tipo === 'saida')
+      .reduce((s, m) => s + Number(m.valor), 0);
+
+    autoTable(doc, {
+      head: headers,
+      body: body,
+      startY: 24,
+      styles: { fontSize: 9, cellPadding: 2 },
+      headStyles: { fillColor: [37, 99, 235], textColor: [255, 255, 255], fontStyle: 'bold' },
+      columnStyles: {
+        5: { halign: 'right' }
+      },
+      didParseCell: function (data) {
+        if (data.section === 'body' && data.column.index === 1) {
+          if (data.cell.raw === 'Entrada') data.cell.styles.textColor = [22, 163, 74];
+          else if (data.cell.raw === 'Saída') data.cell.styles.textColor = [220, 38, 38];
+        }
+      }
+    });
+
+    // Resumo ao final
+    const finalY = doc.lastAutoTable?.finalY || 24;
+    autoTable(doc, {
+      startY: finalY + 4,
+      body: [
+        ['Total Entradas', formatCurrency(totalEntradas)],
+        ['Total Saídas', formatCurrency(totalSaidas)],
+        ['Saldo do Período', formatCurrency(totalEntradas - totalSaidas)]
+      ],
+      theme: 'grid',
+      styles: { fontSize: 10, cellPadding: 3, fontStyle: 'bold' },
+      columnStyles: {
+        0: { fillColor: [243, 244, 246], cellWidth: 60 },
+        1: { halign: 'right' }
+      },
+      margin: { left: doc.internal.pageSize.width - 120 }
+    });
+
+    doc.save(`Movimentacoes_${filtroDataInicio}_${filtroDataFim}.pdf`);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -400,18 +507,40 @@ export default function MovimentacoesPage() {
           <h1 className="text-2xl font-bold text-gray-800">Movimentação Financeira</h1>
           <p className="text-gray-600 text-sm">Registre todas as suas transações</p>
         </div>
-        
-        <button
-          onClick={() => {
-            resetForm();
-            setShowModal(true);
-          }}
-          className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition shadow-md"
-          data-testid="nova-movimentacao-btn"
-        >
-          <Plus size={20} />
-          Nova Movimentação
-        </button>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={exportToExcel}
+            disabled={movimentacoesFiltradas.length === 0}
+            className="flex items-center gap-2 bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 transition shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+            data-testid="export-excel-btn"
+            title="Exportar para Excel (CSV)"
+          >
+            <FileSpreadsheet size={18} />
+            Excel
+          </button>
+          <button
+            onClick={exportToPDF}
+            disabled={movimentacoesFiltradas.length === 0}
+            className="flex items-center gap-2 bg-red-600 text-white px-4 py-3 rounded-lg hover:bg-red-700 transition shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+            data-testid="export-pdf-btn"
+            title="Exportar para PDF"
+          >
+            <Download size={18} />
+            PDF
+          </button>
+          <button
+            onClick={() => {
+              resetForm();
+              setShowModal(true);
+            }}
+            className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition shadow-md"
+            data-testid="nova-movimentacao-btn"
+          >
+            <Plus size={20} />
+            Nova Movimentação
+          </button>
+        </div>
       </div>
 
       {/* Filtros */}
