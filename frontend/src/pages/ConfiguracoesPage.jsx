@@ -27,7 +27,7 @@ const CATEGORIAS_DRE = {
   deducoes_vendas: { nome: "(-) Deduções Sobre Vendas", tipo: "despesa", cor: "red" },
   custos_variaveis: { nome: "(-) Custos Variáveis", tipo: "despesa", cor: "red" },
   custos_fixos: { nome: "(-) Custos Fixos", tipo: "despesa", cor: "red" },
-  resultado_nao_operacional: { nome: "Resultado Não Operacional", tipo: "misto", cor: "gray" },
+  resultado_nao_operacional: { nome: "Resultado Não Operacional", tipo: "misto", cor: "amber" },
 };
 
 export default function ConfiguracoesPage() {
@@ -281,6 +281,7 @@ export default function ConfiguracoesPage() {
     const cores = {
       cyan: 'bg-cyan-50 border-cyan-200 text-cyan-700',
       red: 'bg-red-50 border-red-200 text-red-700',
+      amber: 'bg-amber-100 border-amber-300 text-amber-800',
       gray: 'bg-gray-50 border-gray-200 text-gray-700',
     };
     return cores[cor] || 'bg-gray-50 border-gray-200';
