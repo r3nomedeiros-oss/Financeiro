@@ -101,9 +101,9 @@ const SaidasBarChart = memo(({ data, title }) => {
   return (
     <div className="bg-white rounded-xl shadow-md p-6">
       <h3 className="text-lg font-semibold text-gray-800 mb-4">{title}</h3>
-      <div className="flex gap-4">
+      <div className="flex flex-col lg:flex-row gap-4">
         {/* Gráfico de barras horizontal */}
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={sortedData} layout="vertical" margin={{ left: 10, right: 10 }}>
               <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
@@ -122,8 +122,8 @@ const SaidasBarChart = memo(({ data, title }) => {
           </ResponsiveContainer>
         </div>
         
-        {/* Legenda lateral */}
-        <div className="w-48 flex-shrink-0 overflow-y-auto max-h-[280px]">
+        {/* Legenda (lateral no desktop, embaixo no mobile) */}
+        <div className="w-full lg:w-48 lg:flex-shrink-0 overflow-y-auto max-h-[280px]">
           <div className="space-y-2">
             {sortedData.map((item, index) => (
               <div key={index} className="flex items-center gap-2 text-xs">
@@ -228,18 +228,18 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6" data-testid="dashboard">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">Dashboard</h1>
-          <p className="text-gray-600 mt-1">Visão geral financeira</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Dashboard</h1>
+          <p className="text-gray-600 mt-1 text-sm md:text-base">Visão geral financeira</p>
         </div>
 
         {/* Filtros */}
-        <div className="flex gap-3">
+        <div className="flex gap-2 md:gap-3">
           <select
             value={filtros.mes}
             onChange={(e) => handleFiltroChange('mes', e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="flex-1 md:flex-initial px-3 md:px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             data-testid="filtro-mes"
           >
             {Array.from({ length: 12 }, (_, i) => i + 1).map((mes) => (
@@ -252,7 +252,7 @@ export default function DashboardPage() {
           <select
             value={filtros.ano}
             onChange={(e) => handleFiltroChange('ano', e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="px-3 md:px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             data-testid="filtro-ano"
           >
             {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map((ano) => (

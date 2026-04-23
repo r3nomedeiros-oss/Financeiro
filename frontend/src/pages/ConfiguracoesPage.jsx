@@ -299,7 +299,7 @@ export default function ConfiguracoesPage() {
     <div className="space-y-6" data-testid="configuracoes-page">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-800">Configurações</h1>
+        <h1 className="text-xl md:text-2xl font-bold text-gray-800">Configurações</h1>
         <p className="text-gray-600 text-sm">Gerencie plano de contas hierárquico e contas bancárias</p>
       </div>
 
@@ -494,7 +494,7 @@ export default function ConfiguracoesPage() {
       {/* Contas Bancárias Tab */}
       {activeTab === 'contas-bancarias' && (
         <div className="space-y-4">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
             <p className="text-sm text-gray-600">
               Gerencie suas contas bancárias para controle de saldo.
             </p>
@@ -504,7 +504,7 @@ export default function ConfiguracoesPage() {
                 setContaFormData({ nome: '', saldo_inicial: 0 });
                 setShowContaModal(true);
               }}
-              className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 text-sm"
+              className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 text-sm whitespace-nowrap"
               data-testid="adicionar-conta-btn"
             >
               + Adicionar Conta
@@ -512,7 +512,8 @@ export default function ConfiguracoesPage() {
           </div>
 
           <div className="bg-white rounded-lg shadow overflow-hidden">
-            <table className="w-full" data-testid="contas-bancarias-table">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[500px]" data-testid="contas-bancarias-table">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="text-left p-3 font-medium text-gray-700">Nome</th>
@@ -557,6 +558,7 @@ export default function ConfiguracoesPage() {
                 )}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       )}

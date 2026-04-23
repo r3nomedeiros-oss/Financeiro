@@ -57,7 +57,7 @@ export default memo(function Sidebar({ user, onLogout }) {
   }, []);
 
   return (
-    <div className={`h-screen ${isMinimized ? 'w-16' : 'w-64'} bg-gradient-to-b from-blue-900 to-blue-800 text-white flex flex-col shadow-2xl transition-all duration-200 relative`}>
+    <div className={`hidden md:flex h-screen ${isMinimized ? 'w-16' : 'w-64'} bg-gradient-to-b from-blue-900 to-blue-800 text-white flex-col shadow-2xl transition-all duration-200 relative`}>
       {/* Toggle Button */}
       <button
         onClick={toggleSidebar}

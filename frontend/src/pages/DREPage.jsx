@@ -574,13 +574,13 @@ export default function DREPage() {
   return (
     <div className="space-y-4" data-testid="dre-page">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">DRE - Demonstrativo de Resultado</h1>
+          <h1 className="text-xl md:text-2xl font-bold text-gray-800">DRE - Demonstrativo de Resultado</h1>
           <p className="text-gray-600 text-sm">Visão anual consolidada com estrutura hierárquica</p>
         </div>
 
-        <div className="flex gap-3 items-center">
+        <div className="flex gap-2 md:gap-3 items-center flex-wrap">
           <button
             onClick={expandAll}
             className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg"

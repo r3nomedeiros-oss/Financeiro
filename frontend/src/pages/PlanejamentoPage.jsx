@@ -751,14 +751,14 @@ export default function PlanejamentoPage() {
   return (
     <div className="space-y-4" data-testid="planejamento-page">
       {/* Header Fixo */}
-      <div className="sticky top-0 z-20 bg-gray-50 pb-4 -mx-6 px-6 -mt-6 pt-6">
-        <div className="flex justify-between items-center">
+      <div className="sticky top-0 z-20 bg-gray-50 pb-4 -mx-4 md:-mx-6 px-4 md:px-6 -mt-4 md:-mt-6 pt-4 md:pt-6">
+        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-gray-800">Planejamento Orçamentário</h1>
+            <h1 className="text-xl md:text-2xl font-bold text-gray-800">Planejamento Orçamentário</h1>
             <p className="text-gray-600 text-sm">Clique na célula para editar. Digite valores em reais (ex: 100000)</p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {hasPendingChanges && (
               <span className="text-sm text-amber-600 bg-amber-50 px-3 py-1 rounded-full">
                 {Object.keys(pendingChanges).length} alterações

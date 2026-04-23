@@ -312,15 +312,15 @@ export default function FluxoCaixaPage() {
   return (
     <div className="space-y-6" data-testid="fluxo-caixa-page">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Fluxo de Caixa</h1>
+          <h1 className="text-xl md:text-2xl font-bold text-gray-800">Fluxo de Caixa</h1>
           <p className="text-gray-600 text-sm">
             {modoVisualizacao === 'mes' ? 'Resumo mensal por semana' : 'Detalhamento diário'}
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 md:gap-3 flex-wrap">
           <button
             onClick={exportToExcel}
             className="flex items-center gap-2 px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700"

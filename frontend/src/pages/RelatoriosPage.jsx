@@ -590,14 +590,14 @@ export default function RelatoriosPage() {
   return (
     <div className="space-y-4" data-testid="relatorios-page">
       {/* Header Fixo */}
-      <div className="sticky top-0 z-20 bg-gray-50 pb-4 -mx-6 px-6 -mt-6 pt-6">
-        <div className="flex justify-between items-center">
+      <div className="sticky top-0 z-20 bg-gray-50 pb-4 -mx-4 md:-mx-6 px-4 md:px-6 -mt-4 md:-mt-6 pt-4 md:pt-6">
+        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-gray-800">Relatórios Comparativos</h1>
+            <h1 className="text-xl md:text-2xl font-bold text-gray-800">Relatórios Comparativos</h1>
             <p className="text-gray-600 text-sm">Compare períodos com análise vertical e horizontal</p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <button onClick={expandirTudo} className="flex items-center gap-1 px-3 py-2 text-sm bg-gray-100 rounded-lg hover:bg-gray-200" title="Expandir Tudo">
               <ChevronsDown size={16} />
             </button>
@@ -619,7 +619,7 @@ export default function RelatoriosPage() {
 
       {/* Filtros */}
       <div className="bg-white rounded-lg shadow p-4">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Período 1 */}
           <div className="space-y-2 p-3 bg-blue-50 rounded-lg">
             <h4 className="font-medium text-blue-800 text-sm">Período 1 (Atual)</h4>
@@ -662,7 +662,8 @@ export default function RelatoriosPage() {
         </div>
       ) : temDados ? (
         <div className="bg-white rounded-lg shadow overflow-hidden">
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[640px]">
             <thead className="bg-blue-600 text-white sticky top-0">
               <tr>
                 <th className="text-left p-2 font-semibold min-w-[200px]">Descrição</th>
@@ -726,6 +727,7 @@ export default function RelatoriosPage() {
               </tr>
             </tbody>
           </table>
+          </div>
         </div>
       ) : (
         <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">

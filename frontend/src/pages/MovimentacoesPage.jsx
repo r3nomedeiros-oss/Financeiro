@@ -523,57 +523,57 @@ export default function MovimentacoesPage() {
   return (
     <div className="space-y-6" data-testid="movimentacoes-page">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Movimentação Financeira</h1>
+          <h1 className="text-xl md:text-2xl font-bold text-gray-800">Movimentação Financeira</h1>
           <p className="text-gray-600 text-sm">Registre todas as suas transações</p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={exportToExcel}
             disabled={movimentacoesFiltradas.length === 0}
-            className="flex items-center gap-2 bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 transition shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 bg-green-600 text-white px-3 md:px-4 py-2.5 md:py-3 rounded-lg hover:bg-green-700 transition shadow-md disabled:opacity-50 disabled:cursor-not-allowed text-sm"
             data-testid="export-excel-btn"
             title="Exportar para Excel (CSV)"
           >
             <FileSpreadsheet size={18} />
-            Excel
+            <span className="hidden sm:inline">Excel</span>
           </button>
           <button
             onClick={exportToPDF}
             disabled={movimentacoesFiltradas.length === 0}
-            className="flex items-center gap-2 bg-red-600 text-white px-4 py-3 rounded-lg hover:bg-red-700 transition shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 bg-red-600 text-white px-3 md:px-4 py-2.5 md:py-3 rounded-lg hover:bg-red-700 transition shadow-md disabled:opacity-50 disabled:cursor-not-allowed text-sm"
             data-testid="export-pdf-btn"
             title="Exportar para PDF"
           >
             <Download size={18} />
-            PDF
+            <span className="hidden sm:inline">PDF</span>
           </button>
           <button
             onClick={() => {
               resetForm();
               setShowModal(true);
             }}
-            className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition shadow-md"
+            className="flex-1 md:flex-initial flex items-center justify-center gap-2 bg-blue-600 text-white px-4 md:px-6 py-2.5 md:py-3 rounded-lg hover:bg-blue-700 transition shadow-md text-sm md:text-base"
             data-testid="nova-movimentacao-btn"
           >
             <Plus size={20} />
-            Nova Movimentação
+            <span>Nova Movimentação</span>
           </button>
         </div>
       </div>
 
       {/* Filtros */}
-      <div className="bg-white rounded-xl shadow-md p-4 flex flex-wrap items-center gap-3" data-testid="filtros-movimentacoes">
-        <div className="flex items-center gap-2">
-          <Filter size={18} className="text-gray-400" />
+      <div className="bg-white rounded-xl shadow-md p-3 md:p-4 flex flex-col md:flex-row md:flex-wrap md:items-center gap-3" data-testid="filtros-movimentacoes">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Filter size={18} className="text-gray-400 shrink-0" />
           <label className="text-sm text-gray-600">De:</label>
           <input
             type="date"
             value={filtroDataInicio}
             onChange={(e) => setFiltroDataInicio(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             data-testid="filtro-data-inicio"
           />
           <label className="text-sm text-gray-600">Até:</label>
@@ -581,12 +581,12 @@ export default function MovimentacoesPage() {
             type="date"
             value={filtroDataFim}
             onChange={(e) => setFiltroDataFim(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             data-testid="filtro-data-fim"
           />
         </div>
 
-        <div className="h-6 w-px bg-gray-200"></div>
+        <div className="hidden md:block h-6 w-px bg-gray-200"></div>
 
         <select
           value={filtroTipo}
@@ -599,13 +599,13 @@ export default function MovimentacoesPage() {
           <option value="saida">Saídas</option>
         </select>
 
-        <div className="flex-1 min-w-[200px] relative">
+        <div className="flex-1 min-w-[180px] relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
           <input
             type="text"
             value={filtroBusca}
             onChange={(e) => setFiltroBusca(e.target.value)}
-            placeholder="Buscar por item, complemento ou banco..."
+            placeholder="Buscar..."
             className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             data-testid="filtro-busca"
           />
@@ -616,8 +616,8 @@ export default function MovimentacoesPage() {
         </span>
       </div>
 
-      {/* Tabela */}
-      <div className="bg-white rounded-xl shadow-md overflow-hidden">
+      {/* Tabela (desktop) */}
+      <div className="hidden md:block bg-white rounded-xl shadow-md overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
@@ -710,12 +710,101 @@ export default function MovimentacoesPage() {
         </div>
       </div>
 
+      {/* Lista de cards (mobile) */}
+      <div className="md:hidden space-y-3" data-testid="movimentacoes-mobile-list">
+        {movimentacoesFiltradas.length > 0 ? (
+          movimentacoesFiltradas.map((mov) => {
+            const isDragging = dragState.dragId === mov.id;
+            const isDragOver = dragState.overId === mov.id;
+            const isEntrada = mov.tipo === 'entrada';
+            return (
+              <div
+                key={mov.id}
+                draggable
+                onDragStart={handleDragStart(mov.id)}
+                onDragOver={handleDragOver(mov.id)}
+                onDrop={handleDrop(mov.id)}
+                onDragEnd={handleDragEnd}
+                className={`bg-white rounded-xl shadow-sm border-l-4 p-3 transition ${
+                  isEntrada ? 'border-green-500' : 'border-red-500'
+                } ${isDragging ? 'opacity-30' : ''} ${isDragOver ? 'ring-2 ring-blue-400' : ''}`}
+                data-testid={`mov-card-${mov.id}`}
+              >
+                {/* Topo: data + tipo + valor */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <GripVertical size={14} className="text-gray-300 shrink-0" style={{ cursor: 'grab' }} />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs text-gray-500">{formatDate(mov.data)}</span>
+                        <span
+                          className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                            isEntrada
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-red-100 text-red-700'
+                          }`}
+                        >
+                          {isEntrada ? 'Entrada' : 'Saída'}
+                        </span>
+                      </div>
+                      <p className="text-sm font-semibold text-gray-800 truncate mt-0.5">
+                        {mov.plano_contas?.nome || '-'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className={`text-right shrink-0 font-bold ${isEntrada ? 'text-green-600' : 'text-red-600'}`}>
+                    {formatCurrency(mov.valor)}
+                  </div>
+                </div>
+
+                {/* Meio: banco + complemento */}
+                <div className="mt-2 text-xs text-gray-600 space-y-0.5">
+                  <p className="flex items-center gap-1">
+                    <span className="text-gray-400">Banco:</span>
+                    <span className="font-medium text-gray-700 truncate">{mov.contas_bancarias?.nome || '-'}</span>
+                  </p>
+                  {mov.complemento && (
+                    <p className="text-gray-500 italic truncate" title={mov.complemento}>
+                      {mov.complemento}
+                    </p>
+                  )}
+                </div>
+
+                {/* Ações */}
+                <div className="mt-2 pt-2 border-t border-gray-100 flex justify-end gap-1">
+                  <button
+                    onClick={() => handleEdit(mov)}
+                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                    data-testid={`edit-mov-mobile-${mov.id}`}
+                    title="Editar"
+                  >
+                    <Edit2 size={16} />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(mov.id)}
+                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
+                    data-testid={`delete-mov-mobile-${mov.id}`}
+                    title="Excluir"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </div>
+            );
+          })
+        ) : (
+          <div className="bg-white rounded-xl shadow-sm p-8 text-center text-gray-500 text-sm">
+            Nenhuma movimentação registrada
+          </div>
+        )}
+      </div>
+
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl">
-            <div className="flex justify-between items-center p-6 border-b">
-              <h2 className="text-2xl font-bold text-gray-800">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-0 md:p-4">
+          <div className="bg-white rounded-none md:rounded-xl shadow-2xl w-full h-full md:h-auto md:max-w-2xl md:max-h-[90vh] flex flex-col">
+            <div className="flex justify-between items-center p-4 md:p-6 border-b shrink-0">
+              <h2 className="text-xl md:text-2xl font-bold text-gray-800">
                 {editingId ? 'Editar Movimentação' : 'Nova Movimentação'}
               </h2>
               <button
@@ -723,14 +812,14 @@ export default function MovimentacoesPage() {
                   setShowModal(false);
                   resetForm();
                 }}
-                className="text-gray-400 hover:text-gray-600 transition"
+                className="text-gray-400 hover:text-gray-600 transition p-1"
               >
                 <X size={24} />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+            <form onSubmit={handleSubmit} className="p-4 md:p-6 space-y-4 overflow-y-auto flex-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Data *
