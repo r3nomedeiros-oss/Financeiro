@@ -38,21 +38,21 @@ const formatCurrencyCompact = (value) => {
 
 // Card memoizado para evitar re-renders - AJUSTADO para valores grandes
 const IndicatorCard = memo(({ title, value, percentage, icon: Icon, borderColor, bgColor, iconColor, percentColor }) => (
-  <div className={`bg-white rounded-xl shadow-md p-4 border-l-4 ${borderColor} min-h-[120px]`}>
+  <div className={`bg-white rounded-xl shadow-md p-3 md:p-4 border-l-4 ${borderColor} min-h-0 md:min-h-[120px]`}>
     <div className="flex justify-between items-start gap-2">
       <div className="flex-1 min-w-0">
-        <p className="text-gray-600 text-xs font-medium truncate">{title}</p>
-        <p className={`text-lg font-bold mt-1 truncate ${value < 0 ? 'text-red-600' : 'text-gray-800'}`} title={formatCurrency(value)}>
+        <p className="text-gray-600 text-[11px] md:text-xs font-medium truncate">{title}</p>
+        <p className={`text-xl md:text-lg font-bold mt-1 truncate ${value < 0 ? 'text-red-600' : 'text-gray-800'}`} title={formatCurrency(value)}>
           {formatCurrency(value)}
         </p>
         {percentage !== undefined && (
-          <p className={`text-xs font-semibold mt-1 ${percentColor}`}>
+          <p className={`text-xs font-semibold mt-0.5 md:mt-1 ${percentColor}`}>
             {percentage.toFixed(0)}%
           </p>
         )}
       </div>
-      <div className={`${bgColor} p-2 rounded-lg flex-shrink-0`}>
-        <Icon className={iconColor} size={20} />
+      <div className={`${bgColor} p-1.5 md:p-2 rounded-lg flex-shrink-0`}>
+        <Icon className={iconColor} size={18} />
       </div>
     </div>
   </div>
@@ -265,7 +265,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Cards de Indicadores */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
         <IndicatorCard
           title="Receita"
           value={dados.indicadores.receita}

@@ -74,6 +74,25 @@ export default function FluxoCaixaPage() {
     return conta?.saldo_inicial || 0;
   };
 
+  // Saldo no início do PERÍODO visualizado (inclui movimentações anteriores)
+  // Usado apenas no card de "Saldo Inicial" para o usuário enxergar coerência:
+  // Saldo Final = Saldo Inicial (do período) + Entradas - Saídas
+  const getSaldoInicialPeriodo = () => {
+    const movs = getMovimentacoesFiltradas();
+    let inicioPeriodo;
+    if (modoVisualizacao === 'periodo') {
+      inicioPeriodo = new Date(dataInicio + 'T00:00:00');
+    } else {
+      inicioPeriodo = new Date(ano, mes - 1, 1);
+    }
+    const anteriores = movs.filter(m => new Date(m.data + 'T00:00:00') < inicioPeriodo);
+    const delta = anteriores.reduce(
+      (acc, m) => acc + (m.tipo === 'entrada' ? m.valor : -m.valor),
+      0
+    );
+    return getSaldoInicial() + delta;
+  };
+
   const getMovimentacoesFiltradas = () => {
     if (contaSelecionada === 'todas') {
       return movimentacoes;
@@ -424,7 +443,7 @@ export default function FluxoCaixaPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
         <div className="bg-white rounded-lg shadow p-3 md:p-4">
           <p className="text-[11px] md:text-sm text-gray-500">Saldo Inicial</p>
-          <p className="text-sm md:text-xl font-bold text-gray-800 break-words">{formatCurrency(getSaldoInicial())}</p>
+          <p className="text-sm md:text-xl font-bold text-gray-800 break-words">{formatCurrency(getSaldoInicialPeriodo())}</p>
         </div>
         <div className="bg-green-50 rounded-lg shadow p-3 md:p-4">
           <p className="text-[11px] md:text-sm text-green-600">Total Entradas</p>

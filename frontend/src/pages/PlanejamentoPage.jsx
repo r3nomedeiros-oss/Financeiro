@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
 import { planejamentoAPI, planoContasAPI, invalidateCache } from '../services/api';
 import { Save, Copy, ChevronDown, ChevronRight, Download, FileSpreadsheet, Check, X, ChevronsDown, ChevronsUp } from 'lucide-react';
 
@@ -62,6 +62,22 @@ export default function PlanejamentoPage() {
   
   // Alterações pendentes
   const [pendingChanges, setPendingChanges] = useState({});
+
+  // Refs para sincronizar scroll horizontal entre barra superior e tabela
+  const scrollContainerRef = useRef(null);
+  const topScrollRef = useRef(null);
+
+  const handleTopScroll = (e) => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollLeft = e.target.scrollLeft;
+    }
+  };
+
+  const handleTableScroll = (e) => {
+    if (topScrollRef.current) {
+      topScrollRef.current.scrollLeft = e.target.scrollLeft;
+    }
+  };
 
   // Debug: log pending changes
   useEffect(() => {
@@ -818,19 +834,37 @@ export default function PlanejamentoPage() {
 
       {/* Tabela com scroll horizontal */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm border-collapse min-w-[1200px]">
+        {/* Barra de scroll superior sincronizada */}
+        <div
+          ref={topScrollRef}
+          className="overflow-x-scroll bg-gray-50 border-b border-gray-300"
+          style={{
+            overflowY: 'hidden',
+            scrollbarWidth: 'auto',
+            scrollbarColor: '#9ca3af #e5e7eb'
+          }}
+          onScroll={handleTopScroll}
+        >
+          <div style={{ height: '1px' }} className="w-[900px] md:w-[1200px]"></div>
+        </div>
+
+        <div
+          ref={scrollContainerRef}
+          className="overflow-x-auto"
+          onScroll={handleTableScroll}
+        >
+          <table className="w-full text-sm border-collapse min-w-[900px] md:min-w-[1200px]">
             <thead className="sticky top-0 z-10">
               <tr className="bg-gray-100 border-b-2 border-gray-300">
-                <th className="text-left p-2 sticky left-0 bg-gray-100 min-w-[220px] border-r border-gray-300">
+                <th className="text-left p-2 sticky left-0 bg-gray-100 min-w-[140px] md:min-w-[220px] border-r border-gray-300">
                   Descrição
                 </th>
                 {MESES.map(mes => (
-                  <th key={mes.key} className="text-right p-2 min-w-[75px] border-r border-gray-200">
+                  <th key={mes.key} className="text-right p-2 min-w-[65px] md:min-w-[75px] border-r border-gray-200">
                     {mes.label}
                   </th>
                 ))}
-                <th className="text-right p-2 min-w-[90px] bg-gray-200 font-bold">
+                <th className="text-right p-2 min-w-[80px] md:min-w-[90px] bg-gray-200 font-bold">
                   Total
                 </th>
               </tr>
