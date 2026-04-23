@@ -138,6 +138,7 @@ export const movimentacoesAPI = {
   create: (data) => api.post('/api/movimentacoes', data),
   update: (id, data) => api.put(`/api/movimentacoes/${id}`, data),
   delete: (id) => api.delete(`/api/movimentacoes/${id}`),
+  reorder: (items) => api.post('/api/movimentacoes/reorder', items),
 };
 
 // ============================================

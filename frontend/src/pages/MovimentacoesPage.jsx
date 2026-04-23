@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { movimentacoesAPI, planoContasAPI, contasAPI, invalidateCache } from '../services/api';
-import { Plus, Edit2, Trash2, X, Search, Filter } from 'lucide-react';
+import { Plus, Edit2, Trash2, X, Search, Filter, GripVertical } from 'lucide-react';
 
 export default function MovimentacoesPage() {
   const [movimentacoes, setMovimentacoes] = useState([]);
@@ -35,6 +35,10 @@ export default function MovimentacoesPage() {
     valor: '',
     valorFormatado: ''
   });
+
+  // Drag & Drop (reordenação manual)
+  const [dragState, setDragState] = useState({ dragId: null, overId: null });
+  const dragRef = useRef(null);
 
   useEffect(() => {
     carregarDados();
@@ -179,9 +183,90 @@ export default function MovimentacoesPage() {
     setFormData((prev) => ({ ...prev, valorFormatado: formatado }));
   };
 
+  // ============================================
+  // DRAG & DROP - Reordenar movimentações
+  // ============================================
+  const handleDragStart = (movId) => (e) => {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', movId);
+    dragRef.current = { dragId: movId };
+    setDragState({ dragId: movId, overId: null });
+  };
+
+  const handleDragOver = (movId) => (e) => {
+    e.preventDefault();
+    if (!dragRef.current || dragRef.current.dragId === movId) return;
+    e.dataTransfer.dropEffect = 'move';
+    setDragState((prev) => ({ ...prev, overId: movId }));
+  };
+
+  const handleDragEnd = () => {
+    setDragState({ dragId: null, overId: null });
+    dragRef.current = null;
+  };
+
+  const handleDrop = (targetId) => async (e) => {
+    e.preventDefault();
+    const ds = dragRef.current;
+    if (!ds || !targetId || ds.dragId === targetId) {
+      handleDragEnd();
+      return;
+    }
+
+    const list = [...movimentacoesFiltradas];
+    const dragIndex = list.findIndex((m) => m.id === ds.dragId);
+    const targetIndex = list.findIndex((m) => m.id === targetId);
+    if (dragIndex === -1 || targetIndex === -1) {
+      handleDragEnd();
+      return;
+    }
+
+    const [moved] = list.splice(dragIndex, 1);
+    list.splice(targetIndex, 0, moved);
+
+    const newPos = list.findIndex((m) => m.id === moved.id);
+    const prev = list[newPos - 1]; // vizinho acima (ordem MAIOR)
+    const next = list[newPos + 1]; // vizinho abaixo (ordem MENOR)
+
+    const SPACING = 1000000;
+    const prevOrdem = prev?.ordem != null ? Number(prev.ordem) : null;
+    const nextOrdem = next?.ordem != null ? Number(next.ordem) : null;
+
+    let novoOrdem;
+    if (prevOrdem != null && nextOrdem != null) {
+      novoOrdem = Math.floor((prevOrdem + nextOrdem) / 2);
+      if (novoOrdem === prevOrdem || novoOrdem === nextOrdem) novoOrdem = prevOrdem - 1;
+    } else if (prevOrdem != null) {
+      novoOrdem = prevOrdem - SPACING;
+    } else if (nextOrdem != null) {
+      novoOrdem = nextOrdem + SPACING;
+    } else {
+      novoOrdem = Date.now() * 1000;
+    }
+
+    // Atualizar estado local imediatamente
+    setMovimentacoes((prevMovs) =>
+      prevMovs
+        .map((m) => (m.id === moved.id ? { ...m, ordem: novoOrdem } : m))
+        .sort((a, b) => (Number(b.ordem) || 0) - (Number(a.ordem) || 0))
+    );
+
+    handleDragEnd();
+
+    // Persistir no backend
+    try {
+      await movimentacoesAPI.reorder([{ id: moved.id, ordem: novoOrdem }]);
+      invalidateCache('/api/movimentacoes');
+    } catch (err) {
+      console.error('Erro ao reordenar:', err);
+      alert('Erro ao salvar nova ordem. Recarregando...');
+      carregarDados(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     try {
       const data = {
         data: formData.data,
@@ -387,6 +472,7 @@ export default function MovimentacoesPage() {
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
+                <th className="w-8 px-2 py-4"></th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Data</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Tipo</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Item/Conta</th>
@@ -398,57 +484,73 @@ export default function MovimentacoesPage() {
             </thead>
             <tbody className="divide-y divide-gray-200">
               {movimentacoesFiltradas.length > 0 ? (
-                movimentacoesFiltradas.map((mov) => (
-                  <tr key={mov.id} className="hover:bg-gray-50 transition">
-                    <td className="px-6 py-4 text-sm text-gray-800">{formatDate(mov.data)}</td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${
-                          mov.tipo === 'entrada'
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-red-100 text-red-700'
-                        }`}
-                      >
-                        {mov.tipo === 'entrada' ? 'Entrada' : 'Saída'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-800">
-                      {mov.plano_contas?.nome || '-'}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{mov.complemento || '-'}</td>
-                    <td className="px-6 py-4 text-sm text-gray-800">
-                      {mov.contas_bancarias?.nome || '-'}
-                    </td>
-                    <td className={`px-6 py-4 text-sm font-semibold text-right ${
-                      mov.tipo === 'entrada' ? 'text-green-600' : 'text-red-600'
-                    }`}>
-                      {formatCurrency(mov.valor)}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex justify-center gap-2">
-                        <button
-                          onClick={() => handleEdit(mov)}
-                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                          title="Editar"
-                          data-testid={`edit-mov-${mov.id}`}
+                movimentacoesFiltradas.map((mov) => {
+                  const isDragging = dragState.dragId === mov.id;
+                  const isDragOver = dragState.overId === mov.id;
+                  return (
+                    <tr
+                      key={mov.id}
+                      draggable
+                      onDragStart={handleDragStart(mov.id)}
+                      onDragOver={handleDragOver(mov.id)}
+                      onDrop={handleDrop(mov.id)}
+                      onDragEnd={handleDragEnd}
+                      className={`group hover:bg-gray-50 transition ${isDragging ? 'opacity-30' : ''} ${isDragOver ? 'border-t-2 border-t-blue-500' : ''}`}
+                      data-testid={`mov-row-${mov.id}`}
+                    >
+                      <td className="w-8 px-2 py-4 text-center" style={{ cursor: 'grab' }} title="Arraste para reordenar">
+                        <GripVertical size={16} className="text-gray-300 group-hover:text-gray-500 inline-block" />
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-800">{formatDate(mov.data)}</td>
+                      <td className="px-6 py-4">
+                        <span
+                          className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${
+                            mov.tipo === 'entrada'
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-red-100 text-red-700'
+                          }`}
                         >
-                          <Edit2 size={18} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(mov.id)}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
-                          title="Excluir"
-                          data-testid={`delete-mov-${mov.id}`}
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                          {mov.tipo === 'entrada' ? 'Entrada' : 'Saída'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-800">
+                        {mov.plano_contas?.nome || '-'}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-600">{mov.complemento || '-'}</td>
+                      <td className="px-6 py-4 text-sm text-gray-800">
+                        {mov.contas_bancarias?.nome || '-'}
+                      </td>
+                      <td className={`px-6 py-4 text-sm font-semibold text-right ${
+                        mov.tipo === 'entrada' ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                        {formatCurrency(mov.valor)}
+                      </td>
+                      <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex justify-center gap-2">
+                          <button
+                            onClick={() => handleEdit(mov)}
+                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                            title="Editar"
+                            data-testid={`edit-mov-${mov.id}`}
+                          >
+                            <Edit2 size={18} />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(mov.id)}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
+                            title="Excluir"
+                            data-testid={`delete-mov-${mov.id}`}
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               ) : (
                 <tr>
-                  <td colSpan="7" className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan="8" className="px-6 py-12 text-center text-gray-500">
                     Nenhuma movimentação registrada
                   </td>
                 </tr>

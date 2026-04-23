@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional, List
 import uuid
+import time
 from datetime import datetime, timedelta
 from database import get_supabase
 from auth import hash_password, verify_password, create_access_token, decode_access_token
@@ -407,7 +408,15 @@ async def get_movimentacoes(
     
     # Paginação otimizada
     offset = (page - 1) * limit
-    result = query.order("data", desc=True).range(offset, offset + limit - 1).execute()
+    # Ordenar por "ordem" (reordenação manual) > data > created_at
+    result = (
+        query
+        .order("ordem", desc=True)
+        .order("data", desc=True)
+        .order("created_at", desc=True)
+        .range(offset, offset + limit - 1)
+        .execute()
+    )
     return result.data
 
 @app.post("/api/movimentacoes")
@@ -430,6 +439,7 @@ async def create_movimentacao(mov: MovimentacaoCreate, user_id: str = Depends(ge
         "complemento": mov.complemento,
         "conta_bancaria_id": mov.conta_bancaria_id,
         "valor": mov.valor,
+        "ordem": int(time.time() * 1_000_000),  # Novo registro sempre no topo
         "created_at": datetime.utcnow().isoformat()
     }
     
@@ -505,6 +515,19 @@ async def delete_movimentacao(mov_id: str, user_id: str = Depends(get_current_us
     
     supabase.table("movimentacoes").delete().eq("id", mov_id).execute()
     return {"message": "Movimentação excluída com sucesso"}
+
+@app.post("/api/movimentacoes/reorder")
+async def reorder_movimentacoes(items: List[ReorderItem], user_id: str = Depends(get_current_user)):
+    """Atualiza a ordem (posição) de movimentações arrastadas pelo usuário.
+    Cada item deve conter {id, ordem}. Apenas movimentações do próprio usuário são afetadas."""
+    supabase = get_supabase()
+    for item in items:
+        supabase.table("movimentacoes") \
+            .update({"ordem": int(item.ordem)}) \
+            .eq("id", item.id) \
+            .eq("user_id", user_id) \
+            .execute()
+    return {"message": "Ordem atualizada", "count": len(items)}
 
 # ============================================
 # ROTAS DE DASHBOARD
