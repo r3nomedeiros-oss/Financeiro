@@ -833,15 +833,14 @@ export default function PlanejamentoPage() {
       </div>
 
       {/* Tabela com scroll horizontal */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="bg-white rounded-lg shadow">
         {/* Barra de scroll superior sincronizada */}
         <div
           ref={topScrollRef}
-          className="overflow-x-scroll bg-gray-50 border-b border-gray-300"
+          className="planejamento-top-scroll overflow-x-scroll bg-gray-100 border-b border-gray-300"
           style={{
             overflowY: 'hidden',
-            scrollbarWidth: 'auto',
-            scrollbarColor: '#9ca3af #e5e7eb'
+            height: '14px'
           }}
           onScroll={handleTopScroll}
         >
