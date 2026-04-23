@@ -343,27 +343,48 @@ export default function MovimentacoesPage() {
         5: { halign: 'right' }
       },
       didParseCell: function (data) {
-        if (data.section === 'body' && data.column.index === 1) {
-          if (data.cell.raw === 'Entrada') data.cell.styles.textColor = [22, 163, 74];
-          else if (data.cell.raw === 'Saída') data.cell.styles.textColor = [220, 38, 38];
+        if (data.section === 'body') {
+          const tipo = body[data.row.index]?.[1];
+          // Coluna Tipo (índice 1) e Coluna Valor (índice 5) coloridas conforme entrada/saída
+          if (data.column.index === 1 || data.column.index === 5) {
+            if (tipo === 'Entrada') {
+              data.cell.styles.textColor = [22, 163, 74]; // verde
+              data.cell.styles.fontStyle = 'bold';
+            } else if (tipo === 'Saída') {
+              data.cell.styles.textColor = [220, 38, 38]; // vermelho
+              data.cell.styles.fontStyle = 'bold';
+            }
+          }
         }
       }
     });
 
     // Resumo ao final
     const finalY = doc.lastAutoTable?.finalY || 24;
+    const saldo = totalEntradas - totalSaidas;
     autoTable(doc, {
       startY: finalY + 4,
       body: [
         ['Total Entradas', formatCurrency(totalEntradas)],
         ['Total Saídas', formatCurrency(totalSaidas)],
-        ['Saldo do Período', formatCurrency(totalEntradas - totalSaidas)]
+        ['Saldo do Período', formatCurrency(saldo)]
       ],
       theme: 'grid',
       styles: { fontSize: 10, cellPadding: 3, fontStyle: 'bold' },
       columnStyles: {
         0: { fillColor: [243, 244, 246], cellWidth: 60 },
         1: { halign: 'right' }
+      },
+      didParseCell: function (data) {
+        if (data.column.index === 1 && data.section === 'body') {
+          if (data.row.index === 0) {
+            data.cell.styles.textColor = [22, 163, 74]; // verde
+          } else if (data.row.index === 1) {
+            data.cell.styles.textColor = [220, 38, 38]; // vermelho
+          } else if (data.row.index === 2) {
+            data.cell.styles.textColor = saldo >= 0 ? [22, 163, 74] : [220, 38, 38];
+          }
+        }
       },
       margin: { left: doc.internal.pageSize.width - 120 }
     });
