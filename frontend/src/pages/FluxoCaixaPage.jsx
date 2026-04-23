@@ -421,22 +421,22 @@ export default function FluxoCaixaPage() {
       </div>
 
       {/* Resumo Cards */}
-      <div className="grid grid-cols-4 gap-4">
-        <div className="bg-white rounded-lg shadow p-4">
-          <p className="text-sm text-gray-500">Saldo Inicial</p>
-          <p className="text-xl font-bold text-gray-800">{formatCurrency(getSaldoInicial())}</p>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
+        <div className="bg-white rounded-lg shadow p-3 md:p-4">
+          <p className="text-[11px] md:text-sm text-gray-500">Saldo Inicial</p>
+          <p className="text-sm md:text-xl font-bold text-gray-800 break-words">{formatCurrency(getSaldoInicial())}</p>
         </div>
-        <div className="bg-green-50 rounded-lg shadow p-4">
-          <p className="text-sm text-green-600">Total Entradas</p>
-          <p className="text-xl font-bold text-green-700">{formatCurrency(totais.entradas)}</p>
+        <div className="bg-green-50 rounded-lg shadow p-3 md:p-4">
+          <p className="text-[11px] md:text-sm text-green-600">Total Entradas</p>
+          <p className="text-sm md:text-xl font-bold text-green-700 break-words">{formatCurrency(totais.entradas)}</p>
         </div>
-        <div className="bg-red-50 rounded-lg shadow p-4">
-          <p className="text-sm text-red-600">Total Saídas</p>
-          <p className="text-xl font-bold text-red-700">{formatCurrency(totais.saidas)}</p>
+        <div className="bg-red-50 rounded-lg shadow p-3 md:p-4">
+          <p className="text-[11px] md:text-sm text-red-600">Total Saídas</p>
+          <p className="text-sm md:text-xl font-bold text-red-700 break-words">{formatCurrency(totais.saidas)}</p>
         </div>
-        <div className={`rounded-lg shadow p-4 ${saldoFinal >= 0 ? 'bg-blue-50' : 'bg-red-50'}`}>
-          <p className="text-sm text-gray-600">Saldo Final</p>
-          <p className={`text-xl font-bold ${saldoFinal >= 0 ? 'text-blue-700' : 'text-red-700'}`}>
+        <div className={`rounded-lg shadow p-3 md:p-4 ${saldoFinal >= 0 ? 'bg-blue-50' : 'bg-red-50'}`}>
+          <p className="text-[11px] md:text-sm text-gray-600">Saldo Final</p>
+          <p className={`text-sm md:text-xl font-bold break-words ${saldoFinal >= 0 ? 'text-blue-700' : 'text-red-700'}`}>
             {formatCurrency(saldoFinal)}
           </p>
         </div>

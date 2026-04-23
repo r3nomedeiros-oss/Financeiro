@@ -640,7 +640,7 @@ export default function DREPage() {
           }}
           onScroll={handleTopScroll}
         >
-          <div style={{ width: '1800px', height: '1px' }}></div>
+          <div style={{ height: '1px' }} className="w-[1180px] md:w-[1800px]"></div>
         </div>
         
         <div 
@@ -652,21 +652,21 @@ export default function DREPage() {
           }}
           onScroll={handleTableScroll}
         >
-          <table ref={tableRef} className="w-full text-sm border-collapse min-w-[1800px]" data-testid="dre-table">
+          <table ref={tableRef} className="w-full text-sm border-collapse min-w-[1180px] md:min-w-[1800px]" data-testid="dre-table">
           <thead>
             <tr className="bg-gray-100 border-b-2 border-gray-300">
-              <th className="text-left p-2 sticky left-0 bg-gray-100 min-w-[320px] border-r border-gray-300">
+              <th className="text-left p-2 sticky left-0 bg-gray-100 min-w-[160px] md:min-w-[320px] border-r border-gray-300">
                 Descrição
               </th>
               {meses.map((mes) => (
-                <th key={mes} className="text-right p-2 min-w-[85px] border-r border-gray-200">
+                <th key={mes} className="text-right p-2 min-w-[75px] md:min-w-[85px] border-r border-gray-200">
                   {MESES_LABELS[mes]}
                 </th>
               ))}
-              <th className="text-right p-2 min-w-[100px] bg-gray-200 border-r border-gray-300 font-bold">
+              <th className="text-right p-2 min-w-[90px] md:min-w-[100px] bg-gray-200 border-r border-gray-300 font-bold">
                 {ano}
               </th>
-              <th className="text-right p-2 min-w-[60px] bg-gray-200 font-bold">
+              <th className="text-right p-2 min-w-[55px] md:min-w-[60px] bg-gray-200 font-bold">
                 AV%
               </th>
             </tr>
