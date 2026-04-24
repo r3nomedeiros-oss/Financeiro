@@ -1,6 +1,7 @@
 import React, { useState, useEffect, lazy, Suspense, createContext, useContext, useCallback, useMemo } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Layout from './components/Layout';
+import InstallPWAButton from './components/InstallPWAButton';
 
 // Lazy load de páginas - carrega apenas quando necessário
 const LoginPage = lazy(() => import('./pages/LoginPage'));
@@ -194,6 +195,7 @@ function App() {
         <Layout user={user} onLogout={handleLogout}>
           <AppRoutes />
         </Layout>
+        <InstallPWAButton />
       </BrowserRouter>
     </CacheProvider>
   );
