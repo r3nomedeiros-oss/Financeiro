@@ -89,14 +89,20 @@ export default function PlanejamentoPage() {
 
   // Mantém a largura do spacer da barra superior igual à largura real do conteúdo da tabela
   useEffect(() => {
+    if (loading) return;
+
     const container = scrollContainerRef.current;
     if (!container) return;
 
     const updateWidth = () => {
-      setTableScrollWidth(container.scrollWidth);
+      const w = container.scrollWidth;
+      setTableScrollWidth(w);
     };
 
     updateWidth();
+    // Re-medir após layout estabilizar
+    const t1 = setTimeout(updateWidth, 100);
+    const t2 = setTimeout(updateWidth, 500);
 
     const ro = new ResizeObserver(updateWidth);
     ro.observe(container);
@@ -108,8 +114,10 @@ export default function PlanejamentoPage() {
     return () => {
       ro.disconnect();
       window.removeEventListener('resize', updateWidth);
+      clearTimeout(t1);
+      clearTimeout(t2);
     };
-  }, []);
+  }, [loading]);
 
   // Debug: log pending changes
   useEffect(() => {
