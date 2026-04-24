@@ -66,18 +66,50 @@ export default function PlanejamentoPage() {
   // Refs para sincronizar scroll horizontal entre barra superior e tabela
   const scrollContainerRef = useRef(null);
   const topScrollRef = useRef(null);
+  const isSyncingScroll = useRef(false);
+  const [tableScrollWidth, setTableScrollWidth] = useState(0);
 
   const handleTopScroll = (e) => {
+    if (isSyncingScroll.current) return;
     if (scrollContainerRef.current) {
+      isSyncingScroll.current = true;
       scrollContainerRef.current.scrollLeft = e.target.scrollLeft;
+      requestAnimationFrame(() => { isSyncingScroll.current = false; });
     }
   };
 
   const handleTableScroll = (e) => {
+    if (isSyncingScroll.current) return;
     if (topScrollRef.current) {
+      isSyncingScroll.current = true;
       topScrollRef.current.scrollLeft = e.target.scrollLeft;
+      requestAnimationFrame(() => { isSyncingScroll.current = false; });
     }
   };
+
+  // Mantém a largura do spacer da barra superior igual à largura real do conteúdo da tabela
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const updateWidth = () => {
+      setTableScrollWidth(container.scrollWidth);
+    };
+
+    updateWidth();
+
+    const ro = new ResizeObserver(updateWidth);
+    ro.observe(container);
+    if (container.firstElementChild) {
+      ro.observe(container.firstElementChild);
+    }
+
+    window.addEventListener('resize', updateWidth);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', updateWidth);
+    };
+  }, []);
 
   // Debug: log pending changes
   useEffect(() => {
@@ -837,14 +869,12 @@ export default function PlanejamentoPage() {
         {/* Barra de scroll superior sincronizada */}
         <div
           ref={topScrollRef}
-          className="planejamento-top-scroll overflow-x-scroll bg-gray-100 border-b border-gray-300"
-          style={{
-            overflowY: 'hidden',
-            height: '14px'
-          }}
+          data-testid="planejamento-top-scrollbar"
+          className="planejamento-top-scroll overflow-x-scroll overflow-y-hidden bg-gray-100 border-b border-gray-300"
+          style={{ height: '16px' }}
           onScroll={handleTopScroll}
         >
-          <div style={{ height: '1px' }} className="w-[900px] md:w-[1200px]"></div>
+          <div style={{ height: '1px', width: tableScrollWidth ? `${tableScrollWidth}px` : '100%' }}></div>
         </div>
 
         <div
