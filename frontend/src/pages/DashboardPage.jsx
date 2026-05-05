@@ -37,26 +37,40 @@ const formatCurrencyCompact = (value) => {
 };
 
 // Card memoizado para evitar re-renders - AJUSTADO para valores grandes
-const IndicatorCard = memo(({ title, value, percentage, icon: Icon, borderColor, bgColor, iconColor, percentColor }) => (
-  <div className={`bg-white rounded-xl shadow-md p-4 md:p-5 border-l-4 ${borderColor} min-h-[110px] md:min-h-[140px]`}>
-    <div className="flex justify-between items-start gap-2">
-      <div className="flex-1 min-w-0">
-        <p className="text-gray-600 text-xs md:text-sm font-medium truncate">{title}</p>
-        <p className={`text-2xl md:text-3xl font-bold mt-1.5 truncate ${value < 0 ? 'text-red-600' : 'text-gray-800'}`} title={formatCurrency(value)}>
-          {formatCurrency(value)}
-        </p>
-        {percentage !== undefined && (
-          <p className={`text-sm md:text-base font-semibold mt-1 ${percentColor}`}>
-            {percentage.toFixed(0)}%
+const IndicatorCard = memo(({ title, value, percentage, icon: Icon, borderColor, bgColor, iconColor, percentColor }) => {
+  const formatted = formatCurrency(value);
+  // Reduz tamanho da fonte para valores muito longos (>= 11 chars, ex.: "R$ 1.000.000")
+  const len = formatted.length;
+  let valueSize;
+  if (len <= 10) valueSize = 'text-2xl md:text-3xl';
+  else if (len <= 13) valueSize = 'text-xl md:text-2xl';
+  else if (len <= 16) valueSize = 'text-lg md:text-xl';
+  else valueSize = 'text-base md:text-lg';
+
+  return (
+    <div className={`bg-white rounded-xl shadow-md p-4 md:p-5 border-l-4 ${borderColor} min-h-[110px] md:min-h-[140px]`}>
+      <div className="flex justify-between items-start gap-2">
+        <div className="flex-1 min-w-0">
+          <p className="text-gray-600 text-xs md:text-sm font-medium truncate">{title}</p>
+          <p
+            className={`${valueSize} font-bold mt-1.5 whitespace-nowrap tabular-nums ${value < 0 ? 'text-red-600' : 'text-gray-800'}`}
+            title={formatted}
+          >
+            {formatted}
           </p>
-        )}
-      </div>
-      <div className={`${bgColor} p-2 md:p-2.5 rounded-lg flex-shrink-0`}>
-        <Icon className={iconColor} size={22} />
+          {percentage !== undefined && (
+            <p className={`text-sm md:text-base font-semibold mt-1 ${percentColor}`}>
+              {percentage.toFixed(0)}%
+            </p>
+          )}
+        </div>
+        <div className={`${bgColor} p-2 md:p-2.5 rounded-lg flex-shrink-0`}>
+          <Icon className={iconColor} size={22} />
+        </div>
       </div>
     </div>
-  </div>
-));
+  );
+});
 
 // Gráfico de barras memoizado
 const EntradasSaidasChart = memo(({ data }) => (
