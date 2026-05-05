@@ -140,8 +140,8 @@ export default function MovimentacoesPage() {
   //      "1234,56" -> R$ 1.234,56
   const handleValorChange = (e) => {
     let input = e.target.value;
-    // Aceita apenas dígitos, vírgula e ponto (ponto é convertido em vírgula)
-    input = input.replace(/[^\d,.]/g, '').replace(/\./g, ',');
+    // Mantém apenas dígitos e vírgula. Pontos são separadores de milhar (BR) → removidos.
+    input = input.replace(/[^\d,]/g, '');
 
     // Mantém apenas a primeira vírgula (se houver mais)
     const primeiraVirgula = input.indexOf(',');
