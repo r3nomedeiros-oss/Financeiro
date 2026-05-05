@@ -802,9 +802,9 @@ export default function MovimentacoesPage() {
       {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-0 md:p-4">
-          <div className="bg-white rounded-none md:rounded-xl shadow-2xl w-full h-full md:h-auto md:max-w-2xl md:max-h-[90vh] flex flex-col">
-            <div className="flex justify-between items-center p-4 md:p-6 border-b shrink-0">
-              <h2 className="text-xl md:text-2xl font-bold text-gray-800">
+          <div className="bg-white rounded-none md:rounded-xl shadow-2xl w-full h-full md:h-auto md:max-w-xl md:max-h-[90vh] flex flex-col">
+            <div className="flex justify-between items-center px-4 md:px-6 py-3 border-b shrink-0">
+              <h2 className="text-lg md:text-xl font-bold text-gray-800">
                 {editingId ? 'Editar Movimentação' : 'Nova Movimentação'}
               </h2>
               <button
@@ -814,14 +814,15 @@ export default function MovimentacoesPage() {
                 }}
                 className="text-gray-400 hover:text-gray-600 transition p-1"
               >
-                <X size={24} />
+                <X size={22} />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-4 md:p-6 space-y-4 overflow-y-auto flex-1">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+              <div className="px-4 md:px-6 py-3 space-y-3 overflow-y-auto flex-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     Data *
                   </label>
                   <input
@@ -829,12 +830,12 @@ export default function MovimentacoesPage() {
                     value={formData.data}
                     onChange={(e) => setFormData({ ...formData, data: e.target.value })}
                     required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     Tipo *
                   </label>
                   <select
@@ -844,7 +845,7 @@ export default function MovimentacoesPage() {
                       setBuscaItem('');
                     }}
                     required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     <option value="entrada">Entrada</option>
                     <option value="saida">Saída</option>
@@ -853,7 +854,7 @@ export default function MovimentacoesPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Item/Conta *
                 </label>
                 <div className="relative">
@@ -870,7 +871,7 @@ export default function MovimentacoesPage() {
                       }}
                       onFocus={() => setShowItemDropdown(true)}
                       placeholder="Digite para buscar..."
-                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full pl-10 pr-4 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       data-testid="item-conta-input"
                     />
                   </div>
@@ -918,68 +919,71 @@ export default function MovimentacoesPage() {
                 <input type="hidden" value={formData.plano_contas_id} required />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Conta Bancária *
-                </label>
-                <select
-                  value={formData.conta_bancaria_id}
-                  onChange={(e) => setFormData({ ...formData, conta_bancaria_id: e.target.value })}
-                  required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">Selecione...</option>
-                  {contas.map((conta) => (
-                    <option key={conta.id} value={conta.id}>
-                      {conta.nome}
-                    </option>
-                  ))}
-                </select>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Conta Bancária *
+                  </label>
+                  <select
+                    value={formData.conta_bancaria_id}
+                    onChange={(e) => setFormData({ ...formData, conta_bancaria_id: e.target.value })}
+                    required
+                    className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">Selecione...</option>
+                    {contas.map((conta) => (
+                      <option key={conta.id} value={conta.id}>
+                        {conta.nome}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Valor *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.valorFormatado}
+                    onChange={handleValorChange}
+                    onBlur={handleValorBlur}
+                    required
+                    className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base font-semibold"
+                    placeholder="R$ 0,00"
+                    data-testid="valor-input"
+                  />
+                </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Valor *
-                </label>
-                <input
-                  type="text"
-                  value={formData.valorFormatado}
-                  onChange={handleValorChange}
-                  onBlur={handleValorBlur}
-                  required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg font-semibold"
-                  placeholder="R$ 0,00"
-                  data-testid="valor-input"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Complemento
                 </label>
                 <textarea
                   value={formData.complemento}
                   onChange={(e) => setFormData({ ...formData, complemento: e.target.value })}
-                  rows="3"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  rows="2"
+                  className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Informações adicionais..."
                 ></textarea>
               </div>
+              </div>
 
-              <div className="flex gap-3 pt-4">
+              <div className="flex gap-3 px-4 md:px-6 py-3 border-t bg-gray-50 shrink-0">
                 <button
                   type="button"
                   onClick={() => {
                     setShowModal(false);
                     resetForm();
                   }}
-                  className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium"
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition font-medium"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
                   data-testid="salvar-movimentacao-btn"
                 >
                   Salvar
