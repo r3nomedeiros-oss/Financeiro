@@ -12,7 +12,8 @@ import {
   BarChart3,
   Settings,
   LogOut,
-  User
+  User,
+  Users
 } from 'lucide-react';
 
 // Itens principais (barra inferior)
@@ -24,16 +25,22 @@ const primaryItems = [
 ];
 
 // Itens secundários (gaveta "Mais")
-const secondaryItems = [
+const baseSecondaryItems = [
   { path: '/planejamento', icon: Target, label: 'Planejamento Orçamentário' },
   { path: '/comparativo', icon: GitCompare, label: 'Orçado x Realizado' },
   { path: '/relatorios', icon: BarChart3, label: 'Relatórios Comparativos' },
   { path: '/configuracoes', icon: Settings, label: 'Configurações' },
 ];
 
+const adminSecondaryItem = { path: '/usuarios', icon: Users, label: 'Usuários' };
+
 export default function MobileBottomNav({ user, onLogout }) {
   const location = useLocation();
   const [showDrawer, setShowDrawer] = useState(false);
+
+  const secondaryItems = user?.is_admin
+    ? [...baseSecondaryItems, adminSecondaryItem]
+    : baseSecondaryItems;
 
   const isActive = (path) => location.pathname === path;
   const isSecondaryActive = secondaryItems.some((i) => isActive(i.path));

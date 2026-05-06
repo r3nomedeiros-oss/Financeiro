@@ -2,6 +2,7 @@ import React, { useState, useEffect, lazy, Suspense, createContext, useContext, 
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Layout from './components/Layout';
 import InstallPWAButton from './components/InstallPWAButton';
+import { authAPI } from './services/api';
 
 // Lazy load de páginas - carrega apenas quando necessário
 const LoginPage = lazy(() => import('./pages/LoginPage'));
@@ -13,6 +14,7 @@ const PlanejamentoPage = lazy(() => import('./pages/PlanejamentoPage'));
 const ComparativoPage = lazy(() => import('./pages/ComparativoPage'));
 const RelatoriosPage = lazy(() => import('./pages/RelatoriosPage'));
 const ConfiguracoesPage = lazy(() => import('./pages/ConfiguracoesPage'));
+const UsuariosPage = lazy(() => import('./pages/UsuariosPage'));
 
 // Loading spinner compacto
 const PageLoader = () => (
@@ -135,6 +137,7 @@ function AppRoutes() {
         <Route path="/comparativo" element={<ComparativoPage />} />
         <Route path="/relatorios" element={<RelatoriosPage />} />
         <Route path="/configuracoes" element={<ConfiguracoesPage />} />
+        <Route path="/usuarios" element={<UsuariosPage />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </Suspense>
@@ -152,7 +155,20 @@ function App() {
     
     if (token && savedUser) {
       try {
-        setUser(JSON.parse(savedUser));
+        const parsed = JSON.parse(savedUser);
+        setUser(parsed);
+        // Sincroniza is_admin com servidor (usuários antigos podem não ter o campo)
+        authAPI
+          .getMe()
+          .then((res) => {
+            const fresh = res.data;
+            if (fresh && fresh.id) {
+              const merged = { ...parsed, ...fresh };
+              localStorage.setItem('user', JSON.stringify(merged));
+              setUser(merged);
+            }
+          })
+          .catch(() => {});
       } catch (error) {
         console.error('Erro ao carregar usuário:', error);
         localStorage.removeItem('token');

@@ -11,10 +11,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Wallet,
-  GitCompare
+  GitCompare,
+  Users
 } from 'lucide-react';
 
-const menuItems = [
+const baseMenuItems = [
   { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { path: '/movimentacoes', icon: ArrowLeftRight, label: 'Movimentação Financeira' },
   { path: '/dre', icon: FileText, label: 'Demonstrativo de Resultado' },
@@ -24,6 +25,8 @@ const menuItems = [
   { path: '/relatorios', icon: BarChart3, label: 'Relatórios Comparativos' },
   { path: '/configuracoes', icon: Settings, label: 'Configurações' },
 ];
+
+const adminMenuItem = { path: '/usuarios', icon: Users, label: 'Usuários', adminOnly: true };
 
 // Item de menu memoizado
 const MenuItem = memo(({ item, isActive, isMinimized }) => {
@@ -106,7 +109,7 @@ export default memo(function Sidebar({ user, onLogout }) {
 
       {/* Menu */}
       <nav className="flex-1 overflow-y-auto py-4">
-        {menuItems.map((item) => (
+        {baseMenuItems.map((item) => (
           <MenuItem 
             key={item.path}
             item={item}
@@ -114,6 +117,14 @@ export default memo(function Sidebar({ user, onLogout }) {
             isMinimized={isMinimized}
           />
         ))}
+        {user?.is_admin && (
+          <MenuItem
+            key={adminMenuItem.path}
+            item={adminMenuItem}
+            isActive={location.pathname === adminMenuItem.path}
+            isMinimized={isMinimized}
+          />
+        )}
       </nav>
 
       {/* Logout */}

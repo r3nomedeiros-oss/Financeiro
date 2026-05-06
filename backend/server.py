@@ -43,6 +43,21 @@ async def get_current_user(authorization: Optional[str] = Header(None)) -> str:
     
     return user_id
 
+
+def _is_user_admin(user_row: dict) -> bool:
+    """Lê o campo is_admin de forma resiliente (caso a coluna não exista ainda)."""
+    return bool(user_row.get("is_admin")) if user_row else False
+
+
+async def require_admin(user_id: str = Depends(get_current_user)) -> str:
+    supabase = get_supabase()
+    result = supabase.table("users").select("id, is_admin").eq("id", user_id).execute()
+    if not result.data:
+        raise HTTPException(status_code=401, detail="Usuário não encontrado")
+    if not _is_user_admin(result.data[0]):
+        raise HTTPException(status_code=403, detail="Acesso restrito a administradores")
+    return user_id
+
 # ============================================
 # ROTAS DE AUTENTICAÇÃO
 # ============================================
@@ -76,7 +91,7 @@ async def register(user: UserRegister):
     return {
         "access_token": token,
         "token_type": "bearer",
-        "user": {"id": user_id, "email": user.email, "nome": user.nome}
+        "user": {"id": user_id, "email": user.email, "nome": user.nome, "is_admin": False}
     }
 
 @app.post("/api/auth/login", response_model=Token)
@@ -102,7 +117,12 @@ async def login(credentials: UserLogin):
         return {
             "access_token": token,
             "token_type": "bearer",
-            "user": {"id": user["id"], "email": user["email"], "nome": user["nome"]}
+            "user": {
+                "id": user["id"],
+                "email": user["email"],
+                "nome": user["nome"],
+                "is_admin": _is_user_admin(user),
+            }
         }
     except HTTPException:
         raise
@@ -113,12 +133,83 @@ async def login(credentials: UserLogin):
 @app.get("/api/auth/me")
 async def get_me(user_id: str = Depends(get_current_user)):
     supabase = get_supabase()
-    result = supabase.table("users").select("id, email, nome").eq("id", user_id).execute()
+    result = supabase.table("users").select("id, email, nome, is_admin").eq("id", user_id).execute()
     
     if not result.data:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
     
-    return result.data[0]
+    user = result.data[0]
+    return {
+        "id": user["id"],
+        "email": user["email"],
+        "nome": user["nome"],
+        "is_admin": _is_user_admin(user),
+    }
+
+# ============================================
+# ROTAS DE GESTÃO DE USUÁRIOS (ADMIN)
+# ============================================
+
+@app.get("/api/users")
+async def list_users(admin_id: str = Depends(require_admin)):
+    supabase = get_supabase()
+    result = (
+        supabase.table("users")
+        .select("id, email, nome, is_admin, created_at")
+        .order("created_at", desc=False)
+        .execute()
+    )
+    return [
+        {
+            "id": u["id"],
+            "email": u["email"],
+            "nome": u["nome"],
+            "is_admin": _is_user_admin(u),
+            "created_at": u.get("created_at"),
+        }
+        for u in (result.data or [])
+    ]
+
+
+@app.delete("/api/users/{target_id}")
+async def delete_user(target_id: str, admin_id: str = Depends(require_admin)):
+    if target_id == admin_id:
+        raise HTTPException(status_code=400, detail="Você não pode excluir sua própria conta")
+    
+    supabase = get_supabase()
+    result = supabase.table("users").select("id, is_admin").eq("id", target_id).execute()
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    
+    # Apaga dados associados antes (para não violar FK eventual)
+    for tabela in [
+        "movimentacoes",
+        "planejamento",
+        "plano_contas",
+        "contas_bancarias",
+    ]:
+        try:
+            supabase.table(tabela).delete().eq("user_id", target_id).execute()
+        except Exception as e:
+            print(f"Aviso ao limpar {tabela} do user {target_id}: {e}")
+    
+    supabase.table("users").delete().eq("id", target_id).execute()
+    return {"success": True, "deleted_id": target_id}
+
+
+@app.patch("/api/users/{target_id}/admin")
+async def set_user_admin(target_id: str, payload: dict, admin_id: str = Depends(require_admin)):
+    is_admin = bool(payload.get("is_admin", False))
+    if target_id == admin_id and not is_admin:
+        raise HTTPException(status_code=400, detail="Você não pode remover seu próprio acesso de admin")
+    
+    supabase = get_supabase()
+    result = supabase.table("users").select("id").eq("id", target_id).execute()
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    
+    supabase.table("users").update({"is_admin": is_admin}).eq("id", target_id).execute()
+    return {"success": True, "id": target_id, "is_admin": is_admin}
 
 # ============================================
 # ROTAS DE CONTAS BANCÁRIAS

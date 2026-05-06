@@ -105,6 +105,16 @@ export const authAPI = {
 };
 
 // ============================================
+// USUÁRIOS (ADMIN)
+// ============================================
+
+export const usuariosAPI = {
+  getAll: () => api.get('/api/users', { cache: false }),
+  delete: (id) => api.delete(`/api/users/${id}`),
+  setAdmin: (id, is_admin) => api.patch(`/api/users/${id}/admin`, { is_admin }),
+};
+
+// ============================================
 // CONTAS BANCÁRIAS
 // ============================================
 
