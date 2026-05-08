@@ -21,6 +21,8 @@ export default function MovimentacoesPage() {
   );
   const [filtroTipo, setFiltroTipo] = useState('todos');
   const [filtroBusca, setFiltroBusca] = useState('');
+  const [filtroPlanoConta, setFiltroPlanoConta] = useState('todos');
+  const [filtroContaBancaria, setFiltroContaBancaria] = useState('todos');
   
   // Estado para busca do Item/Conta
   const [buscaItem, setBuscaItem] = useState('');
@@ -499,9 +501,11 @@ export default function MovimentacoesPage() {
     return new Date(dateString + 'T00:00:00').toLocaleDateString('pt-BR');
   };
 
-  // Filtragem local (tipo + busca por texto)
+  // Filtragem local (tipo + busca por texto + plano de contas + conta bancária)
   const movimentacoesFiltradas = movimentacoes.filter(mov => {
     if (filtroTipo !== 'todos' && mov.tipo !== filtroTipo) return false;
+    if (filtroPlanoConta !== 'todos' && mov.plano_contas_id !== filtroPlanoConta) return false;
+    if (filtroContaBancaria !== 'todos' && mov.conta_bancaria_id !== filtroContaBancaria) return false;
     if (filtroBusca) {
       const texto = filtroBusca.toLowerCase();
       const nome = (mov.plano_contas?.nome || '').toLowerCase();
@@ -511,6 +515,22 @@ export default function MovimentacoesPage() {
     }
     return true;
   });
+
+  // Lista flat de itens (nível 3) do plano de contas para o filtro
+  const itensPlanoContasFiltro = (() => {
+    const itens = [];
+    Object.entries(hierarquia).forEach(([catId, categoria]) => {
+      (categoria.subcategorias || []).forEach(subcat => {
+        (subcat.itens || []).forEach(item => {
+          itens.push({ id: item.id, nome: item.nome, subcategoria: subcat.nome });
+        });
+        if (!subcat.itens || subcat.itens.length === 0) {
+          itens.push({ id: subcat.id, nome: subcat.nome, subcategoria: '' });
+        }
+      });
+    });
+    return itens.sort((a, b) => a.nome.localeCompare(b.nome));
+  })();
 
   if (loading) {
     return (
@@ -597,6 +617,34 @@ export default function MovimentacoesPage() {
           <option value="todos">Todos os tipos</option>
           <option value="entrada">Entradas</option>
           <option value="saida">Saídas</option>
+        </select>
+
+        <select
+          value={filtroPlanoConta}
+          onChange={(e) => setFiltroPlanoConta(e.target.value)}
+          className="shrink-0 max-w-[200px] px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          data-testid="filtro-plano-conta"
+          title="Filtrar por Plano de Contas"
+        >
+          <option value="todos">Todos os planos</option>
+          {itensPlanoContasFiltro.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.subcategoria ? `${item.subcategoria} → ${item.nome}` : item.nome}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={filtroContaBancaria}
+          onChange={(e) => setFiltroContaBancaria(e.target.value)}
+          className="shrink-0 max-w-[180px] px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          data-testid="filtro-conta-bancaria"
+          title="Filtrar por Conta Bancária"
+        >
+          <option value="todos">Todas as contas</option>
+          {contas.map((c) => (
+            <option key={c.id} value={c.id}>{c.nome}</option>
+          ))}
         </select>
 
         <div className="flex-1 min-w-[160px] relative">
