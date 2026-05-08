@@ -605,11 +605,24 @@ export default function MovimentacoesPage() {
             type="text"
             value={filtroBusca}
             onChange={(e) => setFiltroBusca(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') carregarDados(true); }}
             placeholder="Buscar..."
             className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             data-testid="filtro-busca"
           />
         </div>
+
+        <button
+          type="button"
+          onClick={() => carregarDados(true)}
+          disabled={loading}
+          className="shrink-0 inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+          data-testid="filtro-buscar-btn"
+          title="Recarregar com os filtros atuais"
+        >
+          <Search size={16} />
+          Buscar
+        </button>
 
         <span className="text-xs text-gray-500 shrink-0 whitespace-nowrap">
           {movimentacoesFiltradas.length} de {movimentacoes.length} registros
