@@ -566,14 +566,14 @@ export default function MovimentacoesPage() {
 
       {/* Filtros */}
       <div className="bg-white rounded-xl shadow-md p-3 md:p-4 flex flex-col md:flex-row md:flex-wrap md:items-center gap-3" data-testid="filtros-movimentacoes">
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 shrink-0">
           <Filter size={18} className="text-gray-400 shrink-0" />
           <label className="text-sm text-gray-600">De:</label>
           <input
             type="date"
             value={filtroDataInicio}
             onChange={(e) => setFiltroDataInicio(e.target.value)}
-            className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-[150px] px-2 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             data-testid="filtro-data-inicio"
           />
           <label className="text-sm text-gray-600">Até:</label>
@@ -581,17 +581,17 @@ export default function MovimentacoesPage() {
             type="date"
             value={filtroDataFim}
             onChange={(e) => setFiltroDataFim(e.target.value)}
-            className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-[150px] px-2 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             data-testid="filtro-data-fim"
           />
         </div>
 
-        <div className="hidden md:block h-6 w-px bg-gray-200"></div>
+        <div className="hidden md:block h-6 w-px bg-gray-200 shrink-0"></div>
 
         <select
           value={filtroTipo}
           onChange={(e) => setFiltroTipo(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="shrink-0 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           data-testid="filtro-tipo"
         >
           <option value="todos">Todos os tipos</option>
@@ -599,7 +599,7 @@ export default function MovimentacoesPage() {
           <option value="saida">Saídas</option>
         </select>
 
-        <div className="flex-1 min-w-[180px] relative">
+        <div className="flex-1 min-w-[160px] relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
           <input
             type="text"
@@ -611,7 +611,7 @@ export default function MovimentacoesPage() {
           />
         </div>
 
-        <span className="text-xs text-gray-500">
+        <span className="text-xs text-gray-500 shrink-0 whitespace-nowrap">
           {movimentacoesFiltradas.length} de {movimentacoes.length} registros
         </span>
       </div>
