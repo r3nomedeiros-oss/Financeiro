@@ -711,8 +711,8 @@ async def get_dashboard_dados(
     
     # Card "Receita" mostra Receita Bruta (igual primeira linha do DRE)
     receita = receita_bruta
-    # Percentuais calculados sobre Receita Bruta (base do card "Receita")
-    base_pct = receita_bruta
+    # Percentuais calculados sobre Receita Líquida (padrão contábil)
+    base_pct = receita_liquida if receita_liquida > 0 else (receita_bruta if receita_bruta > 0 else 0)
     
     margem_contribuicao_pct = (margem_contribuicao / base_pct * 100) if base_pct > 0 else 0
     lucro_operacional_pct = (resultado_operacional / base_pct * 100) if base_pct > 0 else 0
@@ -884,8 +884,8 @@ async def get_dre_anual(ano: int, user_id: str = Depends(get_current_user)):
     # % Margem de Contribuição
     margem_contribuicao_pct = {}
     for m in meses:
-        margem_contribuicao_pct[m] = (margem_contribuicao[m] / receita_bruta[m] * 100) if receita_bruta[m] > 0 else 0
-    margem_contribuicao_pct["total"] = (margem_contribuicao["total"] / receita_bruta["total"] * 100) if receita_bruta["total"] > 0 else 0
+        margem_contribuicao_pct[m] = (margem_contribuicao[m] / receita_liquida[m] * 100) if receita_liquida[m] > 0 else 0
+    margem_contribuicao_pct["total"] = (margem_contribuicao["total"] / receita_liquida["total"] * 100) if receita_liquida["total"] > 0 else 0
     
     # Custos Fixos
     custos_fixos = calcular_grupo(["5", "6", "7", "16", "17", "18", "19", "20"], meses)
@@ -911,8 +911,8 @@ async def get_dre_anual(ano: int, user_id: str = Depends(get_current_user)):
     # % Margem Líquida
     margem_liquida_pct = {}
     for m in meses:
-        margem_liquida_pct[m] = (lucro_liquido[m] / receita_bruta[m] * 100) if receita_bruta[m] > 0 else 0
-    margem_liquida_pct["total"] = (lucro_liquido["total"] / receita_bruta["total"] * 100) if receita_bruta["total"] > 0 else 0
+        margem_liquida_pct[m] = (lucro_liquido[m] / receita_liquida[m] * 100) if receita_liquida[m] > 0 else 0
+    margem_liquida_pct["total"] = (lucro_liquido["total"] / receita_liquida["total"] * 100) if receita_liquida["total"] > 0 else 0
     
     return {
         "ano": ano,

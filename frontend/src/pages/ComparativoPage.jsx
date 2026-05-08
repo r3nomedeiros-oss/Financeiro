@@ -185,9 +185,13 @@ export default function ComparativoPage() {
   const margemContribuicaoOrcado = totaisReceitas.orcado - totaisDeducoes.orcado - totaisVariaveis.orcado;
   const margemContribuicaoRealizado = totaisReceitas.realizado - totaisDeducoes.realizado - totaisVariaveis.realizado;
 
-  // % Margem de Contribuição
-  const margemContribuicaoPctOrcado = totaisReceitas.orcado > 0 ? (margemContribuicaoOrcado / totaisReceitas.orcado) * 100 : 0;
-  const margemContribuicaoPctRealizado = totaisReceitas.realizado > 0 ? (margemContribuicaoRealizado / totaisReceitas.realizado) * 100 : 0;
+  // Receita Líquida (base para % - padrão contábil)
+  const receitaLiquidaOrcado = totaisReceitas.orcado - totaisDeducoes.orcado;
+  const receitaLiquidaRealizado = totaisReceitas.realizado - totaisDeducoes.realizado;
+
+  // % Margem de Contribuição (sobre Receita Líquida)
+  const margemContribuicaoPctOrcado = receitaLiquidaOrcado > 0 ? (margemContribuicaoOrcado / receitaLiquidaOrcado) * 100 : 0;
+  const margemContribuicaoPctRealizado = receitaLiquidaRealizado > 0 ? (margemContribuicaoRealizado / receitaLiquidaRealizado) * 100 : 0;
 
   // Despesas operacionais (NÃO inclui resultado_nao_operacional — ele entra depois como valor líquido)
   const totaisDespesas = useMemo(() => {

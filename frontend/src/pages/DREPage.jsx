@@ -435,7 +435,7 @@ export default function DREPage() {
 
   const meses = dre?.meses || [];
   const totais = dre?.totais || {};
-  const receitaBrutaTotal = totais?.receita_bruta?.total || 0;
+  const receitaBrutaTotal = totais?.receita_liquida?.total || 0;
 
   // Renderiza valores por linha
   const renderValoresLinha = (valores, isPercent = false, cor = '') => (
