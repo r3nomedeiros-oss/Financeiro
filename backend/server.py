@@ -711,7 +711,8 @@ async def get_dashboard_dados(
     
     # Card "Receita" mostra Receita Bruta (igual primeira linha do DRE)
     receita = receita_bruta
-    base_pct = receita_liquida if receita_liquida > 0 else (receita_bruta if receita_bruta > 0 else 0)
+    # Percentuais calculados sobre Receita Bruta (base do card "Receita")
+    base_pct = receita_bruta
     
     margem_contribuicao_pct = (margem_contribuicao / base_pct * 100) if base_pct > 0 else 0
     lucro_operacional_pct = (resultado_operacional / base_pct * 100) if base_pct > 0 else 0
