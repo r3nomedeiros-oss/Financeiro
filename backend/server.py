@@ -814,39 +814,38 @@ async def get_dre_anual(ano: int, user_id: str = Depends(get_current_user)):
         
         # Mapear para categoria DRE baseado no formato da categoria do plano
         plano_info = mov.get("plano_contas", {})
-        categoria_raw = plano_info.get("categoria", "")
+        categoria_raw = plano_info.get("categoria", "") or ""
         
+        cat_dre = ""
         if categoria_raw:
             partes = categoria_raw.split("|")
-            if len(partes) >= 2:
-                cat_dre = partes[0]  # Ex: "custos_fixos", "receita_bruta"
-                
-                # Somar no grupo correspondente
-                if cat_dre == "receita_bruta":
-                    dados_por_grupo["1"]["meses"][mes_nome] += valor
-                    dados_por_grupo["1"]["total"] += valor
-                elif cat_dre == "deducoes_vendas":
-                    if "imposto" in plano_info.get("nome", "").lower():
-                        dados_por_grupo["2"]["meses"][mes_nome] += valor
-                        dados_por_grupo["2"]["total"] += valor
-                    else:
-                        dados_por_grupo["3"]["meses"][mes_nome] += valor
-                        dados_por_grupo["3"]["total"] += valor
-                elif cat_dre == "custos_variaveis":
-                    dados_por_grupo["4"]["meses"][mes_nome] += valor
-                    dados_por_grupo["4"]["total"] += valor
-                elif cat_dre == "custos_fixos":
-                    dados_por_grupo["5"]["meses"][mes_nome] += valor
-                    dados_por_grupo["5"]["total"] += valor
-                elif cat_dre == "resultado_nao_operacional":
-                    if mov["tipo"] == "entrada":
-                        dados_por_grupo["9"]["meses"][mes_nome] += valor
-                        dados_por_grupo["9"]["total"] += valor
-                    else:
-                        dados_por_grupo["10"]["meses"][mes_nome] += valor
-                        dados_por_grupo["10"]["total"] += valor
+            cat_dre = partes[0] if partes and partes[0] else ""
+
+        if cat_dre == "receita_bruta":
+            dados_por_grupo["1"]["meses"][mes_nome] += valor
+            dados_por_grupo["1"]["total"] += valor
+        elif cat_dre == "deducoes_vendas":
+            if "imposto" in (plano_info.get("nome") or "").lower():
+                dados_por_grupo["2"]["meses"][mes_nome] += valor
+                dados_por_grupo["2"]["total"] += valor
+            else:
+                dados_por_grupo["3"]["meses"][mes_nome] += valor
+                dados_por_grupo["3"]["total"] += valor
+        elif cat_dre == "custos_variaveis":
+            dados_por_grupo["4"]["meses"][mes_nome] += valor
+            dados_por_grupo["4"]["total"] += valor
+        elif cat_dre == "custos_fixos":
+            dados_por_grupo["5"]["meses"][mes_nome] += valor
+            dados_por_grupo["5"]["total"] += valor
+        elif cat_dre == "resultado_nao_operacional":
+            if mov["tipo"] == "entrada":
+                dados_por_grupo["9"]["meses"][mes_nome] += valor
+                dados_por_grupo["9"]["total"] += valor
+            else:
+                dados_por_grupo["10"]["meses"][mes_nome] += valor
+                dados_por_grupo["10"]["total"] += valor
         else:
-            # Fallback se não tem categoria definida
+            # Fallback se categoria DRE não reconhecida: entrada → receita_bruta, saída → custos_variaveis
             if mov["tipo"] == "entrada":
                 dados_por_grupo["1"]["meses"][mes_nome] += valor
                 dados_por_grupo["1"]["total"] += valor
