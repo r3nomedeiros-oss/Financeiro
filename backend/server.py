@@ -666,19 +666,56 @@ async def get_dashboard_dados(
     # Buscar saldos das contas
     contas = supabase.table("contas_bancarias").select("*").eq("user_id", user_id).execute().data
     
-    # Calcular indicadores
-    receita = total_entradas
-    custos = total_saidas * 0.4  # Exemplo: 40% das saídas são custos
-    lucro_bruto = receita - custos
-    despesas = total_saidas * 0.6  # Exemplo: 60% das saídas são despesas
-    lucro_operacional = lucro_bruto - despesas
-    impostos = lucro_operacional * 0.15  # Exemplo: 15% de impostos
-    lucro_liquido = lucro_operacional - impostos
+    # ============================================
+    # Cálculo dos indicadores usando MESMA LÓGICA do DRE
+    # (categorias reais do plano de contas, não percentuais arbitrários)
+    # ============================================
+    receita_bruta = 0.0
+    deducoes = 0.0
+    custos_variaveis = 0.0
+    custos_fixos = 0.0
+    receitas_nao_op = 0.0
+    gastos_nao_op = 0.0
     
-    margem_contribuicao = lucro_bruto
-    margem_contribuicao_pct = (margem_contribuicao / receita * 100) if receita > 0 else 0
-    lucro_operacional_pct = (lucro_operacional / receita * 100) if receita > 0 else 0
-    lucro_liquido_pct = (lucro_liquido / receita * 100) if receita > 0 else 0
+    for mov in movimentacoes:
+        valor = mov["valor"]
+        plano_info = mov.get("plano_contas") or {}
+        categoria_raw = plano_info.get("categoria", "") or ""
+        cat_dre = categoria_raw.split("|")[0] if categoria_raw else ""
+        
+        if cat_dre == "receita_bruta":
+            receita_bruta += valor
+        elif cat_dre == "deducoes_vendas":
+            deducoes += valor
+        elif cat_dre == "custos_variaveis":
+            custos_variaveis += valor
+        elif cat_dre == "custos_fixos":
+            custos_fixos += valor
+        elif cat_dre == "resultado_nao_operacional":
+            if mov["tipo"] == "entrada":
+                receitas_nao_op += valor
+            else:
+                gastos_nao_op += valor
+        else:
+            # Fallback: sem categoria DRE -> entradas em receita bruta, saídas em custos variáveis
+            if mov["tipo"] == "entrada":
+                receita_bruta += valor
+            else:
+                custos_variaveis += valor
+    
+    receita_liquida = receita_bruta - deducoes
+    margem_contribuicao = receita_liquida - custos_variaveis
+    resultado_operacional = margem_contribuicao - custos_fixos
+    resultado_nao_operacional = receitas_nao_op - gastos_nao_op
+    lucro_liquido = resultado_operacional + resultado_nao_operacional
+    
+    # Card "Receita" mostra Receita Bruta (igual primeira linha do DRE)
+    receita = receita_bruta
+    base_pct = receita_liquida if receita_liquida > 0 else (receita_bruta if receita_bruta > 0 else 0)
+    
+    margem_contribuicao_pct = (margem_contribuicao / base_pct * 100) if base_pct > 0 else 0
+    lucro_operacional_pct = (resultado_operacional / base_pct * 100) if base_pct > 0 else 0
+    lucro_liquido_pct = (lucro_liquido / base_pct * 100) if base_pct > 0 else 0
     
     return {
         "total_entradas": total_entradas,
@@ -690,7 +727,7 @@ async def get_dashboard_dados(
             "receita": receita,
             "margem_contribuicao": margem_contribuicao,
             "margem_contribuicao_pct": margem_contribuicao_pct,
-            "lucro_operacional": lucro_operacional,
+            "lucro_operacional": resultado_operacional,
             "lucro_operacional_pct": lucro_operacional_pct,
             "lucro_liquido": lucro_liquido,
             "lucro_liquido_pct": lucro_liquido_pct
