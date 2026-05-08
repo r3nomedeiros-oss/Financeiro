@@ -2,6 +2,7 @@ import React, { useState, useEffect, lazy, Suspense, createContext, useContext, 
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Layout from './components/Layout';
 import InstallPWAButton from './components/InstallPWAButton';
+import ErrorBoundary from './components/ErrorBoundary';
 import { authAPI } from './services/api';
 
 // Lazy load de páginas - carrega apenas quando necessário
