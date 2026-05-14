@@ -457,11 +457,11 @@ export default function FluxoCaixaPage() {
         </div>
         <div className="bg-green-50 rounded-lg shadow p-3 md:p-4">
           <p className="text-[11px] md:text-sm text-green-600">Total Entradas</p>
-          <p className="text-sm md:text-xl font-bold text-green-700 break-words">{formatCurrency(totais.entradas)}</p>
+          <p className="text-sm md:text-xl font-bold text-green-700 break-words">{formatBalance(totais.entradas)}</p>
         </div>
         <div className="bg-red-50 rounded-lg shadow p-3 md:p-4">
           <p className="text-[11px] md:text-sm text-red-600">Total Saídas</p>
-          <p className="text-sm md:text-xl font-bold text-red-700 break-words">{formatCurrency(totais.saidas)}</p>
+          <p className="text-sm md:text-xl font-bold text-red-700 break-words">{formatBalance(totais.saidas)}</p>
         </div>
         <div className={`rounded-lg shadow p-3 md:p-4 ${saldoFinal >= 0 ? 'bg-blue-50' : 'bg-red-50'}`}>
           <p className="text-[11px] md:text-sm text-gray-600">Saldo Final</p>
