@@ -677,6 +677,60 @@ export default function MovimentacoesPage() {
         </span>
       </div>
 
+      {/* Resumo do período filtrado */}
+      {(() => {
+        const totalEntradas = movimentacoesFiltradas
+          .filter((m) => m.tipo === 'entrada')
+          .reduce((acc, m) => acc + (Number(m.valor) || 0), 0);
+        const totalSaidas = movimentacoesFiltradas
+          .filter((m) => m.tipo === 'saida')
+          .reduce((acc, m) => acc + (Number(m.valor) || 0), 0);
+        const saldo = totalEntradas - totalSaidas;
+        return (
+          <div className="grid grid-cols-3 gap-2 md:gap-4" data-testid="movimentacoes-resumo">
+            <div className="bg-green-50 rounded-lg shadow p-3 md:p-4 border border-green-100">
+              <p className="text-[11px] md:text-sm text-green-700 font-medium">Total Entradas</p>
+              <p
+                className="text-sm md:text-xl font-bold text-green-700 break-words"
+                data-testid="resumo-entradas"
+              >
+                {formatCurrency(totalEntradas)}
+              </p>
+            </div>
+            <div className="bg-red-50 rounded-lg shadow p-3 md:p-4 border border-red-100">
+              <p className="text-[11px] md:text-sm text-red-700 font-medium">Total Saídas</p>
+              <p
+                className="text-sm md:text-xl font-bold text-red-700 break-words"
+                data-testid="resumo-saidas"
+              >
+                {formatCurrency(totalSaidas)}
+              </p>
+            </div>
+            <div
+              className={`rounded-lg shadow p-3 md:p-4 border ${
+                saldo >= 0 ? 'bg-blue-50 border-blue-100' : 'bg-red-50 border-red-100'
+              }`}
+            >
+              <p
+                className={`text-[11px] md:text-sm font-medium ${
+                  saldo >= 0 ? 'text-blue-700' : 'text-red-700'
+                }`}
+              >
+                Saldo do Período
+              </p>
+              <p
+                className={`text-sm md:text-xl font-bold break-words ${
+                  saldo >= 0 ? 'text-blue-700' : 'text-red-700'
+                }`}
+                data-testid="resumo-saldo"
+              >
+                {formatCurrency(saldo)}
+              </p>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Tabela (desktop) */}
       <div className="hidden md:block bg-white rounded-xl shadow-md overflow-hidden">
         <div className="overflow-x-auto">
