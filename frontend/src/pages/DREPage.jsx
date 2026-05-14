@@ -36,6 +36,11 @@ const MESES_LABELS = {
   dezembro: "Dez"
 };
 
+const MES_TO_NUM = {
+  janeiro: 1, fevereiro: 2, marco: 3, abril: 4, maio: 5, junho: 6,
+  julho: 7, agosto: 8, setembro: 9, outubro: 10, novembro: 11, dezembro: 12
+};
+
 // Estrutura de categorias fixas do DRE com cores para PDF
 const CATEGORIAS_CONFIG = {
   receita_bruta: { label: "(+) Receita Bruta", cor: "cyan", tipo: "positivo", rgbHeader: [224, 247, 250], rgbText: [6, 148, 162] },
@@ -63,6 +68,40 @@ export default function DREPage() {
   
   // Estado de expansão
   const [expandedState, setExpandedState] = useState({});
+
+  // Drilldown de Movimentações ao clicar em valor de item
+  const [drilldown, setDrilldown] = useState({
+    open: false,
+    item: null,
+    mesNome: null, // 'janeiro' ... 'dezembro' ou 'total'
+    movs: [],
+    loadingMovs: false,
+  });
+
+  const abrirDrilldown = async (item, mesNome) => {
+    setDrilldown({ open: true, item, mesNome, movs: [], loadingMovs: true });
+    try {
+      let params;
+      if (mesNome === 'total') {
+        params = { data_inicio: `${ano}-01-01`, data_fim: `${ano}-12-31` };
+      } else {
+        const mesNum = MES_TO_NUM[mesNome];
+        const ultimoDia = new Date(ano, mesNum, 0).getDate();
+        params = {
+          data_inicio: `${ano}-${String(mesNum).padStart(2, '0')}-01`,
+          data_fim: `${ano}-${String(mesNum).padStart(2, '0')}-${String(ultimoDia).padStart(2, '0')}`,
+        };
+      }
+      const res = await movimentacoesAPI.getAll(params);
+      const filtradas = (res.data || []).filter((m) => m.plano_contas_id === item.id);
+      setDrilldown((prev) => ({ ...prev, movs: filtradas, loadingMovs: false }));
+    } catch (e) {
+      console.error('Erro ao buscar movimentações do drilldown:', e);
+      setDrilldown((prev) => ({ ...prev, loadingMovs: false }));
+    }
+  };
+
+  const fecharDrilldown = () => setDrilldown({ open: false, item: null, mesNome: null, movs: [], loadingMovs: false });
 
   useEffect(() => {
     carregarAnosDisponiveis();
@@ -551,14 +590,37 @@ export default function DREPage() {
                   <td className="p-2 pl-14 sticky left-0 bg-white hover:bg-gray-50 border-r border-gray-300 text-gray-600 text-sm whitespace-nowrap">
                     • {item.nome}
                   </td>
-                  {meses.map((mes) => (
-                    <td key={mes} className="text-right p-2 border-r border-gray-200 text-gray-600 text-sm">
-                      {formatCurrency(dre?.valores_por_plano?.[item.id]?.[mes] || 0)}
-                    </td>
-                  ))}
-                  <td className="text-right p-2 bg-gray-50 border-r border-gray-300 text-gray-600 text-sm">
-                    {formatCurrency(meses.reduce((a, m) => a + (dre?.valores_por_plano?.[item.id]?.[m] || 0), 0))}
-                  </td>
+                  {meses.map((mes) => {
+                    const valor = dre?.valores_por_plano?.[item.id]?.[mes] || 0;
+                    const clicavel = valor !== 0;
+                    return (
+                      <td
+                        key={mes}
+                        onClick={clicavel ? () => abrirDrilldown(item, mes) : undefined}
+                        className={`text-right p-2 border-r border-gray-200 text-gray-600 text-sm ${
+                          clicavel ? 'cursor-pointer hover:bg-blue-50 hover:text-blue-700 hover:underline' : ''
+                        }`}
+                        title={clicavel ? `Ver lançamentos de ${item.nome} em ${MESES_LABELS[mes]}/${ano}` : undefined}
+                      >
+                        {formatCurrency(valor)}
+                      </td>
+                    );
+                  })}
+                  {(() => {
+                    const totalItem = meses.reduce((a, m) => a + (dre?.valores_por_plano?.[item.id]?.[m] || 0), 0);
+                    const clicavel = totalItem !== 0;
+                    return (
+                      <td
+                        onClick={clicavel ? () => abrirDrilldown(item, 'total') : undefined}
+                        className={`text-right p-2 bg-gray-50 border-r border-gray-300 text-gray-600 text-sm ${
+                          clicavel ? 'cursor-pointer hover:bg-blue-100 hover:text-blue-700 hover:underline font-semibold' : ''
+                        }`}
+                        title={clicavel ? `Ver lançamentos de ${item.nome} no ano de ${ano}` : undefined}
+                      >
+                        {formatCurrency(totalItem)}
+                      </td>
+                    );
+                  })()}
                   <td className="text-right p-2 bg-gray-50 text-gray-600 text-sm">
                     {calcularAV(meses.reduce((a, m) => a + (dre?.valores_por_plano?.[item.id]?.[m] || 0), 0), receitaBrutaTotal)}
                   </td>
@@ -735,6 +797,112 @@ export default function DREPage() {
           </div>
         </div>
       </div>
+
+      {/* Modal de Drilldown - Lançamentos do plano */}
+      {drilldown.open && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3"
+          onClick={fecharDrilldown}
+          data-testid="dre-drilldown-modal"
+        >
+          <div
+            className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-start justify-between gap-3 p-4 border-b border-gray-200">
+              <div>
+                <h3 className="text-lg font-bold text-gray-800">
+                  Lançamentos — {drilldown.item?.nome}
+                </h3>
+                <p className="text-sm text-gray-500">
+                  {drilldown.mesNome === 'total'
+                    ? `Ano de ${ano}`
+                    : `${MESES_LABELS[drilldown.mesNome]}/${ano}`}
+                </p>
+              </div>
+              <button
+                onClick={fecharDrilldown}
+                className="text-gray-400 hover:text-gray-700 text-2xl leading-none px-2"
+                title="Fechar"
+                data-testid="dre-drilldown-close"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Conteúdo */}
+            <div className="flex-1 overflow-auto p-4">
+              {drilldown.loadingMovs ? (
+                <div className="text-center py-10 text-gray-500">Carregando lançamentos...</div>
+              ) : drilldown.movs.length === 0 ? (
+                <div className="text-center py-10 text-gray-500">
+                  Nenhum lançamento encontrado para este plano no período.
+                </div>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 sticky top-0">
+                    <tr>
+                      <th className="text-left p-2 font-semibold text-gray-700">Data</th>
+                      <th className="text-left p-2 font-semibold text-gray-700">Tipo</th>
+                      <th className="text-left p-2 font-semibold text-gray-700">Complemento</th>
+                      <th className="text-left p-2 font-semibold text-gray-700">Banco</th>
+                      <th className="text-right p-2 font-semibold text-gray-700">Valor</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {drilldown.movs.map((m) => (
+                      <tr key={m.id} className="border-t border-gray-100 hover:bg-gray-50">
+                        <td className="p-2 whitespace-nowrap">
+                          {new Date(m.data + 'T00:00:00').toLocaleDateString('pt-BR')}
+                        </td>
+                        <td className="p-2">
+                          <span
+                            className={`text-xs px-2 py-0.5 rounded-full ${
+                              m.tipo === 'entrada'
+                                ? 'bg-green-100 text-green-700'
+                                : 'bg-red-100 text-red-700'
+                            }`}
+                          >
+                            {m.tipo === 'entrada' ? 'Entrada' : 'Saída'}
+                          </span>
+                        </td>
+                        <td className="p-2 text-gray-600">{m.complemento || '-'}</td>
+                        <td className="p-2 text-gray-600">{m.contas_bancarias?.nome || '-'}</td>
+                        <td
+                          className={`p-2 text-right font-medium whitespace-nowrap ${
+                            m.tipo === 'entrada' ? 'text-green-700' : 'text-red-700'
+                          }`}
+                        >
+                          {formatCurrency(m.valor)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot className="bg-gray-50 sticky bottom-0 border-t-2 border-gray-300">
+                    <tr>
+                      <td colSpan={4} className="p-2 font-bold text-right">Total ({drilldown.movs.length} lançamentos):</td>
+                      <td className="p-2 text-right font-bold whitespace-nowrap">
+                        {formatCurrency(drilldown.movs.reduce((a, m) => a + (m.valor || 0), 0))}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-3 border-t border-gray-200 flex justify-end">
+              <button
+                onClick={fecharDrilldown}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium text-gray-700"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
