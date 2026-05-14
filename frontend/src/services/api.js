@@ -144,7 +144,7 @@ export const planoContasAPI = {
 // ============================================
 
 export const movimentacoesAPI = {
-  getAll: (params) => api.get('/api/movimentacoes', { params }),
+  getAll: (params) => api.get('/api/movimentacoes', { params: { limit: 100000, ...params } }),
   create: (data) => api.post('/api/movimentacoes', data),
   update: (id, data) => api.put(`/api/movimentacoes/${id}`, data),
   delete: (id) => api.delete(`/api/movimentacoes/${id}`),

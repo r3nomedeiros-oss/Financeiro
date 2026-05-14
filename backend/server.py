@@ -472,43 +472,42 @@ async def get_movimentacoes(
     data_inicio: Optional[str] = None,
     data_fim: Optional[str] = None,
     page: Optional[int] = 1,
-    limit: Optional[int] = 100,
+    limit: Optional[int] = 100000,
     user_id: str = Depends(get_current_user)
 ):
     supabase = get_supabase()
-    query = supabase.table("movimentacoes").select("*, plano_contas(*), contas_bancarias:conta_bancaria_id(*)").eq("user_id", user_id)
     
-    # Filtro por data_inicio e data_fim (prioridade)
-    if data_inicio and data_fim:
-        query = query.gte("data", data_inicio).lte("data", data_fim)
-    elif data_inicio:
-        query = query.gte("data", data_inicio)
-    elif data_fim:
-        query = query.lte("data", data_fim)
-    # Fallback para filtro por mês e ano
-    elif mes and ano:
-        data_inicio_calc = f"{ano}-{mes:02d}-01"
-        if mes == 12:
-            data_fim_calc = f"{ano + 1}-01-01"
-        else:
-            data_fim_calc = f"{ano}-{mes + 1:02d}-01"
-        
-        query = query.gte("data", data_inicio_calc).lt("data", data_fim_calc)
-    elif ano:
-        query = query.gte("data", f"{ano}-01-01").lt("data", f"{ano + 1}-01-01")
+    def build_query():
+        q = supabase.table("movimentacoes").select("*, plano_contas(*), contas_bancarias:conta_bancaria_id(*)").eq("user_id", user_id)
+        if data_inicio and data_fim:
+            q = q.gte("data", data_inicio).lte("data", data_fim)
+        elif data_inicio:
+            q = q.gte("data", data_inicio)
+        elif data_fim:
+            q = q.lte("data", data_fim)
+        elif mes and ano:
+            di = f"{ano}-{mes:02d}-01"
+            df = f"{ano + 1}-01-01" if mes == 12 else f"{ano}-{mes + 1:02d}-01"
+            q = q.gte("data", di).lt("data", df)
+        elif ano:
+            q = q.gte("data", f"{ano}-01-01").lt("data", f"{ano + 1}-01-01")
+        return q.order("ordem", desc=True).order("data", desc=True).order("created_at", desc=True)
     
-    # Paginação otimizada
-    offset = (page - 1) * limit
-    # Ordenar por "ordem" (reordenação manual) > data > created_at
-    result = (
-        query
-        .order("ordem", desc=True)
-        .order("data", desc=True)
-        .order("created_at", desc=True)
-        .range(offset, offset + limit - 1)
-        .execute()
-    )
-    return result.data
+    # Paginar internamente porque o Supabase trunca em 1000 registros por chamada
+    PAGE_SIZE = 1000
+    offset_inicial = (page - 1) * limit
+    all_data = []
+    fetched = 0
+    while fetched < limit:
+        start = offset_inicial + fetched
+        end = start + min(PAGE_SIZE, limit - fetched) - 1
+        result = build_query().range(start, end).execute()
+        batch = result.data or []
+        all_data.extend(batch)
+        fetched += len(batch)
+        if len(batch) < PAGE_SIZE:
+            break
+    return all_data
 
 @app.post("/api/movimentacoes")
 async def create_movimentacao(mov: MovimentacaoCreate, user_id: str = Depends(get_current_user)):
