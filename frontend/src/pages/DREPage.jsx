@@ -840,14 +840,14 @@ export default function DREPage() {
                   Nenhum lançamento encontrado para este plano no período.
                 </div>
               ) : (
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50 sticky top-0">
+                <table className="w-full text-sm border-separate border-spacing-0">
+                  <thead>
                     <tr>
-                      <th className="text-left p-2 font-semibold text-gray-700">Data</th>
-                      <th className="text-left p-2 font-semibold text-gray-700">Tipo</th>
-                      <th className="text-left p-2 font-semibold text-gray-700">Complemento</th>
-                      <th className="text-left p-2 font-semibold text-gray-700">Banco</th>
-                      <th className="text-right p-2 font-semibold text-gray-700">Valor</th>
+                      <th className="text-left p-2 font-semibold text-gray-700 bg-gray-100 sticky top-0 z-10 border-b border-gray-300">Data</th>
+                      <th className="text-left p-2 font-semibold text-gray-700 bg-gray-100 sticky top-0 z-10 border-b border-gray-300">Tipo</th>
+                      <th className="text-left p-2 font-semibold text-gray-700 bg-gray-100 sticky top-0 z-10 border-b border-gray-300">Complemento</th>
+                      <th className="text-left p-2 font-semibold text-gray-700 bg-gray-100 sticky top-0 z-10 border-b border-gray-300">Banco</th>
+                      <th className="text-right p-2 font-semibold text-gray-700 bg-gray-100 sticky top-0 z-10 border-b border-gray-300">Valor</th>
                     </tr>
                   </thead>
                   <tbody>
