@@ -832,7 +832,7 @@ export default function DREPage() {
             </div>
 
             {/* Conteúdo */}
-            <div className="flex-1 overflow-auto p-4">
+            <div className="flex-1 overflow-auto">
               {drilldown.loadingMovs ? (
                 <div className="text-center py-10 text-gray-500">Carregando lançamentos...</div>
               ) : drilldown.movs.length === 0 ? (
