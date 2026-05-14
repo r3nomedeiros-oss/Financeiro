@@ -879,7 +879,7 @@ export default function DREPage() {
                       </tr>
                     ))}
                   </tbody>
-                  <tfoot className="bg-gray-50 sticky bottom-0 border-t-2 border-gray-300">
+                  <tfoot className="bg-gray-100 border-t-2 border-gray-300">
                     <tr>
                       <td colSpan={4} className="p-2 font-bold text-right">Total ({drilldown.movs.length} lançamentos):</td>
                       <td className="p-2 text-right font-bold whitespace-nowrap">
