@@ -640,7 +640,7 @@ export default function DREPage() {
           }}
           onScroll={handleTopScroll}
         >
-          <div style={{ height: '1px' }} className="w-[1100px] md:w-[1700px]"></div>
+          <div style={{ height: '1px' }} className="w-[1000px] md:w-[1500px]"></div>
         </div>
         
         <div 
@@ -652,10 +652,10 @@ export default function DREPage() {
           }}
           onScroll={handleTableScroll}
         >
-          <table ref={tableRef} className="w-full text-sm border-collapse min-w-[1100px] md:min-w-[1700px]" data-testid="dre-table">
+          <table ref={tableRef} className="w-full text-sm border-collapse min-w-[1000px] md:min-w-[1500px]" data-testid="dre-table">
           <thead>
             <tr className="bg-gray-100 border-b-2 border-gray-300">
-              <th className="text-left p-2 sticky left-0 bg-gray-100 min-w-[140px] md:min-w-[220px] border-r border-gray-300 whitespace-nowrap">
+              <th className="text-left p-2 sticky left-0 bg-gray-100 border-r border-gray-300 whitespace-nowrap">
                 Descrição
               </th>
               {meses.map((mes) => (
