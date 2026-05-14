@@ -594,36 +594,35 @@ export default function MovimentacoesPage() {
         </div>
       </div>
 
-      {/* Filtros - Layout fixo: linha 1 (filtros) + linha 2 (busca livre) */}
+      {/* Filtros - Layout fixo: sub-linha de datas + sub-linha de selects + linha de busca */}
       <div className="bg-white rounded-xl shadow-md p-3 md:p-4 space-y-3" data-testid="filtros-movimentacoes">
-        {/* Linha 1: Datas + Tipo + Plano de Contas + Conta Bancária */}
-        <div className="flex flex-col md:flex-row md:flex-wrap md:items-center gap-3">
-          <div className="flex items-center gap-2 shrink-0">
-            <Filter size={18} className="text-gray-400 shrink-0" />
-            <label className="text-sm text-gray-600">De:</label>
-            <input
-              type="date"
-              value={filtroDataInicio}
-              onChange={(e) => setFiltroDataInicio(e.target.value)}
-              className="w-[150px] px-2 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              data-testid="filtro-data-inicio"
-            />
-            <label className="text-sm text-gray-600">Até:</label>
-            <input
-              type="date"
-              value={filtroDataFim}
-              onChange={(e) => setFiltroDataFim(e.target.value)}
-              className="w-[150px] px-2 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              data-testid="filtro-data-fim"
-            />
-          </div>
+        {/* Sub-linha A: Datas (sempre sozinhas) */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <Filter size={18} className="text-gray-400 shrink-0" />
+          <label className="text-sm text-gray-600">De:</label>
+          <input
+            type="date"
+            value={filtroDataInicio}
+            onChange={(e) => setFiltroDataInicio(e.target.value)}
+            className="w-[150px] px-2 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            data-testid="filtro-data-inicio"
+          />
+          <label className="text-sm text-gray-600">Até:</label>
+          <input
+            type="date"
+            value={filtroDataFim}
+            onChange={(e) => setFiltroDataFim(e.target.value)}
+            className="w-[150px] px-2 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            data-testid="filtro-data-fim"
+          />
+        </div>
 
-          <div className="hidden md:block h-6 w-px bg-gray-200 shrink-0"></div>
-
+        {/* Sub-linha B: Tipo + Plano de Contas + Conta Bancária (sempre juntos) */}
+        <div className="flex flex-col md:flex-row md:items-center gap-3">
           <select
             value={filtroTipo}
             onChange={(e) => setFiltroTipo(e.target.value)}
-            className="shrink-0 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="shrink-0 w-full md:w-[180px] px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             data-testid="filtro-tipo"
           >
             <option value="todos">Todos os tipos</option>
@@ -632,7 +631,7 @@ export default function MovimentacoesPage() {
           </select>
 
           {/* Combobox com busca - filtro de Plano de Contas */}
-          <div className="relative w-full md:w-[260px] shrink-0">
+          <div className="relative w-full md:w-[300px] shrink-0">
             <input
               ref={filtroPlanoInputRef}
               type="text"
@@ -727,7 +726,7 @@ export default function MovimentacoesPage() {
           <select
             value={filtroContaBancaria}
             onChange={(e) => setFiltroContaBancaria(e.target.value)}
-            className="shrink-0 max-w-[180px] px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="shrink-0 w-full md:w-[200px] px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             data-testid="filtro-conta-bancaria"
             title="Filtrar por Conta Bancária"
           >
@@ -738,7 +737,7 @@ export default function MovimentacoesPage() {
           </select>
         </div>
 
-        {/* Linha 2: Busca livre + Botão + Contador (SEMPRE na segunda linha) */}
+        {/* Linha de busca livre + Botão + Contador */}
         <div className="flex flex-col md:flex-row md:items-center gap-3">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
