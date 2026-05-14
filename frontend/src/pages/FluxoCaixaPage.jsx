@@ -66,6 +66,16 @@ export default function FluxoCaixaPage() {
     }).format(value);
   };
 
+  // Formatador específico para SALDO - sempre com centavos
+  const formatBalance = (value) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(value || 0);
+  };
+
   const getSaldoInicial = () => {
     if (contaSelecionada === 'todas') {
       return contas.reduce((acc, conta) => acc + (conta.saldo_inicial || 0), 0);
@@ -443,7 +453,7 @@ export default function FluxoCaixaPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
         <div className="bg-white rounded-lg shadow p-3 md:p-4">
           <p className="text-[11px] md:text-sm text-gray-500">Saldo Inicial</p>
-          <p className="text-sm md:text-xl font-bold text-gray-800 break-words">{formatCurrency(getSaldoInicialPeriodo())}</p>
+          <p className="text-sm md:text-xl font-bold text-gray-800 break-words">{formatBalance(getSaldoInicialPeriodo())}</p>
         </div>
         <div className="bg-green-50 rounded-lg shadow p-3 md:p-4">
           <p className="text-[11px] md:text-sm text-green-600">Total Entradas</p>
@@ -456,7 +466,7 @@ export default function FluxoCaixaPage() {
         <div className={`rounded-lg shadow p-3 md:p-4 ${saldoFinal >= 0 ? 'bg-blue-50' : 'bg-red-50'}`}>
           <p className="text-[11px] md:text-sm text-gray-600">Saldo Final</p>
           <p className={`text-sm md:text-xl font-bold break-words ${saldoFinal >= 0 ? 'text-blue-700' : 'text-red-700'}`}>
-            {formatCurrency(saldoFinal)}
+            {formatBalance(saldoFinal)}
           </p>
         </div>
       </div>
@@ -490,7 +500,7 @@ export default function FluxoCaixaPage() {
                       {sem.saidas > 0 ? formatCurrency(sem.saidas) : '-'}
                     </td>
                     <td className={`p-3 text-right font-semibold ${sem.saldo >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
-                      {formatCurrency(sem.saldo)}
+                      {formatBalance(sem.saldo)}
                     </td>
                   </tr>
                 ))}
@@ -501,7 +511,7 @@ export default function FluxoCaixaPage() {
                   <td className="p-3 text-right text-green-700">{formatCurrency(totais.entradas)}</td>
                   <td className="p-3 text-right text-red-700">{formatCurrency(totais.saidas)}</td>
                   <td className={`p-3 text-right ${saldoFinal >= 0 ? 'text-blue-700' : 'text-red-700'}`}>
-                    {formatCurrency(saldoFinal)}
+                    {formatBalance(saldoFinal)}
                   </td>
                 </tr>
               </tfoot>
@@ -535,7 +545,7 @@ export default function FluxoCaixaPage() {
                       {dia.saidas > 0 ? formatCurrency(dia.saidas) : '-'}
                     </td>
                     <td className={`p-3 text-right font-semibold ${dia.saldo >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
-                      {formatCurrency(dia.saldo)}
+                      {formatBalance(dia.saldo)}
                     </td>
                   </tr>
                 ))}
@@ -546,7 +556,7 @@ export default function FluxoCaixaPage() {
                   <td className="p-3 text-right text-green-700">{formatCurrency(totais.entradas)}</td>
                   <td className="p-3 text-right text-red-700">{formatCurrency(totais.saidas)}</td>
                   <td className={`p-3 text-right ${saldoFinal >= 0 ? 'text-blue-700' : 'text-red-700'}`}>
-                    {formatCurrency(saldoFinal)}
+                    {formatBalance(saldoFinal)}
                   </td>
                 </tr>
               </tfoot>

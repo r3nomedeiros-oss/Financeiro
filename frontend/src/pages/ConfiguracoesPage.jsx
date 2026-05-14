@@ -277,6 +277,16 @@ export default function ConfiguracoesPage() {
     }).format(value);
   };
 
+  // Formatador específico para SALDO de conta - sempre com centavos
+  const formatBalance = (value) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(value || 0);
+  };
+
   const getCorClasse = (cor) => {
     const cores = {
       cyan: 'bg-cyan-50 border-cyan-200 text-cyan-700',
@@ -533,11 +543,11 @@ export default function ConfiguracoesPage() {
                   contasBancarias.map((conta) => (
                     <tr key={conta.id} className="border-t border-gray-100 hover:bg-gray-50">
                       <td className="p-3 font-medium">{conta.nome}</td>
-                      <td className="p-3 text-right">{formatCurrency(conta.saldo_inicial)}</td>
+                      <td className="p-3 text-right">{formatBalance(conta.saldo_inicial)}</td>
                       <td className={`p-3 text-right font-semibold ${
                         conta.saldo_atual >= 0 ? 'text-green-600' : 'text-red-600'
                       }`}>
-                        {formatCurrency(conta.saldo_atual)}
+                        {formatBalance(conta.saldo_atual)}
                       </td>
                       <td className="p-3 text-right">
                         <button

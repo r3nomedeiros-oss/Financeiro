@@ -24,6 +24,16 @@ const formatCurrency = (value) => {
   }).format(value);
 };
 
+// Formatador específico para SALDO de conta - sempre com centavos
+const formatBalance = (value) => {
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(value || 0);
+};
+
 // Formatador compacto para valores grandes
 const formatCurrencyCompact = (value) => {
   const absValue = Math.abs(value);
@@ -175,7 +185,7 @@ const ContaCard = memo(({ conta }) => (
       <span className="font-medium text-gray-800">{conta.nome}</span>
     </div>
     <span className={`font-bold text-lg ${conta.saldo_atual >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-      {formatCurrency(conta.saldo_atual)}
+      {formatBalance(conta.saldo_atual)}
     </span>
   </div>
 ));
