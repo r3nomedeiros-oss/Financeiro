@@ -29,6 +29,12 @@ export default function MovimentacoesPage() {
   const [showItemDropdown, setShowItemDropdown] = useState(false);
   const itemInputRef = useRef(null);
   const dropdownRef = useRef(null);
+
+  // Estado para busca do FILTRO de Plano de Contas (combobox com typeahead)
+  const [buscaFiltroPlano, setBuscaFiltroPlano] = useState('');
+  const [showFiltroPlanoDropdown, setShowFiltroPlanoDropdown] = useState(false);
+  const filtroPlanoInputRef = useRef(null);
+  const filtroPlanoDropdownRef = useRef(null);
   
   const [formData, setFormData] = useState({
     data: new Date().toISOString().split('T')[0],
@@ -123,6 +129,10 @@ export default function MovimentacoesPage() {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target) &&
           itemInputRef.current && !itemInputRef.current.contains(event.target)) {
         setShowItemDropdown(false);
+      }
+      if (filtroPlanoDropdownRef.current && !filtroPlanoDropdownRef.current.contains(event.target) &&
+          filtroPlanoInputRef.current && !filtroPlanoInputRef.current.contains(event.target)) {
+        setShowFiltroPlanoDropdown(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -584,97 +594,181 @@ export default function MovimentacoesPage() {
         </div>
       </div>
 
-      {/* Filtros */}
-      <div className="bg-white rounded-xl shadow-md p-3 md:p-4 flex flex-col md:flex-row md:flex-wrap md:items-center gap-3" data-testid="filtros-movimentacoes">
-        <div className="flex items-center gap-2 shrink-0">
-          <Filter size={18} className="text-gray-400 shrink-0" />
-          <label className="text-sm text-gray-600">De:</label>
-          <input
-            type="date"
-            value={filtroDataInicio}
-            onChange={(e) => setFiltroDataInicio(e.target.value)}
-            className="w-[150px] px-2 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            data-testid="filtro-data-inicio"
-          />
-          <label className="text-sm text-gray-600">Até:</label>
-          <input
-            type="date"
-            value={filtroDataFim}
-            onChange={(e) => setFiltroDataFim(e.target.value)}
-            className="w-[150px] px-2 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            data-testid="filtro-data-fim"
-          />
+      {/* Filtros - Layout fixo: linha 1 (filtros) + linha 2 (busca livre) */}
+      <div className="bg-white rounded-xl shadow-md p-3 md:p-4 space-y-3" data-testid="filtros-movimentacoes">
+        {/* Linha 1: Datas + Tipo + Plano de Contas + Conta Bancária */}
+        <div className="flex flex-col md:flex-row md:flex-wrap md:items-center gap-3">
+          <div className="flex items-center gap-2 shrink-0">
+            <Filter size={18} className="text-gray-400 shrink-0" />
+            <label className="text-sm text-gray-600">De:</label>
+            <input
+              type="date"
+              value={filtroDataInicio}
+              onChange={(e) => setFiltroDataInicio(e.target.value)}
+              className="w-[150px] px-2 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              data-testid="filtro-data-inicio"
+            />
+            <label className="text-sm text-gray-600">Até:</label>
+            <input
+              type="date"
+              value={filtroDataFim}
+              onChange={(e) => setFiltroDataFim(e.target.value)}
+              className="w-[150px] px-2 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              data-testid="filtro-data-fim"
+            />
+          </div>
+
+          <div className="hidden md:block h-6 w-px bg-gray-200 shrink-0"></div>
+
+          <select
+            value={filtroTipo}
+            onChange={(e) => setFiltroTipo(e.target.value)}
+            className="shrink-0 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            data-testid="filtro-tipo"
+          >
+            <option value="todos">Todos os tipos</option>
+            <option value="entrada">Entradas</option>
+            <option value="saida">Saídas</option>
+          </select>
+
+          {/* Combobox com busca - filtro de Plano de Contas */}
+          <div className="relative w-full md:w-[260px] shrink-0">
+            <input
+              ref={filtroPlanoInputRef}
+              type="text"
+              value={buscaFiltroPlano}
+              onChange={(e) => {
+                setBuscaFiltroPlano(e.target.value);
+                setShowFiltroPlanoDropdown(true);
+                if (e.target.value === '') setFiltroPlanoConta('todos');
+              }}
+              onFocus={() => setShowFiltroPlanoDropdown(true)}
+              placeholder="Todos os planos"
+              className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              data-testid="filtro-plano-conta-input"
+              title="Filtrar por Plano de Contas (digite para buscar)"
+              autoComplete="off"
+            />
+            {(buscaFiltroPlano || filtroPlanoConta !== 'todos') && (
+              <button
+                type="button"
+                onClick={() => {
+                  setBuscaFiltroPlano('');
+                  setFiltroPlanoConta('todos');
+                  setShowFiltroPlanoDropdown(false);
+                }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
+                title="Limpar filtro"
+                data-testid="filtro-plano-conta-clear"
+              >
+                <X size={14} />
+              </button>
+            )}
+            {showFiltroPlanoDropdown && (
+              <div
+                ref={filtroPlanoDropdownRef}
+                className="absolute z-30 mt-1 w-full md:w-[340px] max-h-72 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg"
+                data-testid="filtro-plano-conta-dropdown"
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFiltroPlanoConta('todos');
+                    setBuscaFiltroPlano('');
+                    setShowFiltroPlanoDropdown(false);
+                  }}
+                  className="block w-full text-left px-3 py-2 text-sm hover:bg-blue-50 border-b border-gray-100 text-gray-700"
+                >
+                  Todos os planos
+                </button>
+                {(() => {
+                  const termo = buscaFiltroPlano.toLowerCase().trim();
+                  const itens = itensPlanoContasFiltro.filter((item) => {
+                    if (!termo) return true;
+                    const texto = item.subcategoria
+                      ? `${item.subcategoria} ${item.nome}`.toLowerCase()
+                      : item.nome.toLowerCase();
+                    return texto.includes(termo);
+                  });
+                  if (itens.length === 0) {
+                    return (
+                      <div className="px-3 py-3 text-sm text-gray-400 text-center">
+                        Nenhum plano encontrado
+                      </div>
+                    );
+                  }
+                  return itens.map((item) => {
+                    const label = item.subcategoria
+                      ? `${item.subcategoria} → ${item.nome}`
+                      : item.nome;
+                    const selected = filtroPlanoConta === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          setFiltroPlanoConta(item.id);
+                          setBuscaFiltroPlano(label);
+                          setShowFiltroPlanoDropdown(false);
+                        }}
+                        className={`block w-full text-left px-3 py-2 text-sm hover:bg-blue-50 border-b border-gray-50 ${
+                          selected ? 'bg-blue-100 text-blue-700 font-medium' : 'text-gray-700'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    );
+                  });
+                })()}
+              </div>
+            )}
+          </div>
+
+          <select
+            value={filtroContaBancaria}
+            onChange={(e) => setFiltroContaBancaria(e.target.value)}
+            className="shrink-0 max-w-[180px] px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            data-testid="filtro-conta-bancaria"
+            title="Filtrar por Conta Bancária"
+          >
+            <option value="todos">Todas as contas</option>
+            {contas.map((c) => (
+              <option key={c.id} value={c.id}>{c.nome}</option>
+            ))}
+          </select>
         </div>
 
-        <div className="hidden md:block h-6 w-px bg-gray-200 shrink-0"></div>
+        {/* Linha 2: Busca livre + Botão + Contador (SEMPRE na segunda linha) */}
+        <div className="flex flex-col md:flex-row md:items-center gap-3">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+            <input
+              type="text"
+              value={filtroBusca}
+              onChange={(e) => setFiltroBusca(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') carregarDados(true); }}
+              placeholder="Buscar por item, complemento ou banco..."
+              className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              data-testid="filtro-busca"
+            />
+          </div>
 
-        <select
-          value={filtroTipo}
-          onChange={(e) => setFiltroTipo(e.target.value)}
-          className="shrink-0 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          data-testid="filtro-tipo"
-        >
-          <option value="todos">Todos os tipos</option>
-          <option value="entrada">Entradas</option>
-          <option value="saida">Saídas</option>
-        </select>
+          <button
+            type="button"
+            onClick={() => carregarDados(true)}
+            disabled={loading}
+            className="shrink-0 inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+            data-testid="filtro-buscar-btn"
+            title="Recarregar com os filtros atuais"
+          >
+            <Search size={16} />
+            Buscar
+          </button>
 
-        <select
-          value={filtroPlanoConta}
-          onChange={(e) => setFiltroPlanoConta(e.target.value)}
-          className="shrink-0 max-w-[200px] px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          data-testid="filtro-plano-conta"
-          title="Filtrar por Plano de Contas"
-        >
-          <option value="todos">Todos os planos</option>
-          {itensPlanoContasFiltro.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.subcategoria ? `${item.subcategoria} → ${item.nome}` : item.nome}
-            </option>
-          ))}
-        </select>
-
-        <select
-          value={filtroContaBancaria}
-          onChange={(e) => setFiltroContaBancaria(e.target.value)}
-          className="shrink-0 max-w-[180px] px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          data-testid="filtro-conta-bancaria"
-          title="Filtrar por Conta Bancária"
-        >
-          <option value="todos">Todas as contas</option>
-          {contas.map((c) => (
-            <option key={c.id} value={c.id}>{c.nome}</option>
-          ))}
-        </select>
-
-        <div className="flex-1 min-w-[160px] relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
-          <input
-            type="text"
-            value={filtroBusca}
-            onChange={(e) => setFiltroBusca(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') carregarDados(true); }}
-            placeholder="Buscar..."
-            className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            data-testid="filtro-busca"
-          />
+          <span className="text-xs text-gray-500 shrink-0 whitespace-nowrap">
+            {movimentacoesFiltradas.length} de {movimentacoes.length} registros
+          </span>
         </div>
-
-        <button
-          type="button"
-          onClick={() => carregarDados(true)}
-          disabled={loading}
-          className="shrink-0 inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-          data-testid="filtro-buscar-btn"
-          title="Recarregar com os filtros atuais"
-        >
-          <Search size={16} />
-          Buscar
-        </button>
-
-        <span className="text-xs text-gray-500 shrink-0 whitespace-nowrap">
-          {movimentacoesFiltradas.length} de {movimentacoes.length} registros
-        </span>
       </div>
 
       {/* Resumo do período filtrado */}
