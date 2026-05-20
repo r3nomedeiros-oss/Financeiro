@@ -293,7 +293,19 @@ export default function ComparativoPage() {
       });
     };
     
-    ['receita_bruta', 'deducoes_vendas', 'custos_variaveis'].forEach(renderCatExcel);
+    renderCatExcel('receita_bruta');
+    renderCatExcel('deducoes_vendas');
+
+    // (=) Receita Líquida
+    rows.push([
+      '(=) Receita Líquida',
+      receitaLiquidaOrcado.toFixed(0),
+      receitaLiquidaRealizado.toFixed(0),
+      (receitaLiquidaRealizado - receitaLiquidaOrcado).toFixed(0),
+      (receitaLiquidaOrcado !== 0 ? ((receitaLiquidaRealizado - receitaLiquidaOrcado) / Math.abs(receitaLiquidaOrcado)) * 100 : 0).toFixed(1).replace('.', ',') + '%'
+    ].join(';'));
+
+    renderCatExcel('custos_variaveis');
     
     // (=) Margem de Contribuição
     rows.push([
@@ -396,7 +408,20 @@ export default function ComparativoPage() {
       });
     };
     
-    ['receita_bruta', 'deducoes_vendas', 'custos_variaveis'].forEach(renderCatPDF);
+    renderCatPDF('receita_bruta');
+    renderCatPDF('deducoes_vendas');
+
+    // (=) Receita Líquida
+    const varRL = receitaLiquidaOrcado !== 0 ? ((receitaLiquidaRealizado - receitaLiquidaOrcado) / Math.abs(receitaLiquidaOrcado)) * 100 : 0;
+    body.push([
+      { content: '(=) Receita Líquida', styles: { fontStyle: 'bold', fillColor: [207, 250, 254], textColor: [21, 94, 117] } },
+      { content: formatCurrency(receitaLiquidaOrcado), styles: { halign: 'right', fontStyle: 'bold', fillColor: [207, 250, 254], textColor: [21, 94, 117] } },
+      { content: formatCurrency(receitaLiquidaRealizado), styles: { halign: 'right', fontStyle: 'bold', fillColor: [207, 250, 254], textColor: receitaLiquidaRealizado >= 0 ? [22, 163, 74] : [220, 38, 38] } },
+      { content: formatCurrency(receitaLiquidaRealizado - receitaLiquidaOrcado), styles: { halign: 'right', fontStyle: 'bold', fillColor: [207, 250, 254], textColor: (receitaLiquidaRealizado - receitaLiquidaOrcado) >= 0 ? [22, 163, 74] : [220, 38, 38] } },
+      { content: formatPercent(varRL), styles: { halign: 'right', fontStyle: 'bold', fillColor: [207, 250, 254], textColor: varRL >= 0 ? [22, 163, 74] : [220, 38, 38] } }
+    ]);
+
+    renderCatPDF('custos_variaveis');
     
     // (=) Margem de Contribuição
     const varMargemC = margemContribuicaoOrcado !== 0 ? ((margemContribuicaoRealizado - margemContribuicaoOrcado) / Math.abs(margemContribuicaoOrcado)) * 100 : 0;
@@ -649,10 +674,37 @@ export default function ComparativoPage() {
             </tr>
           </thead>
           <tbody>
-            {/* Receita Bruta, Deduções, Custos Variáveis */}
-            {['receita_bruta', 'deducoes_vendas', 'custos_variaveis'].map(catId =>
-              renderCategoriaHierarquica(catId, CATEGORIAS_CONFIG[catId])
-            )}
+            {/* Receita Bruta */}
+            {renderCategoriaHierarquica('receita_bruta', CATEGORIAS_CONFIG.receita_bruta)}
+
+            {/* Deduções */}
+            {renderCategoriaHierarquica('deducoes_vendas', CATEGORIAS_CONFIG.deducoes_vendas)}
+
+            {/* (=) Receita Líquida */}
+            <tr className="bg-cyan-50 font-semibold border-y border-cyan-200">
+              <td className="p-2 text-cyan-800">(=) Receita Líquida</td>
+              <td className={`p-2 text-right ${receitaLiquidaOrcado >= 0 ? 'text-cyan-800' : 'text-red-700'}`}>
+                {formatCurrency(receitaLiquidaOrcado)}
+              </td>
+              <td className={`p-2 text-right ${receitaLiquidaRealizado >= 0 ? 'text-cyan-800' : 'text-red-700'}`}>
+                {formatCurrency(receitaLiquidaRealizado)}
+              </td>
+              <td className={`p-2 text-right ${(receitaLiquidaRealizado - receitaLiquidaOrcado) >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                {formatCurrency(receitaLiquidaRealizado - receitaLiquidaOrcado)}
+              </td>
+              <td className={`p-2 text-right ${receitaLiquidaRealizado >= receitaLiquidaOrcado ? 'text-green-700' : 'text-red-700'}`}>
+                {formatPercent(receitaLiquidaOrcado !== 0 ? ((receitaLiquidaRealizado - receitaLiquidaOrcado) / Math.abs(receitaLiquidaOrcado)) * 100 : 0)}
+              </td>
+              <td className="p-2 text-center">
+                {receitaLiquidaRealizado >= receitaLiquidaOrcado
+                  ? <TrendingUp className="text-green-500 mx-auto" size={16} />
+                  : <TrendingDown className="text-red-500 mx-auto" size={16} />
+                }
+              </td>
+            </tr>
+
+            {/* Custos Variáveis */}
+            {renderCategoriaHierarquica('custos_variaveis', CATEGORIAS_CONFIG.custos_variaveis)}
 
             {/* (=) Margem de Contribuição */}
             <tr className="bg-cyan-50 font-semibold border-y border-cyan-200">

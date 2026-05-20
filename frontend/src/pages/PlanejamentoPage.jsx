@@ -388,6 +388,18 @@ export default function PlanejamentoPage() {
     return totais;
   }, [hierarquia, getValor]);
 
+  // Calcular Receita Líquida (Receita Bruta - Deduções)
+  const calcularReceitaLiquida = useMemo(() => {
+    const receitas = calcularTotalCategoria('receita_bruta');
+    const deducoes = calcularTotalCategoria('deducoes_vendas');
+    const liquida = { meses: {}, total: 0 };
+    MESES.forEach(mes => {
+      liquida.meses[mes.num] = (receitas.meses[mes.num] || 0) - (deducoes.meses[mes.num] || 0);
+    });
+    liquida.total = receitas.total - deducoes.total;
+    return liquida;
+  }, [calcularTotalCategoria]);
+
   // Calcular Margem de Contribuição (Receita - Deduções - Custos Variáveis)
   const calcularMargemContribuicao = useMemo(() => {
     const receitas = calcularTotalCategoria('receita_bruta');
@@ -489,7 +501,17 @@ export default function PlanejamentoPage() {
       });
     };
     
-    ['receita_bruta', 'deducoes_vendas', 'custos_variaveis'].forEach(renderCatCsv);
+    renderCatCsv('receita_bruta');
+    renderCatCsv('deducoes_vendas');
+
+    // (=) Receita Líquida
+    rows.push([
+      '(=) Receita Líquida',
+      ...MESES.map(m => (calcularReceitaLiquida.meses[m.num] || 0).toFixed(0)),
+      calcularReceitaLiquida.total.toFixed(0)
+    ].join(';'));
+
+    renderCatCsv('custos_variaveis');
     
     // (=) Margem de Contribuição
     rows.push([
@@ -580,7 +602,17 @@ export default function PlanejamentoPage() {
       });
     };
     
-    ['receita_bruta', 'deducoes_vendas', 'custos_variaveis'].forEach(renderCatPdf);
+    renderCatPdf('receita_bruta');
+    renderCatPdf('deducoes_vendas');
+
+    // (=) Receita Líquida
+    body.push([
+      { content: '(=) Receita Líquida', styles: { fontStyle: 'bold', fillColor: [207, 250, 254], textColor: [21, 94, 117] } },
+      ...MESES.map(m => ({ content: formatCurrency(calcularReceitaLiquida.meses[m.num] || 0), styles: { halign: 'right', fontStyle: 'bold', fillColor: [207, 250, 254], textColor: [21, 94, 117] } })),
+      { content: formatCurrency(calcularReceitaLiquida.total), styles: { halign: 'right', fontStyle: 'bold', fillColor: [207, 250, 254], textColor: [21, 94, 117] } }
+    ]);
+
+    renderCatPdf('custos_variaveis');
     
     // (=) Margem de Contribuição
     body.push([
@@ -914,10 +946,36 @@ export default function PlanejamentoPage() {
               </tr>
             </thead>
             <tbody>
-              {/* Receita Bruta, Deduções, Custos Variáveis */}
-              {['receita_bruta', 'deducoes_vendas', 'custos_variaveis'].map(catId =>
-                renderCategoriaHierarquica(catId, CATEGORIAS_CONFIG[catId])
-              )}
+              {/* Receita Bruta */}
+              {renderCategoriaHierarquica('receita_bruta', CATEGORIAS_CONFIG.receita_bruta)}
+
+              {/* Deduções */}
+              {renderCategoriaHierarquica('deducoes_vendas', CATEGORIAS_CONFIG.deducoes_vendas)}
+
+              {/* (=) Receita Líquida */}
+              <tr className="bg-cyan-50 border-y border-cyan-200 font-semibold">
+                <td className="p-2 sticky left-0 bg-cyan-50 z-10 border-r border-cyan-200 text-cyan-800 max-w-[150px] md:max-w-none whitespace-normal md:whitespace-nowrap break-words">
+                  (=) Receita Líquida
+                </td>
+                {MESES.map(mes => (
+                  <td
+                    key={mes.key}
+                    className={`p-2 text-right text-sm border-r border-cyan-100 whitespace-nowrap ${
+                      calcularReceitaLiquida.meses[mes.num] >= 0 ? 'text-cyan-800' : 'text-red-600'
+                    }`}
+                  >
+                    {formatCurrency(calcularReceitaLiquida.meses[mes.num])}
+                  </td>
+                ))}
+                <td className={`p-2 text-right font-bold bg-cyan-100 whitespace-nowrap ${
+                  calcularReceitaLiquida.total >= 0 ? 'text-cyan-800' : 'text-red-600'
+                }`}>
+                  {formatCurrency(calcularReceitaLiquida.total)}
+                </td>
+              </tr>
+
+              {/* Custos Variáveis */}
+              {renderCategoriaHierarquica('custos_variaveis', CATEGORIAS_CONFIG.custos_variaveis)}
 
               {/* (=) Margem de Contribuição */}
               <tr className="bg-cyan-50 border-y border-cyan-200 font-semibold">

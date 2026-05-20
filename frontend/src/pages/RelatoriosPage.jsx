@@ -312,7 +312,18 @@ export default function RelatoriosPage() {
       });
     };
     
-    ['receita_bruta', 'deducoes_vendas', 'custos_variaveis'].forEach(renderCatCsv);
+    renderCatCsv('receita_bruta');
+    renderCatCsv('deducoes_vendas');
+
+    // (=) Receita Líquida
+    const rowRL = ['(=) Receita Líquida', receitaLiquidaValor1.toFixed(0)];
+    if (mostrarAV) rowRL.push(calcularAV(receitaLiquidaValor1, receitaLiquidaValor1).toFixed(1).replace('.', ',') + '%');
+    rowRL.push(receitaLiquidaValor2.toFixed(0));
+    if (mostrarAV) rowRL.push(calcularAV(receitaLiquidaValor2, receitaLiquidaValor2).toFixed(1).replace('.', ',') + '%');
+    if (mostrarAH) rowRL.push(calcularAH(receitaLiquidaValor2, receitaLiquidaValor1).toFixed(1).replace('.', ',') + '%');
+    rows.push(rowRL.join(';'));
+
+    renderCatCsv('custos_variaveis');
     
     // (=) Margem de Contribuição
     const rowMC = ['(=) Margem de Contribuição', margemContribValor1.toFixed(0)];
@@ -428,7 +439,22 @@ export default function RelatoriosPage() {
       });
     };
     
-    ['receita_bruta', 'deducoes_vendas', 'custos_variaveis'].forEach(renderCatPdf);
+    renderCatPdf('receita_bruta');
+    renderCatPdf('deducoes_vendas');
+
+    // (=) Receita Líquida
+    const ahRL = calcularAH(receitaLiquidaValor2, receitaLiquidaValor1);
+    const rowRLPdf = [
+      { content: '(=) Receita Líquida', styles: { fontStyle: 'bold', fillColor: [207, 250, 254], textColor: [21, 94, 117] } },
+      { content: formatCurrency(receitaLiquidaValor1), styles: { halign: 'right', fontStyle: 'bold', fillColor: [207, 250, 254], textColor: [21, 94, 117] } }
+    ];
+    if (mostrarAV) rowRLPdf.push({ content: formatPercent(calcularAV(receitaLiquidaValor1, receitaLiquidaValor1)), styles: { halign: 'right', fillColor: [207, 250, 254] } });
+    rowRLPdf.push({ content: formatCurrency(receitaLiquidaValor2), styles: { halign: 'right', fontStyle: 'bold', fillColor: [207, 250, 254], textColor: [21, 94, 117] } });
+    if (mostrarAV) rowRLPdf.push({ content: formatPercent(calcularAV(receitaLiquidaValor2, receitaLiquidaValor2)), styles: { halign: 'right', fillColor: [207, 250, 254] } });
+    if (mostrarAH) rowRLPdf.push({ content: formatPercent(ahRL), styles: { halign: 'right', fillColor: [207, 250, 254], textColor: ahRL >= 0 ? [22, 163, 74] : [220, 38, 38] } });
+    body.push(rowRLPdf);
+
+    renderCatPdf('custos_variaveis');
     
     // (=) Margem de Contribuição
     const ahMC = calcularAH(margemContribValor2, margemContribValor1);
@@ -686,10 +712,24 @@ export default function RelatoriosPage() {
               </tr>
             </thead>
             <tbody>
-              {/* Receita Bruta, Deduções, Custos Variáveis */}
-              {['receita_bruta', 'deducoes_vendas', 'custos_variaveis'].map(catId =>
-                renderCategoriaHierarquica(catId, CATEGORIAS_CONFIG[catId])
-              )}
+              {/* Receita Bruta */}
+              {renderCategoriaHierarquica('receita_bruta', CATEGORIAS_CONFIG.receita_bruta)}
+
+              {/* Deduções */}
+              {renderCategoriaHierarquica('deducoes_vendas', CATEGORIAS_CONFIG.deducoes_vendas)}
+
+              {/* (=) Receita Líquida */}
+              <tr className="bg-cyan-50 border-y border-cyan-200 font-semibold">
+                <td className="p-2 text-cyan-800">(=) Receita Líquida</td>
+                <td className={`p-2 text-right ${receitaLiquidaValor1 >= 0 ? 'text-cyan-800' : 'text-red-700'}`}>{formatCurrency(receitaLiquidaValor1)}</td>
+                {mostrarAV && <td className="p-2 text-right bg-green-50">{formatPercent(calcularAV(receitaLiquidaValor1, receitaLiquidaValor1))}</td>}
+                <td className={`p-2 text-right ${receitaLiquidaValor2 >= 0 ? 'text-cyan-800' : 'text-red-700'}`}>{formatCurrency(receitaLiquidaValor2)}</td>
+                {mostrarAV && <td className="p-2 text-right bg-green-50">{formatPercent(calcularAV(receitaLiquidaValor2, receitaLiquidaValor2))}</td>}
+                {mostrarAH && <td className={`p-2 text-right bg-purple-50 ${calcularAH(receitaLiquidaValor2, receitaLiquidaValor1) >= 0 ? 'text-green-700' : 'text-red-700'}`}>{formatPercent(calcularAH(receitaLiquidaValor2, receitaLiquidaValor1))}</td>}
+              </tr>
+
+              {/* Custos Variáveis */}
+              {renderCategoriaHierarquica('custos_variaveis', CATEGORIAS_CONFIG.custos_variaveis)}
 
               {/* (=) Margem de Contribuição */}
               <tr className="bg-cyan-50 border-y border-cyan-200 font-semibold">
