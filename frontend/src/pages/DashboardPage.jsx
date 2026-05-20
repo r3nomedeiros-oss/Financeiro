@@ -49,30 +49,28 @@ const formatCurrencyCompact = (value) => {
 // Card memoizado para evitar re-renders - AJUSTADO para valores grandes
 const IndicatorCard = memo(({ title, value, percentage, icon: Icon, borderColor, bgColor, iconColor, percentColor }) => {
   const formatted = formatCurrency(value);
-  const compact = formatCurrencyCompact(value);
-  // Em mobile mostramos o formato compacto (ex.: R$ 294K) p/ nunca sobrepor o ícone.
-  // Em desktop mostramos o valor inteiro com escala progressiva por breakpoint.
+  // Valor sempre por extenso. Fonte e ícone escalonam por breakpoint para nunca
+  // sobrepor (mobile estreito → fonte e ícone menores; notebook xl/2xl → tamanhos originais).
 
   return (
-    <div className={`bg-white rounded-xl shadow-md p-4 md:p-5 border-l-4 ${borderColor} min-h-[110px] md:min-h-[140px]`}>
-      <div className="flex justify-between items-start gap-1.5 md:gap-2">
+    <div className={`bg-white rounded-xl shadow-md p-3 md:p-5 border-l-4 ${borderColor} min-h-[110px] md:min-h-[140px]`}>
+      <div className="flex justify-between items-start gap-1 md:gap-2">
         <div className="flex-1 min-w-0 overflow-hidden">
           <p className="text-gray-600 text-xs md:text-sm font-medium truncate">{title}</p>
           <p
-            className={`font-bold mt-1.5 whitespace-nowrap tabular-nums text-lg sm:text-xl xl:text-2xl 2xl:text-3xl ${value < 0 ? 'text-red-600' : 'text-gray-800'}`}
+            className={`font-bold mt-1.5 whitespace-nowrap tabular-nums text-sm sm:text-base md:text-xl xl:text-2xl 2xl:text-3xl ${value < 0 ? 'text-red-600' : 'text-gray-800'}`}
             title={formatted}
           >
-            <span className="md:hidden">{compact}</span>
-            <span className="hidden md:inline">{formatted}</span>
+            {formatted}
           </p>
           {percentage !== undefined && (
-            <p className={`text-sm md:text-base font-semibold mt-1 ${percentColor}`}>
+            <p className={`text-xs md:text-base font-semibold mt-1 ${percentColor}`}>
               {percentage.toFixed(0)}%
             </p>
           )}
         </div>
-        <div className={`${bgColor} p-1.5 md:p-2 xl:p-2.5 rounded-lg flex-shrink-0`}>
-          <Icon className={`${iconColor} w-4 h-4 md:w-5 md:h-5 xl:w-[22px] xl:h-[22px]`} />
+        <div className={`${bgColor} p-1 md:p-2 xl:p-2.5 rounded-lg flex-shrink-0`}>
+          <Icon className={`${iconColor} w-3.5 h-3.5 md:w-5 md:h-5 xl:w-[22px] xl:h-[22px]`} />
         </div>
       </div>
     </div>
