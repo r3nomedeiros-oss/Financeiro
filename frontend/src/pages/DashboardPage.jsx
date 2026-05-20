@@ -50,17 +50,19 @@ const formatCurrencyCompact = (value) => {
 const IndicatorCard = memo(({ title, value, percentage, icon: Icon, borderColor, bgColor, iconColor, percentColor }) => {
   const formatted = formatCurrency(value);
   // Reduz tamanho da fonte para valores muito longos (>= 11 chars, ex.: "R$ 1.000.000")
+  // text-3xl reservado apenas para telas xl+ (>=1280px), evitando sobreposição do ícone
+  // em mobile e em desktops com escala (ex.: Windows 125%) onde o card fica estreito.
   const len = formatted.length;
   let valueSize;
-  if (len <= 10) valueSize = 'text-2xl md:text-3xl';
-  else if (len <= 13) valueSize = 'text-xl md:text-2xl';
-  else if (len <= 16) valueSize = 'text-lg md:text-xl';
-  else valueSize = 'text-base md:text-lg';
+  if (len <= 10) valueSize = 'text-xl md:text-2xl xl:text-3xl';
+  else if (len <= 13) valueSize = 'text-lg md:text-xl xl:text-2xl';
+  else if (len <= 16) valueSize = 'text-base md:text-lg xl:text-xl';
+  else valueSize = 'text-sm md:text-base xl:text-lg';
 
   return (
     <div className={`bg-white rounded-xl shadow-md p-4 md:p-5 border-l-4 ${borderColor} min-h-[110px] md:min-h-[140px]`}>
-      <div className="flex justify-between items-start gap-2">
-        <div className="flex-1 min-w-0">
+      <div className="flex justify-between items-start gap-1.5 md:gap-2">
+        <div className="flex-1 min-w-0 overflow-hidden">
           <p className="text-gray-600 text-xs md:text-sm font-medium truncate">{title}</p>
           <p
             className={`${valueSize} font-bold mt-1.5 whitespace-nowrap tabular-nums ${value < 0 ? 'text-red-600' : 'text-gray-800'}`}
@@ -74,8 +76,8 @@ const IndicatorCard = memo(({ title, value, percentage, icon: Icon, borderColor,
             </p>
           )}
         </div>
-        <div className={`${bgColor} p-2 md:p-2.5 rounded-lg flex-shrink-0`}>
-          <Icon className={iconColor} size={22} />
+        <div className={`${bgColor} p-1.5 md:p-2 xl:p-2.5 rounded-lg flex-shrink-0`}>
+          <Icon className={`${iconColor} w-[18px] h-[18px] md:w-5 md:h-5 xl:w-[22px] xl:h-[22px]`} />
         </div>
       </div>
     </div>
