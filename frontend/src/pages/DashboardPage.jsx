@@ -58,13 +58,13 @@ const IndicatorCard = memo(({ title, value, percentage, icon: Icon, borderColor,
         <div className="flex-1 min-w-0 overflow-hidden">
           <p className="text-gray-600 text-xs md:text-sm font-medium truncate">{title}</p>
           <p
-            className={`font-bold mt-1.5 whitespace-nowrap tabular-nums text-sm sm:text-base md:text-xl xl:text-2xl 2xl:text-3xl ${value < 0 ? 'text-red-600' : 'text-gray-800'}`}
+            className={`font-bold mt-1.5 whitespace-nowrap tabular-nums text-lg md:text-xl xl:text-2xl 2xl:text-3xl ${value < 0 ? 'text-red-600' : 'text-gray-800'}`}
             title={formatted}
           >
             {formatted}
           </p>
           {percentage !== undefined && (
-            <p className={`text-xs md:text-base font-semibold mt-1 ${percentColor}`}>
+            <p className={`text-sm md:text-base font-semibold mt-1 ${percentColor}`}>
               {percentage.toFixed(0)}%
             </p>
           )}
