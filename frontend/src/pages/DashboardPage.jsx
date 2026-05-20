@@ -106,7 +106,6 @@ const SaidasBarChart = memo(({ data, title }) => {
   const sortedData = useMemo(() => {
     return [...data]
       .sort((a, b) => b.valor - a.valor)
-      .slice(0, 8)
       .map((item, index) => ({
         ...item,
         color: COLORS[index % COLORS.length]
@@ -117,13 +116,16 @@ const SaidasBarChart = memo(({ data, title }) => {
     return sortedData.reduce((acc, item) => acc + item.valor, 0);
   }, [sortedData]);
 
+  // Altura dinâmica: ~32px por barra, mínimo 280px para poucos itens
+  const chartHeight = Math.max(280, sortedData.length * 32);
+
   return (
     <div className="bg-white rounded-xl shadow-md p-6">
       <h3 className="text-lg font-semibold text-gray-800 mb-4">{title}</h3>
       <div className="flex flex-col lg:flex-row gap-4">
         {/* Gráfico de barras horizontal */}
         <div className="flex-1 min-w-0">
-          <ResponsiveContainer width="100%" height={280}>
+          <ResponsiveContainer width="100%" height={chartHeight}>
             <BarChart data={sortedData} layout="vertical" margin={{ left: 10, right: 10 }}>
               <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
               <XAxis type="number" tickFormatter={formatCurrencyCompact} />
@@ -142,7 +144,7 @@ const SaidasBarChart = memo(({ data, title }) => {
         </div>
         
         {/* Legenda (lateral no desktop, embaixo no mobile) */}
-        <div className="w-full lg:w-48 lg:flex-shrink-0 overflow-y-auto max-h-[280px]">
+        <div className="w-full lg:w-48 lg:flex-shrink-0 overflow-y-auto" style={{ maxHeight: `${chartHeight}px` }}>
           <div className="space-y-2">
             {sortedData.map((item, index) => (
               <div key={index} className="flex items-center gap-2 text-xs">
