@@ -183,7 +183,7 @@ Este é um sistema financeiro completo desenvolvido para gestão industrial, com
 ### 1. Primeiro Acesso
 
 1. **Acesse a aplicação:**
-   - URL: https://meu-financeiro-8.preview.emergentagent.com
+   - URL: https://learn-this-3.preview.emergentagent.com
 
 2. **Crie sua conta:**
    - Clique em "Cadastro"
