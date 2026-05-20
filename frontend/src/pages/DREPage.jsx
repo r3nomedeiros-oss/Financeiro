@@ -500,7 +500,7 @@ export default function DREPage() {
     
     return (
       <tr key={key} className={`${getCorClasse(config.cor, true)} border-b border-gray-200`}>
-        <td className={`p-2 sticky left-0 ${getCorClasse(config.cor, true)} font-semibold border-r border-gray-300 whitespace-nowrap`}>
+        <td className={`p-2 sticky left-0 ${getCorClasse(config.cor, true)} font-semibold border-r border-gray-300 max-w-[150px] md:max-w-none whitespace-normal md:whitespace-nowrap break-words`}>
           {config.label}
         </td>
         {renderValoresLinha(valores, isPercent, `font-semibold ${getCorClasse(config.cor)}`)}
@@ -531,9 +531,9 @@ export default function DREPage() {
         <tr className={`${getCorClasse(catConfig.cor, true)} border-b border-gray-200 cursor-pointer hover:opacity-90`}
             onClick={() => toggleCategoria(catId)}
             data-testid={`categoria-${catId}`}>
-          <td className={`p-2 sticky left-0 ${getCorClasse(catConfig.cor, true)} font-semibold border-r border-gray-300 whitespace-nowrap`}>
-            <div className="flex items-center gap-2">
-              <span className="transition-transform duration-200">
+          <td className={`p-2 sticky left-0 ${getCorClasse(catConfig.cor, true)} font-semibold border-r border-gray-300 max-w-[150px] md:max-w-none whitespace-normal md:whitespace-nowrap break-words`}>
+            <div className="flex items-start md:items-center gap-1 md:gap-2">
+              <span className="transition-transform duration-200 flex-shrink-0 mt-0.5 md:mt-0">
                 {subcategorias.length > 0 && (isExpanded ? <ChevronDown /> : <ChevronRight />)}
               </span>
               {catConfig.label}
@@ -562,9 +562,9 @@ export default function DREPage() {
               <tr className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
                   onClick={(e) => { e.stopPropagation(); toggleSubcategoria(catId, subcat.id); }}
                   data-testid={`subcategoria-${subcat.id}`}>
-                <td className="p-2 pl-8 sticky left-0 bg-white hover:bg-gray-50 border-r border-gray-300 whitespace-nowrap">
-                  <div className="flex items-center gap-2">
-                    <span className="transition-transform duration-200">
+                <td className="p-2 pl-4 md:pl-8 sticky left-0 bg-white hover:bg-gray-50 border-r border-gray-300 max-w-[150px] md:max-w-none whitespace-normal md:whitespace-nowrap break-words">
+                  <div className="flex items-start md:items-center gap-1 md:gap-2">
+                    <span className="transition-transform duration-200 flex-shrink-0 mt-0.5 md:mt-0">
                       {itens.length > 0 && (isSubExpanded ? <ChevronDown /> : <ChevronRight />)}
                     </span>
                     {subcat.nome}
@@ -587,7 +587,7 @@ export default function DREPage() {
               {isSubExpanded && itens.map((item) => (
                 <tr key={item.id} className="border-b border-gray-50 hover:bg-gray-50"
                     data-testid={`item-${item.id}`}>
-                  <td className="p-2 pl-14 sticky left-0 bg-white hover:bg-gray-50 border-r border-gray-300 text-gray-600 text-sm whitespace-nowrap">
+                  <td className="p-2 pl-6 md:pl-14 sticky left-0 bg-white hover:bg-gray-50 border-r border-gray-300 text-gray-600 text-sm max-w-[150px] md:max-w-none whitespace-normal md:whitespace-nowrap break-words">
                     • {item.nome}
                   </td>
                   {meses.map((mes) => {
@@ -717,7 +717,7 @@ export default function DREPage() {
           <table ref={tableRef} className="w-full text-sm border-collapse min-w-[1000px] md:min-w-[1500px]" data-testid="dre-table">
           <thead>
             <tr className="bg-gray-100 border-b-2 border-gray-300">
-              <th className="text-left p-2 sticky left-0 bg-gray-100 border-r border-gray-300 whitespace-nowrap">
+              <th className="text-left p-2 sticky left-0 bg-gray-100 border-r border-gray-300 max-w-[150px] md:max-w-none whitespace-normal md:whitespace-nowrap break-words">
                 Descrição
               </th>
               {meses.map((mes) => (
