@@ -273,7 +273,54 @@ CATEGORIAS_DRE = {
     "custos_variaveis": {"nome": "(-) Custos Variáveis", "tipo": "despesa", "cor": "red"},
     "custos_fixos": {"nome": "(-) Custos Fixos", "tipo": "despesa", "cor": "red"},
     "resultado_nao_operacional": {"nome": "Resultado Não Operacional", "tipo": "misto", "cor": "gray"},
+    # Categoria especial: movimentações de transferência entre contas próprias.
+    # NÃO entra em nenhum relatório (Dashboard / DRE / Planejamento).
+    # Aparece apenas na tela de Movimentação Financeira e em seus filtros.
+    "transferencias": {"nome": "Transferências entre Contas", "tipo": "misto", "cor": "indigo", "is_transferencia": True},
 }
+
+
+def _seed_transferencias_for_user(user_id: str) -> None:
+    """Garante que existam os itens padrão de Transferências entre contas próprias
+    para o usuário. Idempotente: só cria o que ainda não existe.
+
+    Cria dois itens (no nível 2 - subcategoria, sem filhos) dentro da
+    categoria fixa 'transferencias':
+      - 'Transferência entre contas próprias - efetuadas' (tipo: despesa)
+      - 'Transferência entre contas próprias - recebidas' (tipo: receita)
+    """
+    supabase = get_supabase()
+    categoria_code = "transferencias|2|"
+    existentes = supabase.table("plano_contas") \
+        .select("nome") \
+        .eq("user_id", user_id) \
+        .like("categoria", "transferencias|%") \
+        .execute().data or []
+    nomes_existentes = {p.get("nome", "").strip().lower() for p in existentes}
+
+    defaults = [
+        {"nome": "Transferência entre contas próprias - efetuadas", "tipo": "despesa"},
+        {"nome": "Transferência entre contas próprias - recebidas", "tipo": "receita"},
+    ]
+    for d in defaults:
+        if d["nome"].strip().lower() in nomes_existentes:
+            continue
+        supabase.table("plano_contas").insert({
+            "id": str(uuid.uuid4()),
+            "user_id": user_id,
+            "nome": d["nome"],
+            "tipo": d["tipo"],
+            "categoria": categoria_code,
+            "created_at": datetime.utcnow().isoformat()
+        }).execute()
+
+
+def _is_transferencia_mov(mov: dict) -> bool:
+    """Identifica se a movimentação pertence à categoria de transferências
+    entre contas próprias (não deve entrar em relatórios)."""
+    plano_info = mov.get("plano_contas") or {}
+    categoria_raw = (plano_info.get("categoria") or "") if isinstance(plano_info, dict) else ""
+    return categoria_raw.split("|")[0] == "transferencias"
 
 @app.get("/api/categorias-dre")
 async def get_categorias_dre():
@@ -290,6 +337,12 @@ async def get_plano_contas(user_id: str = Depends(get_current_user)):
 async def get_plano_contas_hierarquico(user_id: str = Depends(get_current_user)):
     """Retorna plano de contas em estrutura de árvore hierárquica"""
     supabase = get_supabase()
+    # Garante que os itens padrão de Transferências entre contas existam
+    try:
+        _seed_transferencias_for_user(user_id)
+    except Exception as _e:
+        # Não bloquear a listagem caso o seed falhe (logamos no stdout)
+        print(f"[seed_transferencias] erro: {_e}")
     result = supabase.table("plano_contas").select("*").eq("user_id", user_id).order("categoria, nome").execute()
     planos = result.data
     
@@ -645,6 +698,8 @@ async def get_dashboard_dados(
         query = query.gte("data", f"{ano}-01-01").lt("data", f"{ano + 1}-01-01")
     
     movimentacoes = query.execute().data
+    # Excluir movimentações de Transferência entre contas próprias dos relatórios
+    movimentacoes = [m for m in movimentacoes if not _is_transferencia_mov(m)]
     
     # Calcular totais
     total_entradas = sum(m["valor"] for m in movimentacoes if m["tipo"] == "entrada")
@@ -769,6 +824,8 @@ async def get_dre_anual(ano: int, user_id: str = Depends(get_current_user)):
     data_fim = f"{ano + 1}-01-01"
     
     movimentacoes = supabase.table("movimentacoes").select("*, plano_contas(*)").eq("user_id", user_id).gte("data", data_inicio).lt("data", data_fim).execute().data
+    # Excluir Transferências entre contas próprias do DRE anual
+    movimentacoes = [m for m in movimentacoes if not _is_transferencia_mov(m)]
     
     # Buscar plano de contas do usuário
     planos = supabase.table("plano_contas").select("*").eq("user_id", user_id).execute().data
@@ -946,6 +1003,8 @@ async def get_dre(mes: int, ano: int, user_id: str = Depends(get_current_user)):
         data_fim = f"{ano}-{mes + 1:02d}-01"
     
     movimentacoes = supabase.table("movimentacoes").select("*, plano_contas(*)").eq("user_id", user_id).gte("data", data_inicio).lt("data", data_fim).execute().data
+    # Excluir Transferências entre contas próprias do DRE mensal
+    movimentacoes = [m for m in movimentacoes if not _is_transferencia_mov(m)]
     
     # Calcular DRE
     receitas = sum(m["valor"] for m in movimentacoes if m["tipo"] == "entrada")

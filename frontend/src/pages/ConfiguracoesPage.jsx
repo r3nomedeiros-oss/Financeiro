@@ -28,6 +28,8 @@ const CATEGORIAS_DRE = {
   custos_variaveis: { nome: "(-) Custos Variáveis", tipo: "despesa", cor: "red" },
   custos_fixos: { nome: "(-) Custos Fixos", tipo: "despesa", cor: "red" },
   resultado_nao_operacional: { nome: "(=) Resultado Não Operacional", tipo: "misto", cor: "amber" },
+  // Categoria especial: NÃO entra em relatórios. Aparece apenas em Movimentação Financeira.
+  transferencias: { nome: "Transferências entre Contas (não entra em relatórios)", tipo: "misto", cor: "indigo" },
 };
 
 export default function ConfiguracoesPage() {
@@ -293,6 +295,7 @@ export default function ConfiguracoesPage() {
       red: 'bg-red-50 border-red-200 text-red-700',
       amber: 'bg-amber-50 border-amber-200 text-amber-700',
       gray: 'bg-gray-50 border-gray-200 text-gray-700',
+      indigo: 'bg-indigo-50 border-indigo-200 text-indigo-700',
     };
     return cores[cor] || 'bg-gray-50 border-gray-200';
   };

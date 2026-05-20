@@ -138,14 +138,17 @@ export default function PlanejamentoPage() {
         planejamentoAPI.getAll({ ano }),
       ]);
       
-      setHierarquia(hierRes.data);
+      // Remover categoria 'transferencias' do planejamento (não entra em relatórios)
+      const hierData = { ...(hierRes.data || {}) };
+      delete hierData.transferencias;
+      setHierarquia(hierData);
       setPlanejamentos(planRes.data);
       
       // Inicializar estado de expansão - todas expandidas
       const initialExpanded = {};
-      Object.keys(hierRes.data || {}).forEach(catId => {
+      Object.keys(hierData || {}).forEach(catId => {
         initialExpanded[catId] = { expanded: true, subcategorias: {} };
-        (hierRes.data[catId]?.subcategorias || []).forEach(sub => {
+        (hierData[catId]?.subcategorias || []).forEach(sub => {
           initialExpanded[catId].subcategorias[sub.id] = true;
         });
       });

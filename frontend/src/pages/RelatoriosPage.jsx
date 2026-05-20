@@ -53,13 +53,16 @@ export default function RelatoriosPage() {
   const carregarHierarquia = async () => {
     try {
       const res = await planoContasAPI.getHierarquico();
-      setHierarquia(res.data);
+      // Remover categoria 'transferencias' dos relatórios (não entra em nenhum relatório)
+      const hierData = { ...(res.data || {}) };
+      delete hierData.transferencias;
+      setHierarquia(hierData);
       
       // Inicializar expansão
       const initialExpanded = {};
-      Object.keys(res.data || {}).forEach(catId => {
+      Object.keys(hierData || {}).forEach(catId => {
         initialExpanded[catId] = { expanded: true, subcategorias: {} };
-        (res.data[catId]?.subcategorias || []).forEach(sub => {
+        (hierData[catId]?.subcategorias || []).forEach(sub => {
           initialExpanded[catId].subcategorias[sub.id] = true;
         });
       });
@@ -123,8 +126,12 @@ export default function RelatoriosPage() {
         })
       ]);
 
-      setDadosPeriodo1(movs1.data);
-      setDadosPeriodo2(movs2.data);
+      // Excluir Transferências entre contas próprias dos relatórios
+      const filtrarTransferencias = (lista) => (lista || []).filter(
+        (m) => !((m.plano_contas?.categoria || '').startsWith('transferencias|'))
+      );
+      setDadosPeriodo1(filtrarTransferencias(movs1.data));
+      setDadosPeriodo2(filtrarTransferencias(movs2.data));
     } catch (error) {
       console.error('Erro ao comparar períodos:', error);
     } finally {
