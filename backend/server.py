@@ -491,7 +491,7 @@ async def get_movimentacoes(
             q = q.gte("data", di).lt("data", df)
         elif ano:
             q = q.gte("data", f"{ano}-01-01").lt("data", f"{ano + 1}-01-01")
-        return q.order("ordem", desc=True).order("data", desc=True).order("created_at", desc=True)
+        return q.order("data", desc=True).order("ordem", desc=True).order("created_at", desc=True)
     
     # Paginar internamente porque o Supabase trunca em 1000 registros por chamada
     PAGE_SIZE = 1000
