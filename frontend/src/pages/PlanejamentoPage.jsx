@@ -698,12 +698,12 @@ export default function PlanejamentoPage() {
 
   // Renderizar linha de item
   const renderItemRow = (item, nivel = 2) => {
-    const paddingLeft = nivel === 2 ? 'pl-8' : 'pl-14';
+    const paddingLeft = nivel === 2 ? 'pl-4 md:pl-8' : 'pl-6 md:pl-14';
     
     return (
       <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50">
-        <td className={`p-2 ${paddingLeft} sticky left-0 bg-white z-10 border-r border-gray-300 text-sm`}>
-          <div className="flex items-center justify-between">
+        <td className={`p-2 ${paddingLeft} sticky left-0 bg-white z-10 border-r border-gray-300 text-sm max-w-[150px] md:max-w-none whitespace-normal md:whitespace-nowrap break-words`}>
+          <div className="flex items-start md:items-center justify-between gap-1">
             <span className={nivel === 3 ? 'text-gray-600' : ''}>{nivel === 3 ? '• ' : ''}{item.nome}</span>
             <button
               onClick={() => openApplyAllModal(item.id, item.nome)}
@@ -735,10 +735,12 @@ export default function PlanejamentoPage() {
           className={`${getCorClasse(config.cor, true)} border-b border-gray-200 cursor-pointer hover:opacity-90`}
           onClick={() => toggleCategoria(catId)}
         >
-          <td className={`p-2 sticky left-0 z-10 ${getCorClasse(config.cor, true)} font-semibold border-r border-gray-300`}>
-            <div className="flex items-center gap-2">
+          <td className={`p-2 sticky left-0 z-10 ${getCorClasse(config.cor, true)} font-semibold border-r border-gray-300 max-w-[150px] md:max-w-none whitespace-normal md:whitespace-nowrap break-words`}>
+            <div className="flex items-start md:items-center gap-1 md:gap-2">
               {subcategorias.length > 0 && (
-                isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />
+                <span className="flex-shrink-0 mt-0.5 md:mt-0">
+                  {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                </span>
               )}
               {config.label}
             </div>
@@ -764,11 +766,13 @@ export default function PlanejamentoPage() {
                 className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
                 onClick={() => hasItens && toggleSubcategoria(catId, sub.id)}
               >
-                <td className="p-2 pl-6 sticky left-0 bg-white z-10 border-r border-gray-300 text-sm font-medium">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
+                <td className="p-2 pl-3 md:pl-6 sticky left-0 bg-white z-10 border-r border-gray-300 text-sm font-medium max-w-[150px] md:max-w-none whitespace-normal md:whitespace-nowrap break-words">
+                  <div className="flex items-start md:items-center justify-between gap-1">
+                    <div className="flex items-start md:items-center gap-1 md:gap-2">
                       {hasItens && (
-                        isSubExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />
+                        <span className="flex-shrink-0 mt-0.5 md:mt-0">
+                          {isSubExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                        </span>
                       )}
                       {sub.nome}
                     </div>
@@ -896,7 +900,7 @@ export default function PlanejamentoPage() {
           <table className="w-full text-sm border-collapse min-w-[900px] md:min-w-[1200px]">
             <thead className="sticky top-0 z-10">
               <tr className="bg-gray-100 border-b-2 border-gray-300">
-                <th className="text-left p-2 sticky left-0 bg-gray-100 min-w-[140px] md:min-w-[220px] border-r border-gray-300">
+                <th className="text-left p-2 sticky left-0 bg-gray-100 min-w-[120px] md:min-w-[220px] max-w-[150px] md:max-w-none border-r border-gray-300 whitespace-normal md:whitespace-nowrap break-words">
                   Descrição
                 </th>
                 {MESES.map(mes => (
@@ -917,7 +921,7 @@ export default function PlanejamentoPage() {
 
               {/* (=) Margem de Contribuição */}
               <tr className="bg-cyan-50 border-y border-cyan-200 font-semibold">
-                <td className="p-2 sticky left-0 bg-cyan-50 z-10 border-r border-cyan-200 text-cyan-800">
+                <td className="p-2 sticky left-0 bg-cyan-50 z-10 border-r border-cyan-200 text-cyan-800 max-w-[150px] md:max-w-none whitespace-normal md:whitespace-nowrap break-words">
                   (=) Margem de Contribuição
                 </td>
                 {MESES.map(mes => (
@@ -939,7 +943,7 @@ export default function PlanejamentoPage() {
 
               {/* (=) % Margem de Contribuição */}
               <tr className="bg-blue-50 border-b border-blue-200 font-semibold">
-                <td className="p-2 sticky left-0 bg-blue-50 z-10 border-r border-blue-200 text-blue-800">
+                <td className="p-2 sticky left-0 bg-blue-50 z-10 border-r border-blue-200 text-blue-800 max-w-[150px] md:max-w-none whitespace-normal md:whitespace-nowrap break-words">
                   (=) % Margem de Contribuição
                 </td>
                 {MESES.map(mes => (
@@ -964,7 +968,7 @@ export default function PlanejamentoPage() {
 
               {/* (=) Resultado Operacional (linha calculada) */}
               <tr className="bg-cyan-50 border-y-2 border-cyan-200 font-semibold">
-                <td className="p-2 sticky left-0 bg-cyan-50 z-10 border-r border-cyan-200 text-cyan-800">
+                <td className="p-2 sticky left-0 bg-cyan-50 z-10 border-r border-cyan-200 text-cyan-800 max-w-[150px] md:max-w-none whitespace-normal md:whitespace-nowrap break-words">
                   (=) Resultado Operacional
                 </td>
                 {MESES.map(mes => (
@@ -989,7 +993,7 @@ export default function PlanejamentoPage() {
 
               {/* Linha de Lucro Líquido */}
               <tr className="bg-green-100 border-t-2 border-green-300 font-bold">
-                <td className="p-3 sticky left-0 bg-green-100 z-10 border-r border-green-300 text-base text-green-900">
+                <td className="p-3 sticky left-0 bg-green-100 z-10 border-r border-green-300 text-base text-green-900 max-w-[150px] md:max-w-none whitespace-normal md:whitespace-nowrap break-words">
                   (=) Lucro Líquido
                 </td>
                 {MESES.map(mes => (
