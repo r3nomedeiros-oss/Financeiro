@@ -282,7 +282,11 @@ CATEGORIAS_DRE = {
 
 def _seed_transferencias_for_user(user_id: str) -> None:
     """Garante que existam os itens padrão de Transferências entre contas próprias
-    para o usuário. Idempotente: só cria o que ainda não existe.
+    para o usuário.
+
+    Idempotente e *não-intrusivo*: só faz o seed se o usuário NÃO possuir
+    NENHUM plano de contas na categoria 'transferencias'. Assim, se o usuário
+    renomear/excluir itens, eles não são recriados.
 
     Cria dois itens (no nível 2 - subcategoria, sem filhos) dentro da
     categoria fixa 'transferencias':
@@ -290,21 +294,22 @@ def _seed_transferencias_for_user(user_id: str) -> None:
       - 'Transferência entre contas próprias - recebidas' (tipo: receita)
     """
     supabase = get_supabase()
-    categoria_code = "transferencias|2|"
     existentes = supabase.table("plano_contas") \
-        .select("nome") \
+        .select("id") \
         .eq("user_id", user_id) \
         .like("categoria", "transferencias|%") \
+        .limit(1) \
         .execute().data or []
-    nomes_existentes = {p.get("nome", "").strip().lower() for p in existentes}
+    if existentes:
+        # Usuário já tem ao menos um item nessa categoria — não mexer
+        return
 
+    categoria_code = "transferencias|2|"
     defaults = [
         {"nome": "Transferência entre contas próprias - efetuadas", "tipo": "despesa"},
         {"nome": "Transferência entre contas próprias - recebidas", "tipo": "receita"},
     ]
     for d in defaults:
-        if d["nome"].strip().lower() in nomes_existentes:
-            continue
         supabase.table("plano_contas").insert({
             "id": str(uuid.uuid4()),
             "user_id": user_id,
