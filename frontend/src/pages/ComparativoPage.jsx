@@ -571,6 +571,11 @@ export default function ComparativoPage() {
           const subDiferenca = subRealizado - subOrcado;
           const subVariacao = subOrcado > 0 ? (subDiferenca / subOrcado) * 100 : (subRealizado > 0 ? 100 : 0);
 
+          // Dentro de "Resultado Não Operacional" todas as subcategorias e itens
+          // (Receitas não Op, Gastos não Op, Investimentos) seguem lógica de despesa:
+          // variação positiva = vermelho (desfavorável) / negativa = verde (favorável).
+          const tipoSubcat = catId === 'resultado_nao_operacional' ? 'despesa' : config.tipo;
+
           return (
             <React.Fragment key={sub.id}>
               <tr 
@@ -590,15 +595,15 @@ export default function ComparativoPage() {
                 <td className={`p-2 text-right text-sm ${subDiferenca >= 0 ? '' : 'text-red-600'}`}>
                   {formatCurrency(subDiferenca)}
                 </td>
-                <td className={`p-2 text-right text-sm ${getStatusColor(subVariacao, config.tipo)}`}>
+                <td className={`p-2 text-right text-sm ${getStatusColor(subVariacao, tipoSubcat)}`}>
                   {formatPercent(subVariacao)}
                 </td>
                 <td className="p-2 text-center">
-                  {getStatusIcon(subVariacao, config.tipo)}
+                  {getStatusIcon(subVariacao, tipoSubcat)}
                 </td>
               </tr>
 
-              {isSubExpanded && hasItens && itens.map(item => renderItemRow(item, config.tipo, 3))}
+              {isSubExpanded && hasItens && itens.map(item => renderItemRow(item, tipoSubcat, 3))}
             </React.Fragment>
           );
         })}
