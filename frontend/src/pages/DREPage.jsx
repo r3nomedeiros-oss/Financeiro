@@ -41,6 +41,17 @@ const MES_TO_NUM = {
   julho: 7, agosto: 8, setembro: 9, outubro: 10, novembro: 11, dezembro: 12
 };
 
+const MESES_ORDEM = [
+  'janeiro', 'fevereiro', 'marco', 'abril', 'maio', 'junho',
+  'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'
+];
+
+const MESES_NOMES = {
+  janeiro: 'Janeiro', fevereiro: 'Fevereiro', marco: 'Março', abril: 'Abril',
+  maio: 'Maio', junho: 'Junho', julho: 'Julho', agosto: 'Agosto',
+  setembro: 'Setembro', outubro: 'Outubro', novembro: 'Novembro', dezembro: 'Dezembro'
+};
+
 // Estrutura de categorias fixas do DRE com cores para PDF
 const CATEGORIAS_CONFIG = {
   receita_bruta: { label: "(+) Receita Bruta", cor: "cyan", tipo: "positivo", rgbHeader: [224, 247, 250], rgbText: [6, 148, 162] },
@@ -61,6 +72,7 @@ export default function DREPage() {
   const [hierarquia, setHierarquia] = useState(null);
   const [loading, setLoading] = useState(false);
   const [ano, setAno] = useState(new Date().getFullYear());
+  const [mesFiltro, setMesFiltro] = useState('todos');
   const [anosDisponiveis, setAnosDisponiveis] = useState([]);
   const tableRef = useRef(null);
   const scrollContainerRef = useRef(null);
@@ -317,8 +329,15 @@ export default function DREPage() {
     const formatVal = (v) => v ? v.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, '.') : '0';
     const formatPct = (v) => v ? v.toFixed(0) + '%' : '0%';
     
+    const mesesVis = mesFiltro === 'todos' ? meses : [mesFiltro];
+    const showTotal = mesFiltro === 'todos';
+    const base = mesFiltro === 'todos' ? (totais?.receita_liquida?.total || 0) : (totais?.receita_liquida?.[mesFiltro] || 0);
+    const periodoVal = (valores) => (mesFiltro === 'todos' ? (valores?.total || 0) : (valores?.[mesFiltro] || 0));
+    
     // Header
-    const header = ['Descrição', ...meses.map(m => MESES_LABELS[m]), ano.toString(), 'AV%'];
+    const header = ['Descrição', ...mesesVis.map(m => MESES_LABELS[m])];
+    if (showTotal) header.push(ano.toString());
+    header.push('AV%');
     rows.push(header.join(';'));
     
     // Gerar dados com base no estado de expansão
@@ -329,21 +348,20 @@ export default function DREPage() {
       const prefix = item.nivel === 2 ? '• ' : '';
       const descricao = indent + prefix + item.descricao;
       
-      const av = item.isPercent ? '-' : (receitaBrutaTotal > 0 ? formatPct((item.valores?.total || 0) / receitaBrutaTotal * 100) : '0%');
+      const av = item.isPercent ? '-' : (base > 0 ? formatPct(periodoVal(item.valores) / base * 100) : '0%');
       
-      rows.push([
-        descricao,
-        ...meses.map(m => item.isPercent ? formatPct(item.valores?.[m]) : formatVal(item.valores?.[m])),
-        item.isPercent ? formatPct(item.valores?.total) : formatVal(item.valores?.total),
-        av
-      ].join(';'));
+      const linha = [descricao, ...mesesVis.map(m => item.isPercent ? formatPct(item.valores?.[m]) : formatVal(item.valores?.[m]))];
+      if (showTotal) linha.push(item.isPercent ? formatPct(item.valores?.total) : formatVal(item.valores?.total));
+      linha.push(av);
+      rows.push(linha.join(';'));
     });
     
     const csvContent = '\uFEFF' + rows.join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `DRE_${ano}.csv`;
+    const sufixo = mesFiltro === 'todos' ? '' : `_${MESES_LABELS[mesFiltro]}`;
+    link.download = `DRE_${ano}${sufixo}.csv`;
     link.click();
   };
 
@@ -362,6 +380,11 @@ export default function DREPage() {
     };
     const formatPct = (v) => v ? `${v.toFixed(0)}%` : '0%';
     
+    const mesesVis = mesFiltro === 'todos' ? meses : [mesFiltro];
+    const showTotal = mesFiltro === 'todos';
+    const base = mesFiltro === 'todos' ? (totais?.receita_liquida?.total || 0) : (totais?.receita_liquida?.[mesFiltro] || 0);
+    const periodoVal = (valores) => (mesFiltro === 'todos' ? (valores?.total || 0) : (valores?.[mesFiltro] || 0));
+    
     const dadosExportacao = gerarDadosExportacao();
     
     // Criar PDF em landscape
@@ -369,23 +392,24 @@ export default function DREPage() {
     
     // Título
     doc.setFontSize(16);
-    doc.text(`Demonstrativo de Resultado do Exercício - ${ano}`, doc.internal.pageSize.width / 2, 15, { align: 'center' });
+    const tituloPeriodo = mesFiltro === 'todos' ? `${ano}` : `${MESES_NOMES[mesFiltro]}/${ano}`;
+    doc.text(`Demonstrativo de Resultado do Exercício - ${tituloPeriodo}`, doc.internal.pageSize.width / 2, 15, { align: 'center' });
     
     // Preparar dados para a tabela
-    const headers = ['Descrição', ...meses.map(m => MESES_LABELS[m]), ano.toString(), 'AV%'];
+    const headers = ['Descrição', ...mesesVis.map(m => MESES_LABELS[m])];
+    if (showTotal) headers.push(ano.toString());
+    headers.push('AV%');
     
     const body = dadosExportacao.map(item => {
       const indent = '  '.repeat(item.nivel);
       const prefix = item.nivel === 2 ? '• ' : '';
       const descricao = indent + prefix + item.descricao;
-      const av = item.isPercent ? '-' : (receitaBrutaTotal > 0 ? formatPct((item.valores?.total || 0) / receitaBrutaTotal * 100) : '0%');
+      const av = item.isPercent ? '-' : (base > 0 ? formatPct(periodoVal(item.valores) / base * 100) : '0%');
       
-      return [
-        descricao,
-        ...meses.map(m => item.isPercent ? formatPct(item.valores?.[m]) : formatVal(item.valores?.[m])),
-        item.isPercent ? formatPct(item.valores?.total) : formatVal(item.valores?.total),
-        av
-      ];
+      const linha = [descricao, ...mesesVis.map(m => item.isPercent ? formatPct(item.valores?.[m]) : formatVal(item.valores?.[m]))];
+      if (showTotal) linha.push(item.isPercent ? formatPct(item.valores?.total) : formatVal(item.valores?.total));
+      linha.push(av);
+      return linha;
     });
     
     // Gerar tabela com autoTable
@@ -430,7 +454,8 @@ export default function DREPage() {
     });
     
     // Download automático
-    doc.save(`DRE_${ano}.pdf`);
+    const sufixo = mesFiltro === 'todos' ? '' : `_${MESES_LABELS[mesFiltro]}`;
+    doc.save(`DRE_${ano}${sufixo}.pdf`);
   };
 
   const formatCurrency = (value) => {
@@ -476,19 +501,29 @@ export default function DREPage() {
   const totais = dre?.totais || {};
   const receitaBrutaTotal = totais?.receita_liquida?.total || 0;
 
+  // Filtro de mês: 'todos' = ano consolidado; caso contrário mostra apenas o mês escolhido
+  const mesesVisiveis = mesFiltro === 'todos'
+    ? meses
+    : (meses.includes(mesFiltro) ? [mesFiltro] : meses);
+  const mostrarTotalCol = mesFiltro === 'todos';
+  const periodo = (valores) => (mesFiltro === 'todos' ? (valores?.total || 0) : (valores?.[mesFiltro] || 0));
+  const baseAV = mesFiltro === 'todos' ? receitaBrutaTotal : (totais?.receita_liquida?.[mesFiltro] || 0);
+
   // Renderiza valores por linha
   const renderValoresLinha = (valores, isPercent = false, cor = '') => (
     <>
-      {meses.map((mes) => (
+      {mesesVisiveis.map((mes) => (
         <td key={mes} className={`text-right p-2 border-r border-gray-200 ${cor}`}>
           {isPercent ? formatPercent(valores?.[mes]) : formatCurrency(valores?.[mes])}
         </td>
       ))}
-      <td className={`text-right p-2 bg-gray-50 border-r border-gray-300 font-semibold ${cor}`}>
-        {isPercent ? formatPercent(valores?.total) : formatCurrency(valores?.total)}
-      </td>
+      {mostrarTotalCol && (
+        <td className={`text-right p-2 bg-gray-50 border-r border-gray-300 font-semibold ${cor}`}>
+          {isPercent ? formatPercent(valores?.total) : formatCurrency(valores?.total)}
+        </td>
+      )}
       <td className={`text-right p-2 bg-gray-50 ${cor}`}>
-        {isPercent ? formatPercent(valores?.total) : calcularAV(valores?.total, receitaBrutaTotal)}
+        {isPercent ? formatPercent(periodo(valores)) : calcularAV(periodo(valores), baseAV)}
       </td>
     </>
   );
@@ -570,16 +605,18 @@ export default function DREPage() {
                     {subcat.nome}
                   </div>
                 </td>
-                {meses.map((mes) => (
+                {mesesVisiveis.map((mes) => (
                   <td key={mes} className="text-right p-2 border-r border-gray-200">
                     {formatCurrency(subcatTotal(mes))}
                   </td>
                 ))}
-                <td className="text-right p-2 bg-gray-50 border-r border-gray-300">
-                  {formatCurrency(meses.reduce((a, m) => a + subcatTotal(m), 0))}
-                </td>
+                {mostrarTotalCol && (
+                  <td className="text-right p-2 bg-gray-50 border-r border-gray-300">
+                    {formatCurrency(meses.reduce((a, m) => a + subcatTotal(m), 0))}
+                  </td>
+                )}
                 <td className="text-right p-2 bg-gray-50">
-                  {calcularAV(meses.reduce((a, m) => a + subcatTotal(m), 0), receitaBrutaTotal)}
+                  {calcularAV(mesesVisiveis.reduce((a, m) => a + subcatTotal(m), 0), baseAV)}
                 </td>
               </tr>
 
@@ -590,7 +627,7 @@ export default function DREPage() {
                   <td className="p-2 pl-6 md:pl-14 sticky left-0 bg-white hover:bg-gray-50 border-r border-gray-300 text-gray-600 text-sm max-w-[150px] md:max-w-none whitespace-normal md:whitespace-nowrap break-words">
                     • {item.nome}
                   </td>
-                  {meses.map((mes) => {
+                  {mesesVisiveis.map((mes) => {
                     const valor = dre?.valores_por_plano?.[item.id]?.[mes] || 0;
                     const clicavel = valor !== 0;
                     return (
@@ -606,7 +643,7 @@ export default function DREPage() {
                       </td>
                     );
                   })}
-                  {(() => {
+                  {mostrarTotalCol && (() => {
                     const totalItem = meses.reduce((a, m) => a + (dre?.valores_por_plano?.[item.id]?.[m] || 0), 0);
                     const clicavel = totalItem !== 0;
                     return (
@@ -622,7 +659,7 @@ export default function DREPage() {
                     );
                   })()}
                   <td className="text-right p-2 bg-gray-50 text-gray-600 text-sm">
-                    {calcularAV(meses.reduce((a, m) => a + (dre?.valores_por_plano?.[item.id]?.[m] || 0), 0), receitaBrutaTotal)}
+                    {calcularAV(mesesVisiveis.reduce((a, m) => a + (dre?.valores_por_plano?.[item.id]?.[m] || 0), 0), baseAV)}
                   </td>
                 </tr>
               ))}
@@ -639,7 +676,11 @@ export default function DREPage() {
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3">
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-gray-800">DRE - Demonstrativo de Resultado</h1>
-          <p className="text-gray-600 text-sm">Visão anual consolidada com estrutura hierárquica</p>
+          <p className="text-gray-600 text-sm">
+            {mesFiltro === 'todos'
+              ? 'Visão anual consolidada com estrutura hierárquica'
+              : `Visão do mês de ${MESES_NOMES[mesFiltro]} de ${ano}`}
+          </p>
         </div>
 
         <div className="flex gap-2 md:gap-3 items-center flex-wrap">
@@ -676,6 +717,18 @@ export default function DREPage() {
             PDF
           </button>
           
+          <select
+            value={mesFiltro}
+            onChange={(e) => setMesFiltro(e.target.value)}
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500"
+            data-testid="mes-filtro-select"
+          >
+            <option value="todos">Todos os meses</option>
+            {MESES_ORDEM.map((m) => (
+              <option key={m} value={m}>{MESES_NOMES[m]}</option>
+            ))}
+          </select>
+
           <select
             value={ano}
             onChange={(e) => setAno(parseInt(e.target.value))}
@@ -720,14 +773,16 @@ export default function DREPage() {
               <th className="text-left p-2 sticky left-0 bg-gray-100 border-r border-gray-300 max-w-[150px] md:max-w-none whitespace-normal md:whitespace-nowrap break-words">
                 Descrição
               </th>
-              {meses.map((mes) => (
+              {mesesVisiveis.map((mes) => (
                 <th key={mes} className="text-right p-2 min-w-[75px] md:min-w-[85px] border-r border-gray-200">
                   {MESES_LABELS[mes]}
                 </th>
               ))}
-              <th className="text-right p-2 min-w-[90px] md:min-w-[100px] bg-gray-200 border-r border-gray-300 font-bold">
-                {ano}
-              </th>
+              {mostrarTotalCol && (
+                <th className="text-right p-2 min-w-[90px] md:min-w-[100px] bg-gray-200 border-r border-gray-300 font-bold">
+                  {ano}
+                </th>
+              )}
               <th className="text-right p-2 min-w-[55px] md:min-w-[60px] bg-gray-200 font-bold">
                 AV%
               </th>
