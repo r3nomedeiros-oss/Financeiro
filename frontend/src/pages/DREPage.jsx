@@ -235,10 +235,16 @@ export default function DREPage() {
     const formatVal = (v) => v ? v.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, '.') : '0';
     const formatPct = (v) => v ? v.toFixed(0) + '%' : '0%';
     
+    // Valor do período exportado (mês selecionado ou total anual)
+    const periodoVal = (valores) => (mesFiltro === 'todos' ? (valores?.total || 0) : (valores?.[mesFiltro] || 0));
+
     const addCategoriaRows = (catId, catConfig) => {
       const catData = hierarquia?.[catId];
       const isExpanded = expandedState[catId]?.expanded;
       const subcategorias = catData?.subcategorias || [];
+
+      // Ignorar categorias sem valor no período exportado
+      if (periodoVal(totais[catId]) === 0) return;
       
       // Linha da categoria principal
       rows.push({
@@ -263,6 +269,9 @@ export default function DREPage() {
             subcatValores[mes] = subValor + itensValor;
           });
           subcatValores.total = meses.reduce((a, m) => a + (subcatValores[m] || 0), 0);
+
+          // Ignorar subcategorias sem valor no período exportado
+          if (periodoVal(subcatValores) === 0) return;
           
           rows.push({
             nivel: 1,
@@ -280,6 +289,9 @@ export default function DREPage() {
                 itemValores[mes] = dre?.valores_por_plano?.[item.id]?.[mes] || 0;
               });
               itemValores.total = meses.reduce((a, m) => a + (itemValores[m] || 0), 0);
+
+              // Ignorar itens sem valor no período exportado
+              if (periodoVal(itemValores) === 0) return;
               
               rows.push({
                 nivel: 2,
