@@ -183,7 +183,7 @@ Este é um sistema financeiro completo desenvolvido para gestão industrial, com
 ### 1. Primeiro Acesso
 
 1. **Acesse a aplicação:**
-   - URL: https://money-system-changes.preview.emergentagent.com
+   - URL: https://fintech-gateway-23.preview.emergentagent.com
 
 2. **Crie sua conta:**
    - Clique em "Cadastro"
