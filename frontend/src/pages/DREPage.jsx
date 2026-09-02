@@ -744,19 +744,21 @@ export default function DREPage() {
 
       {/* Tabela DRE com Tree View */}
       <div className="bg-white rounded-lg shadow">
-        {/* Barra de scroll superior sincronizada */}
-        <div 
-          ref={topScrollRef}
-          className="overflow-x-scroll bg-gray-50 border-b border-gray-300"
-          style={{ 
-            overflowY: 'hidden',
-            scrollbarWidth: 'auto',
-            scrollbarColor: '#9ca3af #e5e7eb'
-          }}
-          onScroll={handleTopScroll}
-        >
-          <div style={{ height: '1px' }} className="w-[1000px] md:w-[1500px]"></div>
-        </div>
+        {/* Barra de scroll superior sincronizada - apenas na visão anual (muitas colunas) */}
+        {mesFiltro === 'todos' && (
+          <div 
+            ref={topScrollRef}
+            className="overflow-x-scroll bg-gray-50 border-b border-gray-300"
+            style={{ 
+              overflowY: 'hidden',
+              scrollbarWidth: 'auto',
+              scrollbarColor: '#9ca3af #e5e7eb'
+            }}
+            onScroll={handleTopScroll}
+          >
+            <div style={{ height: '1px' }} className="w-[1000px] md:w-[1500px]"></div>
+          </div>
+        )}
         
         <div 
           ref={scrollContainerRef}
@@ -767,7 +769,7 @@ export default function DREPage() {
           }}
           onScroll={handleTableScroll}
         >
-          <table ref={tableRef} className="w-full text-sm border-collapse min-w-[1000px] md:min-w-[1500px]" data-testid="dre-table">
+          <table ref={tableRef} className={`w-full text-sm border-collapse ${mesFiltro === 'todos' ? 'min-w-[1000px] md:min-w-[1500px]' : ''}`} data-testid="dre-table">
           <thead>
             <tr className="bg-gray-100 border-b-2 border-gray-300">
               <th className="text-left p-2 sticky left-0 bg-gray-100 border-r border-gray-300 max-w-[150px] md:max-w-none whitespace-normal md:whitespace-nowrap break-words">
