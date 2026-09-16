@@ -25,6 +25,7 @@ class ContaBancariaCreate(BaseModel):
 
 class ContaBancariaUpdate(BaseModel):
     nome: Optional[str] = None
+    saldo_inicial: Optional[float] = None
     saldo_atual: Optional[float] = None
 
 # Plano de Contas Models - Estrutura Hierárquica de 3 níveis

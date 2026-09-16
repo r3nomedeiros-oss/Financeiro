@@ -215,6 +215,58 @@ async def set_user_admin(target_id: str, payload: dict, admin_id: str = Depends(
 # ROTAS DE CONTAS BANCÁRIAS
 # ============================================
 
+def _recalcular_saldo_conta(user_id: str, conta_id: str) -> None:
+    """Recalcula o saldo_atual de uma conta de forma DETERMINÍSTICA:
+    saldo_atual = saldo_inicial + soma(entradas) - soma(saídas).
+
+    Usar após cada create/update/delete de movimentação garante que o saldo
+    nunca "desande" por atualizações incrementais inconsistentes (ex.: troca de
+    conta bancária na edição ou operações parciais)."""
+    supabase = get_supabase()
+    conta_res = supabase.table("contas_bancarias").select("*").eq("id", conta_id).eq("user_id", user_id).execute()
+    if not conta_res.data:
+        return
+    saldo_inicial = float(conta_res.data[0].get("saldo_inicial") or 0)
+
+    total = saldo_inicial
+    # Paginar porque o Supabase trunca em 1000 registros por chamada
+    PAGE_SIZE = 1000
+    start = 0
+    while True:
+        movs = (
+            supabase.table("movimentacoes")
+            .select("tipo, valor")
+            .eq("user_id", user_id)
+            .eq("conta_bancaria_id", conta_id)
+            .range(start, start + PAGE_SIZE - 1)
+            .execute()
+            .data or []
+        )
+        for m in movs:
+            valor = float(m.get("valor") or 0)
+            if m.get("tipo") == "entrada":
+                total += valor
+            else:
+                total -= valor
+        if len(movs) < PAGE_SIZE:
+            break
+        start += PAGE_SIZE
+
+    supabase.table("contas_bancarias").update({"saldo_atual": total}).eq("id", conta_id).execute()
+
+
+@app.post("/api/contas-bancarias/recalcular")
+async def recalcular_saldos(user_id: str = Depends(get_current_user)):
+    """Recalcula o saldo de TODAS as contas do usuário a partir das movimentações.
+    Usado para corrigir saldos que ficaram inconsistentes."""
+    supabase = get_supabase()
+    contas = supabase.table("contas_bancarias").select("id").eq("user_id", user_id).execute().data or []
+    for c in contas:
+        _recalcular_saldo_conta(user_id, c["id"])
+    result = supabase.table("contas_bancarias").select("*").eq("user_id", user_id).order("nome").execute()
+    return result.data
+
+
 @app.get("/api/contas-bancarias")
 async def get_contas_bancarias(user_id: str = Depends(get_current_user)):
     supabase = get_supabase()
@@ -248,6 +300,10 @@ async def update_conta_bancaria(conta_id: str, conta: ContaBancariaUpdate, user_
     
     update_data = conta.dict(exclude_unset=True)
     result = supabase.table("contas_bancarias").update(update_data).eq("id", conta_id).execute()
+    # Se o saldo inicial mudou, recalcula o saldo atual (inicial + entradas - saídas)
+    if "saldo_inicial" in update_data:
+        _recalcular_saldo_conta(user_id, conta_id)
+        result = supabase.table("contas_bancarias").select("*").eq("id", conta_id).execute()
     return result.data[0]
 
 @app.delete("/api/contas-bancarias/{conta_id}")
@@ -571,12 +627,10 @@ async def get_movimentacoes(
 async def create_movimentacao(mov: MovimentacaoCreate, user_id: str = Depends(get_current_user)):
     supabase = get_supabase()
     
-    # Buscar conta bancária para atualizar saldo
-    conta_result = supabase.table("contas_bancarias").select("*").eq("id", mov.conta_bancaria_id).eq("user_id", user_id).execute()
+    # Validar conta bancária
+    conta_result = supabase.table("contas_bancarias").select("id").eq("id", mov.conta_bancaria_id).eq("user_id", user_id).execute()
     if not conta_result.data:
         raise HTTPException(status_code=404, detail="Conta bancária não encontrada")
-    
-    conta = conta_result.data[0]
     
     nova_mov = {
         "id": str(uuid.uuid4()),
@@ -591,15 +645,9 @@ async def create_movimentacao(mov: MovimentacaoCreate, user_id: str = Depends(ge
         "created_at": datetime.utcnow().isoformat()
     }
     
-    # Atualizar saldo da conta
-    if mov.tipo == "entrada":
-        novo_saldo = conta["saldo_atual"] + mov.valor
-    else:
-        novo_saldo = conta["saldo_atual"] - mov.valor
-    
-    supabase.table("contas_bancarias").update({"saldo_atual": novo_saldo}).eq("id", mov.conta_bancaria_id).execute()
-    
     result = supabase.table("movimentacoes").insert(nova_mov).execute()
+    # Recalcula o saldo da conta de forma determinística
+    _recalcular_saldo_conta(user_id, mov.conta_bancaria_id)
     return result.data[0]
 
 @app.put("/api/movimentacoes/{mov_id}")
@@ -613,30 +661,16 @@ async def update_movimentacao(mov_id: str, mov: MovimentacaoUpdate, user_id: str
     
     mov_original = result.data[0]
     
-    # Se mudou valor ou tipo, atualizar saldo
-    if mov.valor is not None or mov.tipo is not None:
-        conta_result = supabase.table("contas_bancarias").select("*").eq("id", mov_original["conta_bancaria_id"]).execute()
-        conta = conta_result.data[0]
-        
-        # Reverter movimentação original
-        if mov_original["tipo"] == "entrada":
-            saldo = conta["saldo_atual"] - mov_original["valor"]
-        else:
-            saldo = conta["saldo_atual"] + mov_original["valor"]
-        
-        # Aplicar nova movimentação
-        novo_tipo = mov.tipo if mov.tipo else mov_original["tipo"]
-        novo_valor = mov.valor if mov.valor is not None else mov_original["valor"]
-        
-        if novo_tipo == "entrada":
-            saldo += novo_valor
-        else:
-            saldo -= novo_valor
-        
-        supabase.table("contas_bancarias").update({"saldo_atual": saldo}).eq("id", mov_original["conta_bancaria_id"]).execute()
-    
     update_data = mov.dict(exclude_unset=True)
     result = supabase.table("movimentacoes").update(update_data).eq("id", mov_id).execute()
+    
+    # Recalcula o saldo das contas afetadas (original e nova, caso tenha mudado)
+    contas_afetadas = {mov_original["conta_bancaria_id"]}
+    if mov.conta_bancaria_id:
+        contas_afetadas.add(mov.conta_bancaria_id)
+    for cid in contas_afetadas:
+        _recalcular_saldo_conta(user_id, cid)
+    
     return result.data[0]
 
 @app.delete("/api/movimentacoes/{mov_id}")
@@ -650,18 +684,9 @@ async def delete_movimentacao(mov_id: str, user_id: str = Depends(get_current_us
     
     mov = result.data[0]
     
-    # Reverter saldo da conta
-    conta_result = supabase.table("contas_bancarias").select("*").eq("id", mov["conta_bancaria_id"]).execute()
-    conta = conta_result.data[0]
-    
-    if mov["tipo"] == "entrada":
-        novo_saldo = conta["saldo_atual"] - mov["valor"]
-    else:
-        novo_saldo = conta["saldo_atual"] + mov["valor"]
-    
-    supabase.table("contas_bancarias").update({"saldo_atual": novo_saldo}).eq("id", mov["conta_bancaria_id"]).execute()
-    
     supabase.table("movimentacoes").delete().eq("id", mov_id).execute()
+    # Recalcula o saldo da conta após a exclusão
+    _recalcular_saldo_conta(user_id, mov["conta_bancaria_id"])
     return {"message": "Movimentação excluída com sucesso"}
 
 @app.post("/api/movimentacoes/reorder")

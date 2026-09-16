@@ -43,6 +43,7 @@ export default function ConfiguracoesPage() {
   const [editingConta, setEditingConta] = useState(null);
   const [expandedCategories, setExpandedCategories] = useState({});
   const [expandedSubcats, setExpandedSubcats] = useState({});
+  const [recalculando, setRecalculando] = useState(false);
   
   // Drag & Drop
   const [dragState, setDragState] = useState({ dragId: null, dragCatId: null, overId: null });
@@ -267,6 +268,22 @@ export default function ConfiguracoesPage() {
     } catch (error) {
       console.error('Erro ao excluir:', error);
       alert('Erro ao excluir. Esta conta pode ter movimentações vinculadas.');
+    }
+  };
+
+  const handleRecalcularSaldos = async () => {
+    try {
+      setRecalculando(true);
+      const res = await contasAPI.recalcular();
+      setContasBancarias(res.data);
+      invalidateCache('/api/contas-bancarias');
+      invalidateCache('/api/dashboard');
+      alert('Saldos recalculados com sucesso a partir das movimentações.');
+    } catch (error) {
+      console.error('Erro ao recalcular saldos:', error);
+      alert('Erro ao recalcular saldos.');
+    } finally {
+      setRecalculando(false);
     }
   };
 
@@ -511,17 +528,28 @@ export default function ConfiguracoesPage() {
             <p className="text-sm text-gray-600">
               Gerencie suas contas bancárias para controle de saldo.
             </p>
-            <button
-              onClick={() => {
-                setEditingConta(null);
-                setContaFormData({ nome: '', saldo_inicial: 0 });
-                setShowContaModal(true);
-              }}
-              className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 text-sm whitespace-nowrap"
-              data-testid="adicionar-conta-btn"
-            >
-              + Adicionar Conta
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleRecalcularSaldos}
+                disabled={recalculando}
+                className="px-4 py-2 bg-white border border-cyan-600 text-cyan-700 rounded-lg hover:bg-cyan-50 text-sm whitespace-nowrap disabled:opacity-50"
+                data-testid="recalcular-saldos-btn"
+                title="Recalcula o saldo de todas as contas a partir das movimentações (saldo inicial + entradas - saídas)"
+              >
+                {recalculando ? 'Recalculando...' : 'Recalcular Saldos'}
+              </button>
+              <button
+                onClick={() => {
+                  setEditingConta(null);
+                  setContaFormData({ nome: '', saldo_inicial: 0 });
+                  setShowContaModal(true);
+                }}
+                className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 text-sm whitespace-nowrap"
+                data-testid="adicionar-conta-btn"
+              >
+                + Adicionar Conta
+              </button>
+            </div>
           </div>
 
           <div className="bg-white rounded-lg shadow overflow-hidden">

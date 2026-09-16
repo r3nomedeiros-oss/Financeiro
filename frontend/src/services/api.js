@@ -123,6 +123,7 @@ export const contasAPI = {
   create: (data) => api.post('/api/contas-bancarias', data),
   update: (id, data) => api.put(`/api/contas-bancarias/${id}`, data),
   delete: (id) => api.delete(`/api/contas-bancarias/${id}`),
+  recalcular: () => api.post('/api/contas-bancarias/recalcular'),
 };
 
 // ============================================
