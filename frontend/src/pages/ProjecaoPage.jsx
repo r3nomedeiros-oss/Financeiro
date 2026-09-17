@@ -6,6 +6,8 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine,
 } from 'recharts';
 import ContasAPagar from './ContasAPagar';
+import ContasAReceber from './ContasAReceber';
+import ComparativoContas from './ComparativoContas';
 
 const STORAGE_KEY = 'projecao_fluxo_caixa_v1';
 
@@ -266,7 +268,7 @@ export default function ProjecaoPage() {
 
       {/* Abas internas */}
       <div className="border-b border-gray-200">
-        <nav className="flex gap-4">
+        <nav className="flex gap-4 flex-wrap">
           <button
             onClick={() => setView('simulacao')}
             className={`py-2.5 px-1 border-b-2 font-medium text-sm transition-colors ${view === 'simulacao' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
@@ -275,16 +277,32 @@ export default function ProjecaoPage() {
             Simulação (12 meses)
           </button>
           <button
-            onClick={() => setView('contas')}
-            className={`py-2.5 px-1 border-b-2 font-medium text-sm transition-colors ${view === 'contas' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+            onClick={() => setView('pagar')}
+            className={`py-2.5 px-1 border-b-2 font-medium text-sm transition-colors ${view === 'pagar' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
             data-testid="tab-contas-pagar"
           >
             Contas a Pagar
           </button>
+          <button
+            onClick={() => setView('receber')}
+            className={`py-2.5 px-1 border-b-2 font-medium text-sm transition-colors ${view === 'receber' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+            data-testid="tab-contas-receber"
+          >
+            Contas a Receber
+          </button>
+          <button
+            onClick={() => setView('comparativo')}
+            className={`py-2.5 px-1 border-b-2 font-medium text-sm transition-colors ${view === 'comparativo' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+            data-testid="tab-comparativo"
+          >
+            Comparativo (Receber × Pagar)
+          </button>
         </nav>
       </div>
 
-      {view === 'contas' && <ContasAPagar />}
+      {view === 'pagar' && <ContasAPagar />}
+      {view === 'receber' && <ContasAReceber />}
+      {view === 'comparativo' && <ComparativoContas />}
 
       {view === 'simulacao' && (
       <>

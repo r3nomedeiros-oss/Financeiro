@@ -13,6 +13,12 @@ Sistema financeiro existente conectado a Vercel/Supabase/GitHub (React+Vite / Fa
 ### [Jan 2026] Barra de scroll superior na Tabela de Planejamento Orçamentário
 - `/app/frontend/src/pages/PlanejamentoPage.jsx`, `/app/frontend/src/index.css`
 
+### [Jun 2026] Projeção: Contas a Receber + Comparativo (Receber x Pagar)
+- Componente generico `ContasSection.jsx` (parametrizado por config) usado por `ContasAPagar.jsx` (key `projecao_contas_pagar_v1`) e `ContasAReceber.jsx` (key `projecao_contas_receber_v1`).
+- `ComparativoContas.jsx`: le ambos os localStorage, filtro mes/periodo, grafico com 3 linhas (A Receber, A Pagar, Saldo acumulado) + resumo (A Receber / A Pagar / Saldo). Botao "Atualizar" re-le o localStorage.
+- ProjecaoPage: 4 abas internas (view): simulacao | pagar | receber | comparativo.
+- Verificado via screenshot: cadastro receber, resumos e comparativo (15.745,12 - 8.220,00 = 7.525,12) OK.
+
 ### [Jun 2026] Projeção: sub-aba "Contas a Pagar" (dentro de /projecao, isolada)
 - Arquivo: `/app/frontend/src/pages/ContasAPagar.jsx`. Integrada via abas internas em `ProjecaoPage.jsx` (state `view`: 'simulacao' | 'contas').
 - localStorage key `projecao_contas_pagar_v1`. NAO usa API; nao afeta relatorios.
