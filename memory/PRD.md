@@ -13,6 +13,14 @@ Sistema financeiro existente conectado a Vercel/Supabase/GitHub (React+Vite / Fa
 ### [Jan 2026] Barra de scroll superior na Tabela de Planejamento Orçamentário
 - `/app/frontend/src/pages/PlanejamentoPage.jsx`, `/app/frontend/src/index.css`
 
+### [Jun 2026] Projeção: sub-aba "Contas a Pagar" (dentro de /projecao, isolada)
+- Arquivo: `/app/frontend/src/pages/ContasAPagar.jsx`. Integrada via abas internas em `ProjecaoPage.jsx` (state `view`: 'simulacao' | 'contas').
+- localStorage key `projecao_contas_pagar_v1`. NAO usa API; nao afeta relatorios.
+- Cadastro: descricao, valor, vencimento, categoria (datalist), status (pago/pendente, toggle na tabela). Editar/excluir.
+- Resumo: Total a Pagar / Pago / Pendente (sobre o periodo filtrado). Contas vencidas destacadas.
+- Filtro: "Por mes" (ano+mes) ou "Periodo" (De/Ate). Grafico de linha (Recharts) do total por periodo: buckets diarios se intervalo <= 62 dias, senao mensais.
+- Verificado via screenshot: cadastro, resumo, toggle status, filtro mes/periodo e grafico OK.
+
 ### [Jun 2026] Nova aba: Projeção de Fluxo de Caixa (simulador de cenários) - ISOLADA
 - Arquivo: `/app/frontend/src/pages/ProjecaoPage.jsx`. Rota `/projecao` (App.jsx), menu em Sidebar.jsx e MobileBottomNav.jsx (icone TrendingUp).
 - 100% client-side (localStorage key `projecao_fluxo_caixa_v1`). NAO faz nenhuma chamada de API; nao le nem escreve DRE/Movimentacoes/saldos reais.

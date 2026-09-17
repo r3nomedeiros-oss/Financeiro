@@ -44,6 +44,7 @@ export default function ConfiguracoesPage() {
   const [expandedCategories, setExpandedCategories] = useState({});
   const [expandedSubcats, setExpandedSubcats] = useState({});
   const [recalculando, setRecalculando] = useState(false);
+  const [criandoPlano, setCriandoPlano] = useState(false);
   
   // Drag & Drop
   const [dragState, setDragState] = useState({ dragId: null, dragCatId: null, overId: null });

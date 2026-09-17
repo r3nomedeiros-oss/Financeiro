@@ -5,6 +5,7 @@ import {
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine,
 } from 'recharts';
+import ContasAPagar from './ContasAPagar';
 
 const STORAGE_KEY = 'projecao_fluxo_caixa_v1';
 
@@ -84,6 +85,7 @@ export default function ProjecaoPage() {
   const [carregado, setCarregado] = useState(false);
   const [renomeando, setRenomeando] = useState(false);
   const [nomeTmp, setNomeTmp] = useState('');
+  const [view, setView] = useState('simulacao'); // 'simulacao' | 'contas'
   const renameRef = useRef(null);
 
   // Carregar do localStorage
@@ -262,6 +264,30 @@ export default function ProjecaoPage() {
         </div>
       </div>
 
+      {/* Abas internas */}
+      <div className="border-b border-gray-200">
+        <nav className="flex gap-4">
+          <button
+            onClick={() => setView('simulacao')}
+            className={`py-2.5 px-1 border-b-2 font-medium text-sm transition-colors ${view === 'simulacao' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+            data-testid="tab-simulacao"
+          >
+            Simulação (12 meses)
+          </button>
+          <button
+            onClick={() => setView('contas')}
+            className={`py-2.5 px-1 border-b-2 font-medium text-sm transition-colors ${view === 'contas' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+            data-testid="tab-contas-pagar"
+          >
+            Contas a Pagar
+          </button>
+        </nav>
+      </div>
+
+      {view === 'contas' && <ContasAPagar />}
+
+      {view === 'simulacao' && (
+      <>
       {/* Barra de cenários */}
       <div className="bg-white rounded-xl shadow-md p-3 md:p-4 flex flex-col md:flex-row md:items-center gap-3">
         <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -415,6 +441,8 @@ export default function ProjecaoPage() {
           </table>
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }
