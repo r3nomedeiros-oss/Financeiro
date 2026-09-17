@@ -12,7 +12,8 @@ import {
   ChevronRight,
   Wallet,
   GitCompare,
-  Users
+  Users,
+  TrendingUp
 } from 'lucide-react';
 
 const baseMenuItems = [
@@ -20,6 +21,7 @@ const baseMenuItems = [
   { path: '/movimentacoes', icon: ArrowLeftRight, label: 'Movimentação Financeira' },
   { path: '/dre', icon: FileText, label: 'Demonstrativo de Resultado' },
   { path: '/fluxo-caixa', icon: Wallet, label: 'Fluxo de Caixa Diário' },
+  { path: '/projecao', icon: TrendingUp, label: 'Projeção de Fluxo de Caixa' },
   { path: '/planejamento', icon: Target, label: 'Planejamento Orçamentário' },
   { path: '/comparativo', icon: GitCompare, label: 'Orçado x Realizado' },
   { path: '/relatorios', icon: BarChart3, label: 'Relatórios Comparativos' },

@@ -11,6 +11,7 @@ const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const MovimentacoesPage = lazy(() => import('./pages/MovimentacoesPage'));
 const DREPage = lazy(() => import('./pages/DREPage'));
 const FluxoCaixaPage = lazy(() => import('./pages/FluxoCaixaPage'));
+const ProjecaoPage = lazy(() => import('./pages/ProjecaoPage'));
 const PlanejamentoPage = lazy(() => import('./pages/PlanejamentoPage'));
 const ComparativoPage = lazy(() => import('./pages/ComparativoPage'));
 const RelatoriosPage = lazy(() => import('./pages/RelatoriosPage'));
@@ -134,6 +135,7 @@ function AppRoutes() {
         <Route path="/movimentacoes" element={<MovimentacoesPage />} />
         <Route path="/dre" element={<DREPage />} />
         <Route path="/fluxo-caixa" element={<FluxoCaixaPage />} />
+        <Route path="/projecao" element={<ProjecaoPage />} />
         <Route path="/planejamento" element={<PlanejamentoPage />} />
         <Route path="/comparativo" element={<ComparativoPage />} />
         <Route path="/relatorios" element={<RelatoriosPage />} />

@@ -13,7 +13,8 @@ import {
   Settings,
   LogOut,
   User,
-  Users
+  Users,
+  TrendingUp
 } from 'lucide-react';
 
 // Itens principais (barra inferior)
@@ -26,6 +27,7 @@ const primaryItems = [
 
 // Itens secundários (gaveta "Mais")
 const baseSecondaryItems = [
+  { path: '/projecao', icon: TrendingUp, label: 'Projeção de Fluxo de Caixa' },
   { path: '/planejamento', icon: Target, label: 'Planejamento Orçamentário' },
   { path: '/comparativo', icon: GitCompare, label: 'Orçado x Realizado' },
   { path: '/relatorios', icon: BarChart3, label: 'Relatórios Comparativos' },

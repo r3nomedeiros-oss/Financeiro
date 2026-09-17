@@ -13,6 +13,13 @@ Sistema financeiro existente conectado a Vercel/Supabase/GitHub (React+Vite / Fa
 ### [Jan 2026] Barra de scroll superior na Tabela de Planejamento Orçamentário
 - `/app/frontend/src/pages/PlanejamentoPage.jsx`, `/app/frontend/src/index.css`
 
+### [Jun 2026] Nova aba: Projeção de Fluxo de Caixa (simulador de cenários) - ISOLADA
+- Arquivo: `/app/frontend/src/pages/ProjecaoPage.jsx`. Rota `/projecao` (App.jsx), menu em Sidebar.jsx e MobileBottomNav.jsx (icone TrendingUp).
+- 100% client-side (localStorage key `projecao_fluxo_caixa_v1`). NAO faz nenhuma chamada de API; nao le nem escreve DRE/Movimentacoes/saldos reais.
+- Recursos: multiplos cenarios nomeados (novo/duplicar/renomear/excluir), ano selecionavel, saldo inicial manual, planilha 12 meses com linhas de receitas/despesas editaveis, Total Receitas/Despesas, Resultado do Mes e Saldo Acumulado, cards de resumo e grafico de linha (Recharts) do saldo acumulado.
+- Verificado via screenshot (login exige backend, mas a pagina nao usa API; injetei user fake no localStorage): calculo e CRUD de cenarios OK.
+
+
 ### [Jun 2026] DRE: layout compacto no filtro de mês + linhas vazias omitidas na exportação
 - `DREPage.jsx`: largura mínima de 1500px só na visão "Todos os meses"; mês único usa largura natural (compacto). Barra de scroll superior oculta no mês único.
 - `DREPage.jsx` (`gerarDadosExportacao`): PDF/Excel omitem categorias, subcategorias e itens sem valor no período exportado. Linhas de resultado (Receita Líquida, Margem, etc.) sempre mantidas.
