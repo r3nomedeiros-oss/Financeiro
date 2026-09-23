@@ -87,7 +87,7 @@ export default function ProjecaoPage() {
   const [carregado, setCarregado] = useState(false);
   const [renomeando, setRenomeando] = useState(false);
   const [nomeTmp, setNomeTmp] = useState('');
-  const [view, setView] = useState('simulacao'); // 'simulacao' | 'contas'
+  const [view, setView] = useState('pagar'); // 'pagar' | 'receber' | 'comparativo'
   const renameRef = useRef(null);
 
   // Carregar do localStorage
@@ -270,13 +270,6 @@ export default function ProjecaoPage() {
       <div className="border-b border-gray-200">
         <nav className="flex gap-4 flex-wrap">
           <button
-            onClick={() => setView('simulacao')}
-            className={`py-2.5 px-1 border-b-2 font-medium text-sm transition-colors ${view === 'simulacao' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-            data-testid="tab-simulacao"
-          >
-            Simulação (12 meses)
-          </button>
-          <button
             onClick={() => setView('pagar')}
             className={`py-2.5 px-1 border-b-2 font-medium text-sm transition-colors ${view === 'pagar' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
             data-testid="tab-contas-pagar"
@@ -303,164 +296,6 @@ export default function ProjecaoPage() {
       {view === 'pagar' && <ContasAPagar />}
       {view === 'receber' && <ContasAReceber />}
       {view === 'comparativo' && <ComparativoContas />}
-
-      {view === 'simulacao' && (
-      <>
-      {/* Barra de cenários */}
-      <div className="bg-white rounded-xl shadow-md p-3 md:p-4 flex flex-col md:flex-row md:items-center gap-3">
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          <label className="text-sm text-gray-600 shrink-0">Cenário:</label>
-          {renomeando ? (
-            <input
-              ref={renameRef}
-              value={nomeTmp}
-              onChange={(e) => setNomeTmp(e.target.value)}
-              onBlur={salvarNome}
-              onKeyDown={(e) => { if (e.key === 'Enter') salvarNome(); if (e.key === 'Escape') setRenomeando(false); }}
-              className="flex-1 min-w-0 px-3 py-2 border border-emerald-400 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
-              data-testid="renomear-cenario-input"
-            />
-          ) : (
-            <select
-              value={activeId || ''}
-              onChange={(e) => setActiveId(e.target.value)}
-              className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
-              data-testid="cenario-select"
-            >
-              {cenarios.map((c) => (
-                <option key={c.id} value={c.id}>{c.nome}</option>
-              ))}
-            </select>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2 flex-wrap">
-          <button onClick={() => { setNomeTmp(cenario.nome); setRenomeando(true); }}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
-            data-testid="renomear-cenario-btn" title="Renomear">
-            <Pencil size={15} /> <span className="hidden sm:inline">Renomear</span>
-          </button>
-          <button onClick={duplicarCenario}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
-            data-testid="duplicar-cenario-btn" title="Duplicar">
-            <Copy size={15} /> <span className="hidden sm:inline">Duplicar</span>
-          </button>
-          <button onClick={excluirCenario}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm text-red-600 border border-red-200 rounded-lg hover:bg-red-50"
-            data-testid="excluir-cenario-btn" title="Excluir">
-            <Trash2 size={15} /> <span className="hidden sm:inline">Excluir</span>
-          </button>
-          <button onClick={criarCenario}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
-            data-testid="novo-cenario-btn">
-            <Plus size={16} /> Novo Cenário
-          </button>
-        </div>
-      </div>
-
-      {/* Parâmetros: ano + saldo inicial */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
-        <div className="bg-white rounded-xl shadow-md p-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Ano da projeção</label>
-          <select
-            value={cenario.ano}
-            onChange={(e) => atualizarCenario({ ano: parseInt(e.target.value) })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
-            data-testid="projecao-ano-select"
-          >
-            {anosDisponiveis.map((a) => <option key={a} value={a}>{a}</option>)}
-          </select>
-        </div>
-        <div className="bg-white rounded-xl shadow-md p-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Saldo inicial (R$)</label>
-          <CelulaValorLarge
-            value={cenario.saldoInicial}
-            onChange={(v) => atualizarCenario({ saldoInicial: v })}
-          />
-        </div>
-      </div>
-
-      {/* Cards de resumo */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4" data-testid="projecao-resumo">
-        <CardResumo titulo="Total Receitas" valor={calc.totalRec} cor="green" />
-        <CardResumo titulo="Total Despesas" valor={calc.totalDesp} cor="red" />
-        <CardResumo titulo="Resultado (12m)" valor={calc.totalResultado} cor={calc.totalResultado >= 0 ? 'green' : 'red'} />
-        <CardResumo titulo="Saldo Final" valor={calc.saldoFinal} cor={calc.saldoFinal >= 0 ? 'blue' : 'red'} />
-      </div>
-
-      {/* Gráfico de saldo acumulado */}
-      <div className="bg-white rounded-xl shadow-md p-4">
-        <h3 className="font-semibold text-gray-700 mb-2 text-sm md:text-base">Evolução do Saldo Acumulado</h3>
-        <div style={{ width: '100%', height: 260 }} data-testid="projecao-chart">
-          <ResponsiveContainer>
-            <LineChart data={chartData} margin={{ top: 8, right: 16, left: 8, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#eef2f7" />
-              <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
-              <YAxis tick={{ fontSize: 11 }} width={70}
-                tickFormatter={(v) => new Intl.NumberFormat('pt-BR', { notation: 'compact' }).format(v)} />
-              <Tooltip formatter={(v) => fmtMoeda(v)} labelFormatter={(l) => `${l}/${cenario.ano}`} />
-              <ReferenceLine y={0} stroke="#ef4444" strokeDasharray="4 4" />
-              <Line type="monotone" dataKey="saldo" stroke="#059669" strokeWidth={2.5}
-                dot={{ r: 3 }} activeDot={{ r: 5 }} name="Saldo acumulado" />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* Tabela de projeção */}
-      <div className="bg-white rounded-xl shadow-md overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm border-collapse min-w-[1100px]" data-testid="projecao-table">
-            <thead>
-              <tr className="bg-gray-100 border-b-2 border-gray-300">
-                <th className="text-left p-2 sticky left-0 bg-gray-100 border-r border-gray-300 min-w-[200px]">Descrição</th>
-                {MESES.map((m) => (
-                  <th key={m} className="text-right p-2 min-w-[95px] border-r border-gray-200">{m}</th>
-                ))}
-                <th className="text-right p-2 min-w-[110px] bg-gray-200 font-bold">Total</th>
-                <th className="w-10 p-2 bg-gray-100"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {/* RECEITAS */}
-              <SecaoHeader
-                icon={<ArrowUpCircle size={16} className="text-green-600" />}
-                label="Receitas / Entradas"
-                cor="bg-green-50 text-green-800"
-                onAdd={() => addLinha('receitas')}
-                testid="add-receita-btn"
-              />
-              {cenario.receitas.map((l) => (
-                <LinhaEditavel key={l.id} linha={l} tipo="receitas" corValor="text-green-700"
-                  onNome={setNomeLinha} onValor={setValorLinha} onRemover={removerLinha} total={totalLinha(l)} />
-              ))}
-              <LinhaTotal label="Total Receitas" valores={calc.recMes} total={calc.totalRec} cor="text-green-700" bg="bg-green-50" />
-
-              {/* DESPESAS */}
-              <SecaoHeader
-                icon={<ArrowDownCircle size={16} className="text-red-600" />}
-                label="Despesas / Saídas"
-                cor="bg-red-50 text-red-800"
-                onAdd={() => addLinha('despesas')}
-                testid="add-despesa-btn"
-              />
-              {cenario.despesas.map((l) => (
-                <LinhaEditavel key={l.id} linha={l} tipo="despesas" corValor="text-red-700"
-                  onNome={setNomeLinha} onValor={setValorLinha} onRemover={removerLinha} total={totalLinha(l)} />
-              ))}
-              <LinhaTotal label="Total Despesas" valores={calc.despMes} total={calc.totalDesp} cor="text-red-700" bg="bg-red-50" />
-
-              {/* RESULTADOS */}
-              <LinhaTotal label="Resultado do Mês" valores={calc.resultadoMes} total={calc.totalResultado}
-                cor="" bg="bg-gray-50" destaque colorir />
-              <LinhaTotal label="Saldo Acumulado" valores={calc.saldoAcum} total={calc.saldoFinal}
-                cor="" bg="bg-blue-50" destaque colorir semTotalSoma />
-            </tbody>
-          </table>
-        </div>
-      </div>
-      </>
-      )}
     </div>
   );
 }
