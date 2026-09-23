@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Trash2, Pencil, Check, X, CalendarDays, Info } from 'lucide-react';
+import { Plus, Trash2, Pencil, Check, X, CalendarDays, Info, Repeat } from 'lucide-react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
@@ -22,6 +22,23 @@ const toDate = (iso) => new Date(iso + 'T00:00:00');
 const fmtData = (iso) => toDate(iso).toLocaleDateString('pt-BR');
 const MES_CURTO = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 
+// Opções de recorrência do lançamento
+const FREQ_OPTS = [
+  { v: 'nenhuma', l: 'Não recorrente' },
+  { v: 'semanal', l: 'Semanal' },
+  { v: 'mensal', l: 'Mensal' },
+  { v: 'anual', l: 'Anual' },
+];
+
+// Avança uma data ISO (YYYY-MM-DD) em i períodos conforme a frequência
+const avancarData = (iso, freq, i) => {
+  const d = toDate(iso);
+  if (freq === 'semanal') d.setDate(d.getDate() + 7 * i);
+  else if (freq === 'mensal') d.setMonth(d.getMonth() + i);
+  else if (freq === 'anual') d.setFullYear(d.getFullYear() + i);
+  return d.toISOString().split('T')[0];
+};
+
 /**
  * Componente genérico de "Contas a Pagar" / "Contas a Receber".
  * Config define rótulos, cores, chave do localStorage e prefixo de data-testid.
@@ -34,7 +51,7 @@ export default function ContasSection({ config }) {
     isolamentoText, atrasadoLabel,
   } = config;
 
-  const formVazio = () => ({ descricao: '', valor: '', vencimento: hoje(), categoria: categorias[0], status: 'pendente' });
+  const formVazio = () => ({ descricao: '', valor: '', vencimento: hoje(), categoria: categorias[0], status: 'pendente', recorrencia: 'nenhuma', repeticoes: 12 });
 
   const [contas, setContas] = useState([]);
   const [carregado, setCarregado] = useState(false);
@@ -116,15 +133,32 @@ export default function ContasSection({ config }) {
     if (!form.vencimento) { alert('Informe a data.'); return; }
     if (editingId) {
       setContas((prev) => prev.map((c) => (c.id === editingId ? { ...c, descricao, valor, vencimento: form.vencimento, categoria: form.categoria, status: form.status } : c)));
+    } else if (form.recorrencia && form.recorrencia !== 'nenhuma') {
+      const total = Math.min(Math.max(parseInt(form.repeticoes) || 1, 1), 120);
+      const serieId = uid();
+      const novos = [];
+      for (let i = 0; i < total; i++) {
+        novos.push({ id: uid(), descricao, valor, vencimento: avancarData(form.vencimento, form.recorrencia, i), categoria: form.categoria, status: form.status, recorrente: true, serieId });
+      }
+      setContas((prev) => [...prev, ...novos]);
     } else {
       setContas((prev) => [...prev, { id: uid(), descricao, valor, vencimento: form.vencimento, categoria: form.categoria, status: form.status }]);
     }
     setForm(formVazio());
     setEditingId(null);
   };
-  const editar = (c) => { setEditingId(c.id); setForm({ descricao: c.descricao, valor: String(c.valor).replace('.', ','), vencimento: c.vencimento, categoria: c.categoria, status: c.status }); };
+  const editar = (c) => { setEditingId(c.id); setForm({ descricao: c.descricao, valor: String(c.valor).replace('.', ','), vencimento: c.vencimento, categoria: c.categoria, status: c.status, recorrencia: 'nenhuma', repeticoes: 12 }); };
   const cancelarEdicao = () => { setForm(formVazio()); setEditingId(null); };
-  const excluir = (id) => { if (confirm('Excluir este registro?')) setContas((prev) => prev.filter((c) => c.id !== id)); };
+  const excluir = (id) => {
+    const c = contas.find((x) => x.id === id);
+    const naSerie = c?.serieId ? contas.filter((x) => x.serieId === c.serieId).length : 0;
+    if (naSerie > 1) {
+      const todos = confirm(`Este lançamento faz parte de uma recorrência (${naSerie} lançamentos).\n\nOK = excluir TODOS os ${naSerie}\nCancelar = manter`);
+      if (todos) setContas((prev) => prev.filter((x) => x.serieId !== c.serieId));
+      return;
+    }
+    if (confirm('Excluir este registro?')) setContas((prev) => prev.filter((x) => x.id !== id));
+  };
   const toggleStatus = (id) => setContas((prev) => prev.map((c) => (c.id === id ? { ...c, status: c.status === 'pago' ? 'pendente' : 'pago' } : c)));
   const isAtrasada = (c) => c.status === 'pendente' && c.vencimento < hoje();
 
@@ -227,6 +261,28 @@ export default function ContasSection({ config }) {
               {categorias.map((c) => <option key={c} value={c} />)}
             </datalist>
           </div>
+          <div className="md:col-span-2">
+            <label className="block text-xs text-gray-500 mb-1">Recorrência</label>
+            <select
+              value={form.recorrencia}
+              onChange={(e) => setForm({ ...form, recorrencia: e.target.value })}
+              disabled={!!editingId}
+              data-testid={`${prefix}-recorrencia-select`}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none disabled:bg-gray-100 disabled:text-gray-400"
+              title={editingId ? 'A recorrência só se aplica a novos lançamentos' : 'Repetir automaticamente este lançamento'}
+            >
+              {FREQ_OPTS.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}
+            </select>
+          </div>
+          {!editingId && form.recorrencia !== 'nenhuma' && (
+            <div className="md:col-span-2">
+              <label className="block text-xs text-gray-500 mb-1">Repetições</label>
+              <input type="number" min="1" max="120" value={form.repeticoes}
+                onChange={(e) => setForm({ ...form, repeticoes: e.target.value })}
+                data-testid={`${prefix}-repeticoes-input`}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-right focus:ring-2 focus:ring-emerald-500 outline-none" />
+            </div>
+          )}
           <div className="md:col-span-2 flex gap-2">
             <button onClick={salvar} data-testid={`${prefix}-salvar-btn`}
               className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm">
@@ -263,7 +319,12 @@ export default function ContasSection({ config }) {
                   <td className={`p-3 whitespace-nowrap ${isAtrasada(c) ? 'text-red-600 font-semibold' : 'text-gray-700'}`}>
                     {fmtData(c.vencimento)}{isAtrasada(c) && <span className="ml-1 text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded">{atrasadoLabel}</span>}
                   </td>
-                  <td className="p-3 text-gray-800">{c.descricao}</td>
+                  <td className="p-3 text-gray-800">
+                    <span className="inline-flex items-center gap-1.5">
+                      {c.recorrente && <Repeat size={13} className="text-emerald-600 shrink-0" title="Lançamento recorrente" />}
+                      {c.descricao}
+                    </span>
+                  </td>
                   <td className="p-3 text-gray-600"><span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full">{c.categoria}</span></td>
                   <td className="p-3 text-right font-semibold text-gray-800 whitespace-nowrap">{fmtNumero(c.valor)}</td>
                   <td className="p-3 text-center">

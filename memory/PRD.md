@@ -54,6 +54,12 @@ Sistema financeiro existente conectado a Vercel/Supabase/GitHub (React+Vite / Fa
 - Exportações PDF e Excel respeitam o filtro: exportam só o mês selecionado (arquivo `DRE_{ano}_{Mes}.pdf/csv`) ou o ano consolidado ("Todos").
 - Lógica 100% client-side, reutiliza dados de `dreAPI.getAnual(ano)` (por-mês já disponível em `valores_por_plano` e `totais`). Build Vite verificado (OK).
 
+### [Jun 2026] Projeção/Contas: campo de recorrência nos lançamentos
+- `ContasSection.jsx` (usado por Contas a Pagar e a Receber): novo campo "Recorrência" (Não recorrente / Semanal / Mensal / Anual) + campo "Repetições" (1..120, aparece só quando recorrente e em novo lançamento).
+- Ao salvar recorrente, gera N lançamentos com datas avançadas pela frequência (`avancarData`), marcados com `recorrente:true` e `serieId` compartilhado. Ícone `Repeat` (lucide) indica linhas recorrentes.
+- Exclusão de item de série pergunta se apaga a série toda. Edição aplica-se só ao lançamento (recorrência desabilitada ao editar). 100% client-side (localStorage).
+- Verificado via screenshot: mensal×6 gerou 6 lançamentos (set/26→fev/27), Total R$ 21.000,00; formulário reseta e ícones de recorrência presentes.
+
 ### [Jun 2026] DRE: exportação PDF redesenhada (modelo do usuário)
 - `DREPage.jsx` (`exportToPDF`): título + subtítulo ("Visão Simplificada – Mês / Ano" ou "Visão Anual – Ano"); tabela com tema 'plain' (apenas linhas horizontais finas cinza, sem grade vertical); texto colorido por categoria/total (ciano/vermelho/verde/azul) e itens em cinza; orientação retrato no mês único e paisagem no consolidado.
 - Cards de resumo no rodapé (roundedRect): RECEITA LÍQUIDA (azul), MARGEM DE CONTRIBUIÇÃO (verde, com %), LUCRO LÍQUIDO (rosa/vermelho, com %). Valores usam o período exportado.
