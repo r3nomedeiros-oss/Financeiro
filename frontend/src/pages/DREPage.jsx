@@ -240,7 +240,6 @@ export default function DREPage() {
 
     const addCategoriaRows = (catId, catConfig) => {
       const catData = hierarquia?.[catId];
-      const isExpanded = expandedState[catId]?.expanded;
       const subcategorias = catData?.subcategorias || [];
 
       // Ignorar categorias sem valor no período exportado
@@ -254,56 +253,48 @@ export default function DREPage() {
         isPercent: false,
         cor: catConfig.cor
       });
-      
-      // Se expandido, adicionar subcategorias
-      if (isExpanded) {
-        subcategorias.forEach(subcat => {
-          const isSubExpanded = expandedState[catId]?.subcategorias?.[subcat.id];
-          const itens = subcat.itens || [];
-          
-          // Calcular total da subcategoria
-          const subcatValores = {};
-          meses.forEach(mes => {
-            const subValor = dre?.valores_por_plano?.[subcat.id]?.[mes] || 0;
-            const itensValor = itens.reduce((a, item) => a + (dre?.valores_por_plano?.[item.id]?.[mes] || 0), 0);
-            subcatValores[mes] = subValor + itensValor;
-          });
-          subcatValores.total = meses.reduce((a, m) => a + (subcatValores[m] || 0), 0);
 
-          // Ignorar subcategorias sem valor no período exportado
-          if (periodoVal(subcatValores) === 0) return;
-          
-          rows.push({
-            nivel: 1,
-            descricao: subcat.nome,
-            valores: subcatValores,
-            isPercent: false,
-            cor: ''
-          });
-          
-          // Se subcategoria expandida, adicionar itens
-          if (isSubExpanded) {
-            itens.forEach(item => {
-              const itemValores = {};
-              meses.forEach(mes => {
-                itemValores[mes] = dre?.valores_por_plano?.[item.id]?.[mes] || 0;
-              });
-              itemValores.total = meses.reduce((a, m) => a + (itemValores[m] || 0), 0);
+      // Resultado Não Operacional mantém subcategorias; demais categorias exibem os itens direto
+      const manterSubcategorias = catId === 'resultado_nao_operacional';
 
-              // Ignorar itens sem valor no período exportado
-              if (periodoVal(itemValores) === 0) return;
-              
-              rows.push({
-                nivel: 2,
-                descricao: item.nome,
-                valores: itemValores,
-                isPercent: false,
-                cor: ''
-              });
-            });
-          }
+      const valoresItem = (item) => {
+        const v = {};
+        meses.forEach(mes => { v[mes] = dre?.valores_por_plano?.[item.id]?.[mes] || 0; });
+        v.total = meses.reduce((a, m) => a + (v[m] || 0), 0);
+        return v;
+      };
+
+      subcategorias.forEach(subcat => {
+        const itens = subcat.itens || [];
+
+        // Calcular total da subcategoria
+        const subcatValores = {};
+        meses.forEach(mes => {
+          const subValor = dre?.valores_por_plano?.[subcat.id]?.[mes] || 0;
+          const itensValor = itens.reduce((a, item) => a + (dre?.valores_por_plano?.[item.id]?.[mes] || 0), 0);
+          subcatValores[mes] = subValor + itensValor;
         });
-      }
+        subcatValores.total = meses.reduce((a, m) => a + (subcatValores[m] || 0), 0);
+
+        // Ignorar subcategorias sem valor no período exportado
+        if (periodoVal(subcatValores) === 0) return;
+
+        if (manterSubcategorias) {
+          rows.push({ nivel: 1, descricao: subcat.nome, valores: subcatValores, isPercent: false, cor: '' });
+          itens.forEach(item => {
+            const itemValores = valoresItem(item);
+            if (periodoVal(itemValores) === 0) return;
+            rows.push({ nivel: 2, descricao: item.nome, valores: itemValores, isPercent: false, cor: '', isItem: true });
+          });
+        } else {
+          // Subcategoria removida: itens aparecem direto sob a categoria
+          itens.forEach(item => {
+            const itemValores = valoresItem(item);
+            if (periodoVal(itemValores) === 0) return;
+            rows.push({ nivel: 1, descricao: item.nome, valores: itemValores, isPercent: false, cor: '', isItem: true });
+          });
+        }
+      });
     };
     
     const addTotalRow = (key, config) => {
@@ -357,7 +348,7 @@ export default function DREPage() {
     
     dadosExportacao.forEach(item => {
       const indent = '  '.repeat(item.nivel);
-      const prefix = item.nivel === 2 ? '• ' : '';
+      const prefix = item.isItem ? '• ' : '';
       const descricao = indent + prefix + item.descricao;
       
       const av = item.isPercent ? '-' : (base > 0 ? formatPct(periodoVal(item.valores) / base * 100) : '0%');
@@ -414,7 +405,7 @@ export default function DREPage() {
     
     const body = dadosExportacao.map(item => {
       const indent = '  '.repeat(item.nivel);
-      const prefix = item.nivel === 2 ? '• ' : '';
+      const prefix = item.isItem ? '• ' : '';
       const descricao = indent + prefix + item.descricao;
       const av = item.isPercent ? '-' : (base > 0 ? formatPct(periodoVal(item.valores) / base * 100) : '0%');
       

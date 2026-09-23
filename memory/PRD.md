@@ -54,6 +54,11 @@ Sistema financeiro existente conectado a Vercel/Supabase/GitHub (React+Vite / Fa
 - Exportações PDF e Excel respeitam o filtro: exportam só o mês selecionado (arquivo `DRE_{ano}_{Mes}.pdf/csv`) ou o ano consolidado ("Todos").
 - Lógica 100% client-side, reutiliza dados de `dreAPI.getAnual(ano)` (por-mês já disponível em `valores_por_plano` e `totais`). Build Vite verificado (OK).
 
+### [Jun 2026] DRE: exportações sem subcategorias (exceto Resultado Não Operacional)
+- `DREPage.jsx` (`gerarDadosExportacao`): nas exportações PDF/Excel, as linhas de subcategoria foram removidas e os itens passam a aparecer diretamente sob a categoria principal (nível 1 com bullet). Exceção: `resultado_nao_operacional` mantém a hierarquia completa (categoria -> subcategoria -> itens).
+- Bullet de item agora usa flag `isItem` (antes era `nivel === 2`). Tabela na tela permanece inalterada; muda apenas o conteúdo dos arquivos exportados.
+- NÃO verificado via testing_agent: backend não sobe no preview (falta `/app/backend/.env` do Supabase). Build Vite OK.
+
 ## Known Environment Issue
 - `/app/backend/.env` AUSENTE neste preview → backend não sobe (ValueError SUPABASE_URL/KEY). Necessário restaurar credenciais Supabase para rodar/testar localmente. Não afeta produção (Vercel/Supabase).
 
