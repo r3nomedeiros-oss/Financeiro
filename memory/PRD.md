@@ -58,7 +58,8 @@ Sistema financeiro existente conectado a Vercel/Supabase/GitHub (React+Vite / Fa
 - `ContasSection.jsx` (usado por Contas a Pagar e a Receber): novo campo "Recorrência" (Não recorrente / Semanal / Mensal / Anual) + campo "Repetições" (1..120, aparece só quando recorrente e em novo lançamento).
 - Ao salvar recorrente, gera N lançamentos com datas avançadas pela frequência (`avancarData`), marcados com `recorrente:true` e `serieId` compartilhado. Ícone `Repeat` (lucide) indica linhas recorrentes.
 - Exclusão de item de série pergunta se apaga a série toda. Edição aplica-se só ao lançamento (recorrência desabilitada ao editar). 100% client-side (localStorage).
-- Verificado via screenshot: mensal×6 gerou 6 lançamentos (set/26→fev/27), Total R$ 21.000,00; formulário reseta e ícones de recorrência presentes.
+- Preview de datas: ao marcar recorrência, mostra a lista de datas que serão criadas (inputs de data editáveis + remover cada uma) antes de salvar; total recalcula em tempo real; as datas do preview (ajustadas) são as efetivamente salvas. `datasPreview` recalcula quando frequência/data-base/repetições mudam.
+- Verificado via screenshot: mensal×6 gerou 6 lançamentos; no preview editei a 3ª data e removi 1 (ficaram 5, total R$ 17.500) e as 5 datas ajustadas foram salvas.
 
 ### [Jun 2026] DRE: exportação PDF redesenhada (modelo do usuário)
 - `DREPage.jsx` (`exportToPDF`): título + subtítulo ("Visão Simplificada – Mês / Ano" ou "Visão Anual – Ano"); tabela com tema 'plain' (apenas linhas horizontais finas cinza, sem grade vertical); texto colorido por categoria/total (ciano/vermelho/verde/azul) e itens em cinza; orientação retrato no mês único e paisagem no consolidado.

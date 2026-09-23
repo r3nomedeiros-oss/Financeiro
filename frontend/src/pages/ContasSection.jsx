@@ -57,6 +57,7 @@ export default function ContasSection({ config }) {
   const [carregado, setCarregado] = useState(false);
   const [form, setForm] = useState(formVazio());
   const [editingId, setEditingId] = useState(null);
+  const [datasPreview, setDatasPreview] = useState([]);
 
   const [modo, setModo] = useState('mes');
   const now = new Date();
@@ -78,6 +79,13 @@ export default function ContasSection({ config }) {
     try { localStorage.setItem(storageKey, JSON.stringify(contas)); }
     catch (e) { console.error('Erro ao salvar contas:', e); }
   }, [contas, carregado, storageKey]);
+
+  // Preview das datas que serão geradas na recorrência (editáveis antes de salvar)
+  useEffect(() => {
+    if (editingId || form.recorrencia === 'nenhuma' || !form.vencimento) { setDatasPreview([]); return; }
+    const total = Math.min(Math.max(parseInt(form.repeticoes) || 1, 1), 120);
+    setDatasPreview(Array.from({ length: total }, (_, i) => avancarData(form.vencimento, form.recorrencia, i)));
+  }, [form.recorrencia, form.vencimento, form.repeticoes, editingId]);
 
   const range = useMemo(() => {
     if (modo === 'mes') return { start: new Date(ano, mes - 1, 1), end: new Date(ano, mes, 0) };
@@ -134,12 +142,9 @@ export default function ContasSection({ config }) {
     if (editingId) {
       setContas((prev) => prev.map((c) => (c.id === editingId ? { ...c, descricao, valor, vencimento: form.vencimento, categoria: form.categoria, status: form.status } : c)));
     } else if (form.recorrencia && form.recorrencia !== 'nenhuma') {
-      const total = Math.min(Math.max(parseInt(form.repeticoes) || 1, 1), 120);
+      const datas = (datasPreview.length ? datasPreview : [form.vencimento]).filter(Boolean);
       const serieId = uid();
-      const novos = [];
-      for (let i = 0; i < total; i++) {
-        novos.push({ id: uid(), descricao, valor, vencimento: avancarData(form.vencimento, form.recorrencia, i), categoria: form.categoria, status: form.status, recorrente: true, serieId });
-      }
+      const novos = datas.map((venc) => ({ id: uid(), descricao, valor, vencimento: venc, categoria: form.categoria, status: form.status, recorrente: true, serieId }));
       setContas((prev) => [...prev, ...novos]);
     } else {
       setContas((prev) => [...prev, { id: uid(), descricao, valor, vencimento: form.vencimento, categoria: form.categoria, status: form.status }]);
@@ -295,6 +300,38 @@ export default function ContasSection({ config }) {
             )}
           </div>
         </div>
+
+        {!editingId && datasPreview.length > 0 && (
+          <div className="mt-4 border-t border-gray-100 pt-3" data-testid={`${prefix}-preview`}>
+            <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+              <p className="text-xs font-medium text-gray-600 flex items-center gap-1.5">
+                <Repeat size={14} className="text-emerald-600" />
+                {datasPreview.length} {datasPreview.length === 1 ? 'lançamento será criado' : 'lançamentos serão criados'} — revise/ajuste as datas antes de salvar
+              </p>
+              <p className="text-xs text-gray-500" data-testid={`${prefix}-preview-total`}>
+                Total: {fmtMoeda(parseNumero(form.valor) * datasPreview.length)}
+              </p>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+              {datasPreview.map((d, i) => (
+                <div key={i} className="flex items-center gap-1">
+                  <span className="text-[11px] text-gray-400 w-5 shrink-0">{i + 1}º</span>
+                  <input type="date" value={d}
+                    onChange={(e) => setDatasPreview((prev) => prev.map((x, idx) => (idx === i ? e.target.value : x)))}
+                    data-testid={`${prefix}-preview-data-${i}`}
+                    className="flex-1 min-w-0 px-2 py-1 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-emerald-500 outline-none" />
+                  {datasPreview.length > 1 && (
+                    <button onClick={() => setDatasPreview((prev) => prev.filter((_, idx) => idx !== i))}
+                      className="text-gray-300 hover:text-red-600 shrink-0" title="Remover esta data"
+                      data-testid={`${prefix}-preview-remover-${i}`}>
+                      <X size={13} />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Lista */}
