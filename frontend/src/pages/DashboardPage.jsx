@@ -361,7 +361,20 @@ export default function DashboardPage() {
 
         {/* Saldo das Contas */}
         <div className="bg-white rounded-xl shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Saldo das Contas</h3>
+          <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
+            <h3 className="text-lg font-semibold text-gray-800">Saldo das Contas</h3>
+            {dados.contas && dados.contas.length > 0 && (() => {
+              const saldoTotal = dados.contas.reduce((acc, c) => acc + (Number(c.saldo_atual) || 0), 0);
+              return (
+                <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5" data-testid="dashboard-saldo-total">
+                  <span className="text-xs md:text-sm text-gray-500">Saldo atual (todas as contas):</span>
+                  <span className={`font-bold text-base md:text-lg ${saldoTotal >= 0 ? 'text-green-600' : 'text-red-600'}`} data-testid="dashboard-saldo-total-valor">
+                    {formatBalance(saldoTotal)}
+                  </span>
+                </div>
+              );
+            })()}
+          </div>
           <div className="space-y-3">
             {dados.contas && dados.contas.length > 0 ? (
               dados.contas.map((conta) => (
