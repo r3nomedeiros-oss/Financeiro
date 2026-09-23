@@ -74,6 +74,7 @@ export default function ContasSection({ config }) {
   const [bulkForm, setBulkForm] = useState({ descricao: '', categoriaId: '', valor: '', vencimento: hoje(), status: 'pago' });
 
   const [modo, setModo] = useState('mes');
+  const [busca, setBusca] = useState('');
   const now = new Date();
   const [ano, setAno] = useState(now.getFullYear());
   const [mes, setMes] = useState(now.getMonth() + 1);
@@ -161,11 +162,16 @@ export default function ContasSection({ config }) {
     return { start, end };
   }, [modo, ano, mes, de, ate]);
 
-  const filtradas = useMemo(
-    () => contas.filter((c) => { const d = toDate(c.vencimento); return d >= range.start && d <= range.end; })
-      .sort((a, b) => a.vencimento.localeCompare(b.vencimento)),
-    [contas, range]
-  );
+  const filtradas = useMemo(() => {
+    const termo = busca.toLowerCase().trim();
+    return contas
+      .filter((c) => { const d = toDate(c.vencimento); return d >= range.start && d <= range.end; })
+      .filter((c) => {
+        if (!termo) return true;
+        return `${c.descricao || ''} ${c.categoria || ''}`.toLowerCase().includes(termo);
+      })
+      .sort((a, b) => a.vencimento.localeCompare(b.vencimento));
+  }, [contas, range, busca]);
 
   const resumo = useMemo(() => {
     const total = filtradas.reduce((a, c) => a + (Number(c.valor) || 0), 0);
@@ -309,9 +315,23 @@ export default function ContasSection({ config }) {
               className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none" data-testid={`${prefix}-filtro-ate-input`} />
           </div>
         )}
+        <div className="relative md:ml-auto w-full md:w-64">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
+          <input
+            type="text"
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="Buscar por descrição ou item..."
+            data-testid={`${prefix}-busca-input`}
+            className="w-full pl-8 pr-8 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none" />
+          {busca && (
+            <button onClick={() => setBusca('')} data-testid={`${prefix}-busca-limpar`}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700" title="Limpar busca">
+              <X size={15} />
+            </button>
+          )}
+        </div>
       </div>
-
-      {/* Resumo */}
       <div className="grid grid-cols-3 gap-2 md:gap-4" data-testid={`${prefix}-resumo`}>
         <div className="rounded-xl shadow border p-3 md:p-4 bg-slate-50 border-slate-200 text-slate-700">
           <p className="text-[11px] md:text-sm font-medium opacity-90">{totalLabel}</p>

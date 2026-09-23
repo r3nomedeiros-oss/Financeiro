@@ -54,6 +54,10 @@ Sistema financeiro existente conectado a Vercel/Supabase/GitHub (React+Vite / Fa
 - Exportações PDF e Excel respeitam o filtro: exportam só o mês selecionado (arquivo `DRE_{ano}_{Mes}.pdf/csv`) ou o ano consolidado ("Todos").
 - Lógica 100% client-side, reutiliza dados de `dreAPI.getAnual(ano)` (por-mês já disponível em `valores_por_plano` e `totais`). Build Vite verificado (OK).
 
+### [Jun 2026] Contas a Pagar/Receber: campo de busca
+- `ContasSection.jsx`: input de busca (state `busca`) no card de filtro, filtra `filtradas` por descrição + Item/Conta (case-insensitive). Ícone de lupa + botão ✕ para limpar. Resumo, gráfico e total acompanham o filtro. testids: `${prefix}-busca-input`, `${prefix}-busca-limpar`.
+- Verificado via screenshot: 3 lançamentos → busca "energia" → 1 linha, total R$ 1.200.
+
 ### [Jun 2026] Projeção: nova aba "DRE Projetado"
 - Novo `DREProjetado.jsx` + aba em `ProjecaoPage.jsx` (view 'dre', data-testid `tab-dre-projetado`).
 - Lê os localStorage de Contas a Pagar/Receber e o plano de contas (`getHierarquico`); mapeia cada `planoContasId` -> categoria DRE (chave top-level da hierarquia) e monta o DRE: Receita Bruta, Deduções, Receita Líquida, Custos Variáveis, Margem de Contribuição (+%), Custos Fixos, Resultado Operacional, Resultado Não Operacional, Lucro Líquido (+%). Itens detalhados sob cada categoria; AV% sobre Receita Líquida.
