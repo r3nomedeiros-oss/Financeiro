@@ -54,6 +54,10 @@ Sistema financeiro existente conectado a Vercel/Supabase/GitHub (React+Vite / Fa
 - Exportações PDF e Excel respeitam o filtro: exportam só o mês selecionado (arquivo `DRE_{ano}_{Mes}.pdf/csv`) ou o ano consolidado ("Todos").
 - Lógica 100% client-side, reutiliza dados de `dreAPI.getAnual(ano)` (por-mês já disponível em `valores_por_plano` e `totais`). Build Vite verificado (OK).
 
+### [Jun 2026] Comparativo: saldo inicial + saldo final por período
+- `ComparativoContas.jsx`: card "Saldo Inicial" com input editável, persistido em localStorage (`projecao_comparativo_saldo_inicial_v1`). Resumo agora com 4 cards: Saldo Inicial, Entradas (A Receber), Saídas (A Pagar), Saldo Final = Saldo Inicial + Entradas − Saídas (conforme período filtrado). Linha da fórmula visível. Gráfico de saldo acumulado inicia no saldo inicial.
+- Verificado via screenshot: saldo inicial 10.000 + entradas 5.000 − saídas 2.000 = saldo final 13.000; persiste após reload.
+
 ### [Jun 2026] Contas a Pagar/Receber: campo de busca
 - `ContasSection.jsx`: input de busca (state `busca`) no card de filtro, filtra `filtradas` por descrição + Item/Conta (case-insensitive). Ícone de lupa + botão ✕ para limpar. Resumo, gráfico e total acompanham o filtro. testids: `${prefix}-busca-input`, `${prefix}-busca-limpar`.
 - Verificado via screenshot: 3 lançamentos → busca "energia" → 1 linha, total R$ 1.200.

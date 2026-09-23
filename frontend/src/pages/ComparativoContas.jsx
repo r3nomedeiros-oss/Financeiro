@@ -6,11 +6,18 @@ import {
 
 const KEY_PAGAR = 'projecao_contas_pagar_v1';
 const KEY_RECEBER = 'projecao_contas_receber_v1';
+const KEY_SALDO = 'projecao_comparativo_saldo_inicial_v1';
 const MES_CURTO = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 
 const toDate = (iso) => new Date(iso + 'T00:00:00');
 const fmtMoeda = (n) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0);
+const parseNumero = (v) => {
+  if (typeof v === 'number') return v;
+  if (!v) return 0;
+  const n = parseFloat(String(v).replace(/\./g, '').replace(',', '.').replace(/[^0-9.-]/g, ''));
+  return isNaN(n) ? 0 : n;
+};
 
 const lerLS = (key) => {
   try { return JSON.parse(localStorage.getItem(key) || '[]') || []; }
@@ -27,9 +34,16 @@ export default function ComparativoContas() {
   const [mes, setMes] = useState(now.getMonth() + 1);
   const [de, setDe] = useState(new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0]);
   const [ate, setAte] = useState(new Date(now.getFullYear(), 11, 31).toISOString().split('T')[0]);
+  const [saldoInicialStr, setSaldoInicialStr] = useState('');
 
   const recarregar = () => { setPagar(lerLS(KEY_PAGAR)); setReceber(lerLS(KEY_RECEBER)); };
-  useEffect(() => { recarregar(); }, []);
+  useEffect(() => {
+    recarregar();
+    const v = localStorage.getItem(KEY_SALDO);
+    if (v !== null) setSaldoInicialStr(v);
+  }, []);
+  const setSaldo = (v) => { setSaldoInicialStr(v); try { localStorage.setItem(KEY_SALDO, v); } catch { /* ignore */ } };
+  const saldoInicial = parseNumero(saldoInicialStr);
 
   const range = useMemo(() => {
     if (modo === 'mes') return { start: new Date(ano, mes - 1, 1), end: new Date(ano, mes, 0) };
@@ -69,7 +83,7 @@ export default function ComparativoContas() {
       fr.forEach((c) => { const k = c.vencimento.slice(0, 7); if (mapa[k]) mapa[k].receber += Number(c.valor) || 0; });
     }
 
-    let acumulado = 0;
+    let acumulado = saldoInicial;
     const serie = buckets.map((k) => {
       const b = mapa[k];
       acumulado += b.receber - b.pagar;
@@ -83,8 +97,8 @@ export default function ComparativoContas() {
 
     const totalReceber = fr.reduce((a, c) => a + (Number(c.valor) || 0), 0);
     const totalPagar = fp.reduce((a, c) => a + (Number(c.valor) || 0), 0);
-    return { serie, totalReceber, totalPagar, saldo: totalReceber - totalPagar };
-  }, [pagar, receber, range]);
+    return { serie, totalReceber, totalPagar, saldo: totalReceber - totalPagar, saldoFinal: saldoInicial + totalReceber - totalPagar };
+  }, [pagar, receber, range, saldoInicial]);
 
   return (
     <div className="space-y-5" data-testid="comparativo-view">
@@ -126,20 +140,33 @@ export default function ComparativoContas() {
       </div>
 
       {/* Resumo */}
-      <div className="grid grid-cols-3 gap-2 md:gap-4" data-testid="comparativo-resumo">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4" data-testid="comparativo-resumo">
+        <div className="rounded-xl shadow border p-3 md:p-4 bg-slate-50 border-slate-200 text-slate-700">
+          <p className="text-[11px] md:text-sm font-medium opacity-90">Saldo Inicial</p>
+          <div className="flex items-center gap-1">
+            <span className="text-sm md:text-lg font-bold">R$</span>
+            <input type="text" inputMode="decimal" value={saldoInicialStr} onChange={(e) => setSaldo(e.target.value)}
+              placeholder="0,00" data-testid="comp-saldo-inicial-input"
+              className="w-full bg-transparent text-sm md:text-xl font-bold outline-none border-b border-slate-300 focus:border-slate-500" />
+          </div>
+        </div>
         <div className="rounded-xl shadow border p-3 md:p-4 bg-green-50 border-green-100 text-green-700">
-          <p className="text-[11px] md:text-sm font-medium opacity-90">A Receber</p>
+          <p className="text-[11px] md:text-sm font-medium opacity-90">Entradas (A Receber)</p>
           <p className="text-sm md:text-xl font-bold break-words" data-testid="comp-total-receber">{fmtMoeda(dados.totalReceber)}</p>
         </div>
         <div className="rounded-xl shadow border p-3 md:p-4 bg-red-50 border-red-100 text-red-700">
-          <p className="text-[11px] md:text-sm font-medium opacity-90">A Pagar</p>
+          <p className="text-[11px] md:text-sm font-medium opacity-90">Saídas (A Pagar)</p>
           <p className="text-sm md:text-xl font-bold break-words" data-testid="comp-total-pagar">{fmtMoeda(dados.totalPagar)}</p>
         </div>
-        <div className={`rounded-xl shadow border p-3 md:p-4 ${dados.saldo >= 0 ? 'bg-blue-50 border-blue-100 text-blue-700' : 'bg-red-50 border-red-100 text-red-700'}`}>
-          <p className="text-[11px] md:text-sm font-medium opacity-90">Saldo do Período</p>
-          <p className="text-sm md:text-xl font-bold break-words" data-testid="comp-saldo">{fmtMoeda(dados.saldo)}</p>
+        <div className={`rounded-xl shadow border p-3 md:p-4 ${dados.saldoFinal >= 0 ? 'bg-blue-50 border-blue-100 text-blue-700' : 'bg-red-50 border-red-100 text-red-700'}`}>
+          <p className="text-[11px] md:text-sm font-medium opacity-90">Saldo Final</p>
+          <p className="text-sm md:text-xl font-bold break-words" data-testid="comp-saldo-final">{fmtMoeda(dados.saldoFinal)}</p>
         </div>
       </div>
+
+      <p className="text-xs text-gray-400 -mt-2" data-testid="comp-formula">
+        Saldo Final = Saldo Inicial ({fmtMoeda(saldoInicial)}) + Entradas ({fmtMoeda(dados.totalReceber)}) − Saídas ({fmtMoeda(dados.totalPagar)})
+      </p>
 
       {/* Gráfico comparativo */}
       <div className="bg-white rounded-xl shadow-md p-4">
@@ -160,7 +187,7 @@ export default function ComparativoContas() {
           </ResponsiveContainer>
         </div>
         <p className="text-xs text-gray-400 mt-2">
-          "Saldo acumulado" = soma progressiva de (recebimentos − pagamentos) ao longo do período. Use "Atualizar" após cadastrar contas nas outras abas.
+          "Saldo acumulado" começa no Saldo Inicial e soma progressivamente (recebimentos − pagamentos) ao longo do período. Use "Atualizar" após cadastrar contas nas outras abas.
         </p>
       </div>
     </div>
