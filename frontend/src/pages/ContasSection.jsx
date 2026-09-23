@@ -67,6 +67,12 @@ export default function ContasSection({ config }) {
   const itemInputRef = useRef(null);
   const itemDropdownRef = useRef(null);
 
+  // Seleção múltipla + ações em lote
+  const [selecionados, setSelecionados] = useState([]);
+  const [showBulkEdit, setShowBulkEdit] = useState(false);
+  const [bulkFlags, setBulkFlags] = useState({ descricao: false, categoria: false, valor: false, vencimento: false, status: false });
+  const [bulkForm, setBulkForm] = useState({ descricao: '', categoriaId: '', valor: '', vencimento: hoje(), status: 'pago' });
+
   const [modo, setModo] = useState('mes');
   const now = new Date();
   const [ano, setAno] = useState(now.getFullYear());
@@ -235,6 +241,39 @@ export default function ContasSection({ config }) {
   };
   const toggleStatus = (id) => setContas((prev) => prev.map((c) => (c.id === id ? { ...c, status: c.status === 'pago' ? 'pendente' : 'pago' } : c)));
   const isAtrasada = (c) => c.status === 'pendente' && c.vencimento < hoje();
+
+  // ---------- seleção múltipla / lote ----------
+  const idsFiltradas = filtradas.map((c) => c.id);
+  const allSel = idsFiltradas.length > 0 && idsFiltradas.every((id) => selecionados.includes(id));
+  const toggleSel = (id) => setSelecionados((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  const toggleSelAll = () => setSelecionados(allSel ? selecionados.filter((id) => !idsFiltradas.includes(id)) : Array.from(new Set([...selecionados, ...idsFiltradas])));
+  const excluirSelecionados = () => {
+    if (selecionados.length === 0) return;
+    if (!confirm(`Excluir ${selecionados.length} lançamento(s) selecionado(s)?`)) return;
+    const ids = new Set(selecionados);
+    setContas((prev) => prev.filter((c) => !ids.has(c.id)));
+    setSelecionados([]);
+  };
+  const aplicarEdicaoLote = () => {
+    if (!Object.values(bulkFlags).some(Boolean)) { alert('Marque ao menos um campo para alterar.'); return; }
+    const patch = {};
+    if (bulkFlags.descricao) patch.descricao = bulkForm.descricao.trim();
+    if (bulkFlags.valor) patch.valor = parseNumero(bulkForm.valor);
+    if (bulkFlags.vencimento) patch.vencimento = bulkForm.vencimento;
+    if (bulkFlags.status) patch.status = bulkForm.status;
+    if (bulkFlags.categoria) {
+      const item = itensDisponiveis.find((i) => i.id === bulkForm.categoriaId);
+      if (!item) { alert('Selecione um Item/Conta válido.'); return; }
+      patch.categoria = item.subcategoria ? `${item.subcategoria} → ${item.nome}` : item.nome;
+      patch.planoContasId = item.id;
+    }
+    const ids = new Set(selecionados);
+    setContas((prev) => prev.map((c) => (ids.has(c.id) ? { ...c, ...patch } : c)));
+    setShowBulkEdit(false);
+    setSelecionados([]);
+    setBulkFlags({ descricao: false, categoria: false, valor: false, vencimento: false, status: false });
+    setBulkForm({ descricao: '', categoriaId: '', valor: '', vencimento: hoje(), status: 'pago' });
+  };
 
   return (
     <div className="space-y-5" data-testid={viewTestid}>
@@ -427,12 +466,30 @@ export default function ContasSection({ config }) {
         )}
       </div>
 
+      {/* Barra de ações em lote */}
+      {selecionados.length > 0 && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex flex-wrap items-center gap-3" data-testid={`${prefix}-bulk-bar`}>
+          <span className="text-sm font-medium text-emerald-800">{selecionados.length} selecionado(s)</span>
+          <div className="flex gap-2 ml-auto flex-wrap">
+            <button onClick={() => setShowBulkEdit(true)} data-testid={`${prefix}-bulk-editar-btn`}
+              className="flex items-center gap-1.5 px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"><Pencil size={15} /> Editar em lote</button>
+            <button onClick={excluirSelecionados} data-testid={`${prefix}-bulk-excluir-btn`}
+              className="flex items-center gap-1.5 px-3 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700"><Trash2 size={15} /> Excluir selecionados</button>
+            <button onClick={() => setSelecionados([])} className="px-3 py-2 text-sm border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50">Limpar</button>
+          </div>
+        </div>
+      )}
+
       {/* Lista */}
       <div className="bg-white rounded-xl shadow-md overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[700px]" data-testid={`${prefix}-table`}>
+          <table className="w-full text-sm min-w-[740px]" data-testid={`${prefix}-table`}>
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
+                <th className="p-3 w-10 text-center">
+                  <input type="checkbox" checked={allSel} onChange={toggleSelAll} data-testid={`${prefix}-sel-all`}
+                    className="w-4 h-4 accent-emerald-600 cursor-pointer" title="Selecionar todos" />
+                </th>
                 <th className="text-left p-3 font-semibold text-gray-700">{dateLabel}</th>
                 <th className="text-left p-3 font-semibold text-gray-700">Descrição</th>
                 <th className="text-left p-3 font-semibold text-gray-700">Item/Conta</th>
@@ -443,9 +500,13 @@ export default function ContasSection({ config }) {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filtradas.length === 0 ? (
-                <tr><td colSpan={6} className="p-8 text-center text-gray-500">Nenhum registro neste período.</td></tr>
+                <tr><td colSpan={7} className="p-8 text-center text-gray-500">Nenhum registro neste período.</td></tr>
               ) : filtradas.map((c) => (
-                <tr key={c.id} className="hover:bg-gray-50" data-testid={`${prefix}-row-${c.id}`}>
+                <tr key={c.id} className={`hover:bg-gray-50 ${selecionados.includes(c.id) ? 'bg-emerald-50/60' : ''}`} data-testid={`${prefix}-row-${c.id}`}>
+                  <td className="p-3 text-center">
+                    <input type="checkbox" checked={selecionados.includes(c.id)} onChange={() => toggleSel(c.id)}
+                      data-testid={`${prefix}-sel-${c.id}`} className="w-4 h-4 accent-emerald-600 cursor-pointer" />
+                  </td>
                   <td className={`p-3 whitespace-nowrap ${isAtrasada(c) ? 'text-red-600 font-semibold' : 'text-gray-700'}`}>
                     {fmtData(c.vencimento)}{isAtrasada(c) && <span className="ml-1 text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded">{atrasadoLabel}</span>}
                   </td>
@@ -476,7 +537,7 @@ export default function ContasSection({ config }) {
             {filtradas.length > 0 && (
               <tfoot className="bg-gray-100 border-t-2 border-gray-300">
                 <tr>
-                  <td colSpan={3} className="p-3 font-bold text-right">Total do período ({filtradas.length}):</td>
+                  <td colSpan={4} className="p-3 font-bold text-right">Total do período ({filtradas.length}):</td>
                   <td className="p-3 text-right font-bold whitespace-nowrap">{fmtNumero(resumo.total)}</td>
                   <td colSpan={2}></td>
                 </tr>
@@ -490,6 +551,63 @@ export default function ContasSection({ config }) {
         <Info size={14} className="shrink-0 mt-0.5" />
         <span>{isolamentoText}</span>
       </div>
+
+      {/* Modal de edição em lote */}
+      {showBulkEdit && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3" onClick={() => setShowBulkEdit(false)} data-testid={`${prefix}-bulk-modal`}>
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <h3 className="text-lg font-bold text-gray-800">Editar {selecionados.length} lançamento(s) em lote</h3>
+              <button onClick={() => setShowBulkEdit(false)} className="text-gray-400 hover:text-gray-700"><X size={20} /></button>
+            </div>
+            <div className="p-4 space-y-3 overflow-y-auto">
+              <p className="text-xs text-gray-500">Marque apenas os campos que deseja alterar. Os não marcados permanecem como estão.</p>
+
+              <div className="flex items-center gap-2">
+                <input type="checkbox" checked={bulkFlags.descricao} onChange={(e) => setBulkFlags({ ...bulkFlags, descricao: e.target.checked })} className="w-4 h-4 accent-emerald-600" data-testid={`${prefix}-bulk-flag-descricao`} />
+                <label className="text-sm text-gray-600 w-28 shrink-0">Descrição</label>
+                <input type="text" disabled={!bulkFlags.descricao} value={bulkForm.descricao} onChange={(e) => setBulkForm({ ...bulkForm, descricao: e.target.value })} data-testid={`${prefix}-bulk-descricao`} className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm disabled:bg-gray-100 outline-none focus:ring-2 focus:ring-emerald-500" />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input type="checkbox" checked={bulkFlags.categoria} onChange={(e) => setBulkFlags({ ...bulkFlags, categoria: e.target.checked })} className="w-4 h-4 accent-emerald-600" data-testid={`${prefix}-bulk-flag-categoria`} />
+                <label className="text-sm text-gray-600 w-28 shrink-0">Item/Conta</label>
+                <select disabled={!bulkFlags.categoria} value={bulkForm.categoriaId} onChange={(e) => setBulkForm({ ...bulkForm, categoriaId: e.target.value })} data-testid={`${prefix}-bulk-categoria`} className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm disabled:bg-gray-100 outline-none focus:ring-2 focus:ring-emerald-500">
+                  <option value="">Selecione...</option>
+                  {itensDisponiveis.map((item) => (
+                    <option key={item.id} value={item.id}>{item.subcategoria ? `${item.subcategoria} → ${item.nome}` : item.nome}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input type="checkbox" checked={bulkFlags.valor} onChange={(e) => setBulkFlags({ ...bulkFlags, valor: e.target.checked })} className="w-4 h-4 accent-emerald-600" data-testid={`${prefix}-bulk-flag-valor`} />
+                <label className="text-sm text-gray-600 w-28 shrink-0">Valor (R$)</label>
+                <input type="text" inputMode="decimal" disabled={!bulkFlags.valor} value={bulkForm.valor} onChange={(e) => setBulkForm({ ...bulkForm, valor: e.target.value })} placeholder="0,00" data-testid={`${prefix}-bulk-valor`} className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm text-right disabled:bg-gray-100 outline-none focus:ring-2 focus:ring-emerald-500" />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input type="checkbox" checked={bulkFlags.vencimento} onChange={(e) => setBulkFlags({ ...bulkFlags, vencimento: e.target.checked })} className="w-4 h-4 accent-emerald-600" data-testid={`${prefix}-bulk-flag-vencimento`} />
+                <label className="text-sm text-gray-600 w-28 shrink-0">{dateLabel}</label>
+                <input type="date" disabled={!bulkFlags.vencimento} value={bulkForm.vencimento} onChange={(e) => setBulkForm({ ...bulkForm, vencimento: e.target.value })} data-testid={`${prefix}-bulk-vencimento`} className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm disabled:bg-gray-100 outline-none focus:ring-2 focus:ring-emerald-500" />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input type="checkbox" checked={bulkFlags.status} onChange={(e) => setBulkFlags({ ...bulkFlags, status: e.target.checked })} className="w-4 h-4 accent-emerald-600" data-testid={`${prefix}-bulk-flag-status`} />
+                <label className="text-sm text-gray-600 w-28 shrink-0">Status</label>
+                <select disabled={!bulkFlags.status} value={bulkForm.status} onChange={(e) => setBulkForm({ ...bulkForm, status: e.target.value })} data-testid={`${prefix}-bulk-status`} className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm disabled:bg-gray-100 outline-none focus:ring-2 focus:ring-emerald-500">
+                  <option value="pendente">Pendente</option>
+                  <option value="pago">{doneLabel}</option>
+                </select>
+              </div>
+            </div>
+            <div className="flex gap-2 p-4 border-t border-gray-200">
+              <button onClick={() => setShowBulkEdit(false)} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">Cancelar</button>
+              <button onClick={aplicarEdicaoLote} data-testid={`${prefix}-bulk-aplicar-btn`} className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm hover:bg-emerald-700">Aplicar alterações</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
