@@ -390,72 +390,126 @@ export default function DREPage() {
     
     const dadosExportacao = gerarDadosExportacao();
     
-    // Criar PDF em landscape
-    const doc = new jsPDF('landscape', 'mm', 'a4');
-    
-    // Título
-    doc.setFontSize(16);
-    const tituloPeriodo = mesFiltro === 'todos' ? `${ano}` : `${MESES_NOMES[mesFiltro]}/${ano}`;
-    doc.text(`Demonstrativo de Resultado do Exercício - ${tituloPeriodo}`, doc.internal.pageSize.width / 2, 15, { align: 'center' });
-    
+    // Orientação: retrato quando um único mês (poucas colunas), paisagem no consolidado anual
+    const doc = new jsPDF(showTotal ? 'landscape' : 'portrait', 'mm', 'a4');
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+
+    // Cor do texto por categoria (fundo branco, texto colorido — igual ao modelo)
+    const corTexto = {
+      cyan: [14, 116, 144],
+      red: [220, 38, 38],
+      green: [21, 128, 61],
+      blue: [37, 99, 235],
+      gray: [55, 65, 81],
+    };
+
+    // Título + subtítulo
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(18);
+    doc.setTextColor(33, 37, 41);
+    doc.text('Demonstrativo de Resultado do Exercício', pageW / 2, 15, { align: 'center' });
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(11);
+    doc.setTextColor(90, 90, 90);
+    const subtitulo = showTotal ? `Visão Anual – ${ano}` : `Visão Simplificada – ${MESES_NOMES[mesFiltro]} / ${ano}`;
+    doc.text(subtitulo, pageW / 2, 22, { align: 'center' });
+
     // Preparar dados para a tabela
     const headers = ['Descrição', ...mesesVis.map(m => MESES_LABELS[m])];
     if (showTotal) headers.push(ano.toString());
     headers.push('AV%');
-    
+
     const body = dadosExportacao.map(item => {
       const indent = '  '.repeat(item.nivel);
       const prefix = item.isItem ? '• ' : '';
       const descricao = indent + prefix + item.descricao;
       const av = item.isPercent ? '-' : (base > 0 ? formatPct(periodoVal(item.valores) / base * 100) : '0%');
-      
+
       const linha = [descricao, ...mesesVis.map(m => item.isPercent ? formatPct(item.valores?.[m]) : formatVal(item.valores?.[m]))];
       if (showTotal) linha.push(item.isPercent ? formatPct(item.valores?.total) : formatVal(item.valores?.total));
       linha.push(av);
       return linha;
     });
-    
-    // Gerar tabela com autoTable
+
+    // Gerar tabela: apenas linhas horizontais finas (cinza claro), sem grade vertical
     autoTable(doc, {
       head: [headers],
       body: body,
-      startY: 22,
+      startY: 28,
+      theme: 'plain',
       styles: {
-        fontSize: 7,
-        cellPadding: 1.5,
+        fontSize: showTotal ? 7 : 9,
+        cellPadding: showTotal ? 1.5 : 2,
+        halign: 'right',
+        textColor: [55, 65, 81],
+        lineColor: [224, 224, 224],
+        lineWidth: { top: 0, right: 0, bottom: 0.1, left: 0 },
       },
       headStyles: {
-        fillColor: [229, 229, 229],
-        textColor: [0, 0, 0],
+        fillColor: [248, 249, 250],
+        textColor: [33, 37, 41],
         fontStyle: 'bold',
+        halign: 'right',
+        lineColor: [200, 200, 200],
+        lineWidth: { top: 0, right: 0, bottom: 0.3, left: 0 },
       },
       columnStyles: {
-        0: { cellWidth: 50 },
+        0: { halign: 'left', cellWidth: showTotal ? 50 : 90 },
       },
       didParseCell: function(data) {
-        // Colorir linhas baseado no nível
+        if (data.column.index === 0) data.cell.styles.halign = 'left';
         if (data.section === 'body') {
           const rowData = dadosExportacao[data.row.index];
-          if (rowData && rowData.nivel === 0) {
-            if (rowData.cor === 'cyan') {
-              data.cell.styles.fillColor = [224, 247, 250];
-              data.cell.styles.textColor = [14, 116, 144];
-            } else if (rowData.cor === 'red') {
-              data.cell.styles.fillColor = [255, 235, 238];
-              data.cell.styles.textColor = [220, 38, 38];
-            } else if (rowData.cor === 'green') {
-              data.cell.styles.fillColor = [232, 245, 233];
-              data.cell.styles.textColor = [21, 128, 61];
-            } else if (rowData.cor === 'blue') {
-              data.cell.styles.fillColor = [227, 242, 253];
-              data.cell.styles.textColor = [37, 99, 235];
-            }
+          if (rowData && (rowData.nivel === 0 || rowData.isTotal || rowData.isPercent)) {
+            data.cell.styles.textColor = corTexto[rowData.cor] || [33, 37, 41];
             data.cell.styles.fontStyle = 'bold';
           }
         }
       }
     });
-    
+
+    // ---- Cards de resumo (rodapé) ----
+    const fmtBRL = (v) => 'R$ ' + new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v || 0);
+    const receitaLiquidaV = periodoVal(totais.receita_liquida);
+    const margemContribV = periodoVal(totais.margem_contribuicao);
+    const margemContribPctV = periodoVal(totais.margem_contribuicao_pct);
+    const lucroLiquidoV = periodoVal(totais.lucro_liquido);
+    const margemLiqPctV = periodoVal(totais.margem_liquida_pct);
+
+    let cardsY = (doc.lastAutoTable?.finalY || 28) + 8;
+    const cardH = 24;
+    if (cardsY + cardH + 8 > pageH) { doc.addPage(); cardsY = 20; }
+    const marginX = 14;
+    const gap = 6;
+    const cardW = (pageW - marginX * 2 - gap * 2) / 3;
+
+    const cards = [
+      { label: 'RECEITA LÍQUIDA', bg: [227, 242, 253], valor: fmtBRL(receitaLiquidaV), sub: '', valorCor: [30, 64, 175] },
+      { label: 'MARGEM DE CONTRIBUIÇÃO', bg: [220, 252, 231], valor: fmtBRL(margemContribV), sub: `${formatPct(margemContribPctV)}`, valorCor: [21, 128, 61] },
+      { label: 'LUCRO LÍQUIDO', bg: [252, 228, 236], valor: fmtBRL(lucroLiquidoV), sub: `${formatPct(margemLiqPctV)}`, valorCor: lucroLiquidoV < 0 ? [220, 38, 38] : [21, 128, 61] },
+    ];
+
+    cards.forEach((c, i) => {
+      const x = marginX + i * (cardW + gap);
+      doc.setFillColor(c.bg[0], c.bg[1], c.bg[2]);
+      doc.roundedRect(x, cardsY, cardW, cardH, 3, 3, 'F');
+      const cx = x + cardW / 2;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(75, 85, 99);
+      doc.text(c.label, cx, cardsY + 7, { align: 'center' });
+      doc.setFontSize(13);
+      doc.setTextColor(c.valorCor[0], c.valorCor[1], c.valorCor[2]);
+      doc.text(c.valor, cx, cardsY + 15, { align: 'center' });
+      if (c.sub) {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.setTextColor(90, 90, 90);
+        doc.text(c.sub, cx, cardsY + 20.5, { align: 'center' });
+      }
+    });
+
     // Download automático
     const sufixo = mesFiltro === 'todos' ? '' : `_${MESES_LABELS[mesFiltro]}`;
     doc.save(`DRE_${ano}${sufixo}.pdf`);
