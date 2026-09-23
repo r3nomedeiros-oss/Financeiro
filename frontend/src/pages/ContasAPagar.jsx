@@ -12,6 +12,7 @@ const CONFIG = {
   totalLabel: 'Total a Pagar',
   doneLabel: 'Pago',
   atrasadoLabel: 'vencida',
+  tipoPlano: 'despesa',
   descricaoPlaceholder: 'Ex: Fornecedor XYZ - NF 123',
   categorias: ['Fornecedores', 'Salários', 'Impostos', 'Aluguel', 'Energia', 'Água', 'Internet/Telefone', 'Empréstimos', 'Manutenção', 'Outros'],
   isolamentoText: 'Estas contas são apenas para simulação/controle nesta aba e não afetam os relatórios do sistema. Salvas apenas neste navegador.',

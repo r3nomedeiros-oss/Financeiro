@@ -12,6 +12,7 @@ const CONFIG = {
   totalLabel: 'Total a Receber',
   doneLabel: 'Recebido',
   atrasadoLabel: 'atrasada',
+  tipoPlano: 'receita',
   descricaoPlaceholder: 'Ex: Cliente ABC - NF 456',
   categorias: ['Vendas de Produtos', 'Prestação de Serviços', 'Clientes', 'Rendimentos', 'Aluguéis a Receber', 'Outros'],
   isolamentoText: 'Estes recebíveis são apenas para simulação/controle nesta aba e não afetam os relatórios do sistema. Salvos apenas neste navegador.',

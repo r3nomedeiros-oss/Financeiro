@@ -54,6 +54,11 @@ Sistema financeiro existente conectado a Vercel/Supabase/GitHub (React+Vite / Fa
 - Exportações PDF e Excel respeitam o filtro: exportam só o mês selecionado (arquivo `DRE_{ano}_{Mes}.pdf/csv`) ou o ano consolidado ("Todos").
 - Lógica 100% client-side, reutiliza dados de `dreAPI.getAnual(ano)` (por-mês já disponível em `valores_por_plano` e `totais`). Build Vite verificado (OK).
 
+### [Jun 2026] Contas a Pagar/Receber: categoria agora usa Item/Conta do plano de contas
+- `ContasSection.jsx`: campo "Categoria" (texto livre) substituído por combobox "Item/Conta *" com busca (typeahead) igual ao form de Movimentações — carrega `planoContasAPI.getHierarquico()` e lista itens nível 3 (ou subcategoria sem itens) filtrados por `tipoPlano` do config.
+- Config: `tipoPlano: 'despesa'` em `ContasAPagar.jsx`, `'receita'` em `ContasAReceber.jsx`. Cada conta salva `planoContasId` + `categoria` (label "Sub → Item"). Cabeçalho da coluna renomeado para "Item/Conta". Item/Conta é obrigatório ao salvar.
+- Requer backend (plano de contas). Verificado via screenshot com mock do hierárquico: dropdown lista itens de despesa, seleção e salvamento OK. Continua client-side (localStorage) para os lançamentos.
+
 ### [Jun 2026] Projeção/Contas: campo de recorrência nos lançamentos
 - `ContasSection.jsx` (usado por Contas a Pagar e a Receber): novo campo "Recorrência" (Não recorrente / Semanal / Mensal / Anual) + campo "Repetições" (1..120, aparece só quando recorrente e em novo lançamento).
 - Ao salvar recorrente, gera N lançamentos com datas avançadas pela frequência (`avancarData`), marcados com `recorrente:true` e `serieId` compartilhado. Ícone `Repeat` (lucide) indica linhas recorrentes.

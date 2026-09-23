@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Trash2, Pencil, Check, X, CalendarDays, Info, Repeat } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Plus, Trash2, Pencil, Check, X, CalendarDays, Info, Repeat, Search } from 'lucide-react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
+import { planoContasAPI } from '../services/api';
 
 const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 
@@ -48,16 +49,23 @@ export default function ContasSection({ config }) {
   const {
     storageKey, prefix, viewTestid, chartTitle, lineColor, lineName,
     dateLabel, totalLabel, doneLabel, categorias, descricaoPlaceholder,
-    isolamentoText, atrasadoLabel,
+    isolamentoText, atrasadoLabel, tipoPlano,
   } = config;
 
-  const formVazio = () => ({ descricao: '', valor: '', vencimento: hoje(), categoria: categorias[0], status: 'pendente', recorrencia: 'nenhuma', repeticoes: 12 });
+  const formVazio = () => ({ descricao: '', valor: '', vencimento: hoje(), categoria: '', planoContasId: '', status: 'pendente', recorrencia: 'nenhuma', repeticoes: 12 });
 
   const [contas, setContas] = useState([]);
   const [carregado, setCarregado] = useState(false);
   const [form, setForm] = useState(formVazio());
   const [editingId, setEditingId] = useState(null);
   const [datasPreview, setDatasPreview] = useState([]);
+
+  // Plano de contas (Item/Conta) - igual ao formulário de Movimentações
+  const [hierarquia, setHierarquia] = useState({});
+  const [buscaItem, setBuscaItem] = useState('');
+  const [showItemDropdown, setShowItemDropdown] = useState(false);
+  const itemInputRef = useRef(null);
+  const itemDropdownRef = useRef(null);
 
   const [modo, setModo] = useState('mes');
   const now = new Date();
@@ -86,6 +94,59 @@ export default function ContasSection({ config }) {
     const total = Math.min(Math.max(parseInt(form.repeticoes) || 1, 1), 120);
     setDatasPreview(Array.from({ length: total }, (_, i) => avancarData(form.vencimento, form.recorrencia, i)));
   }, [form.recorrencia, form.vencimento, form.repeticoes, editingId]);
+
+  // Carregar plano de contas hierárquico (para o campo Item/Conta)
+  useEffect(() => {
+    planoContasAPI.getHierarquico()
+      .then((res) => setHierarquia(res.data || {}))
+      .catch((e) => console.error('Erro ao carregar plano de contas:', e));
+  }, []);
+
+  // Fechar dropdown do Item/Conta ao clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (itemDropdownRef.current && !itemDropdownRef.current.contains(event.target) &&
+          itemInputRef.current && !itemInputRef.current.contains(event.target)) {
+        setShowItemDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Itens (nível 3, ou subcategoria sem itens) filtrados pelo tipo desta seção (despesa/receita)
+  const itensDisponiveis = useMemo(() => {
+    const itens = [];
+    Object.entries(hierarquia).forEach(([, categoria]) => {
+      (categoria.subcategorias || []).forEach((subcat) => {
+        if (subcat.tipo === tipoPlano || categoria.tipo === 'misto') {
+          (subcat.itens || []).forEach((item) => {
+            if (item.tipo === tipoPlano) itens.push({ id: item.id, nome: item.nome, subcategoria: subcat.nome });
+          });
+          if ((!subcat.itens || subcat.itens.length === 0) && subcat.tipo === tipoPlano) {
+            itens.push({ id: subcat.id, nome: subcat.nome, subcategoria: '' });
+          }
+        }
+      });
+    });
+    return itens;
+  }, [hierarquia, tipoPlano]);
+
+  const itensFiltrados = useMemo(() => {
+    const termo = buscaItem.toLowerCase().replace('→', ' ').replace(/\s+/g, ' ').trim();
+    return itensDisponiveis.filter((item) => {
+      if (!termo) return true;
+      const txt = (item.subcategoria ? `${item.subcategoria} ${item.nome}` : item.nome).toLowerCase();
+      return txt.includes(termo);
+    });
+  }, [buscaItem, itensDisponiveis]);
+
+  const selecionarItem = (item) => {
+    const label = item.subcategoria ? `${item.subcategoria} → ${item.nome}` : item.nome;
+    setForm((f) => ({ ...f, planoContasId: item.id, categoria: label }));
+    setBuscaItem(label);
+    setShowItemDropdown(false);
+  };
 
   const range = useMemo(() => {
     if (modo === 'mes') return { start: new Date(ano, mes - 1, 1), end: new Date(ano, mes, 0) };
@@ -139,21 +200,29 @@ export default function ContasSection({ config }) {
     if (!descricao) { alert('Informe a descrição.'); return; }
     if (!valor) { alert('Informe um valor maior que zero.'); return; }
     if (!form.vencimento) { alert('Informe a data.'); return; }
+    if (!form.categoria) { alert('Selecione o Item/Conta.'); return; }
+    const planoContasId = form.planoContasId;
+    const categoria = form.categoria;
     if (editingId) {
-      setContas((prev) => prev.map((c) => (c.id === editingId ? { ...c, descricao, valor, vencimento: form.vencimento, categoria: form.categoria, status: form.status } : c)));
+      setContas((prev) => prev.map((c) => (c.id === editingId ? { ...c, descricao, valor, vencimento: form.vencimento, categoria, planoContasId, status: form.status } : c)));
     } else if (form.recorrencia && form.recorrencia !== 'nenhuma') {
       const datas = (datasPreview.length ? datasPreview : [form.vencimento]).filter(Boolean);
       const serieId = uid();
-      const novos = datas.map((venc) => ({ id: uid(), descricao, valor, vencimento: venc, categoria: form.categoria, status: form.status, recorrente: true, serieId }));
+      const novos = datas.map((venc) => ({ id: uid(), descricao, valor, vencimento: venc, categoria, planoContasId, status: form.status, recorrente: true, serieId }));
       setContas((prev) => [...prev, ...novos]);
     } else {
-      setContas((prev) => [...prev, { id: uid(), descricao, valor, vencimento: form.vencimento, categoria: form.categoria, status: form.status }]);
+      setContas((prev) => [...prev, { id: uid(), descricao, valor, vencimento: form.vencimento, categoria, planoContasId, status: form.status }]);
     }
     setForm(formVazio());
+    setBuscaItem('');
     setEditingId(null);
   };
-  const editar = (c) => { setEditingId(c.id); setForm({ descricao: c.descricao, valor: String(c.valor).replace('.', ','), vencimento: c.vencimento, categoria: c.categoria, status: c.status, recorrencia: 'nenhuma', repeticoes: 12 }); };
-  const cancelarEdicao = () => { setForm(formVazio()); setEditingId(null); };
+  const editar = (c) => {
+    setEditingId(c.id);
+    setForm({ descricao: c.descricao, valor: String(c.valor).replace('.', ','), vencimento: c.vencimento, categoria: c.categoria || '', planoContasId: c.planoContasId || '', status: c.status, recorrencia: 'nenhuma', repeticoes: 12 });
+    setBuscaItem(c.categoria || '');
+  };
+  const cancelarEdicao = () => { setForm(formVazio()); setBuscaItem(''); setEditingId(null); };
   const excluir = (id) => {
     const c = contas.find((x) => x.id === id);
     const naSerie = c?.serieId ? contas.filter((x) => x.serieId === c.serieId).length : 0;
@@ -257,14 +326,38 @@ export default function ContasSection({ config }) {
               data-testid={`${prefix}-vencimento-input`}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none" />
           </div>
-          <div className="md:col-span-2">
-            <label className="block text-xs text-gray-500 mb-1">Categoria</label>
-            <input type="text" list={`${prefix}-categorias-list`} value={form.categoria} onChange={(e) => setForm({ ...form, categoria: e.target.value })}
-              data-testid={`${prefix}-categoria-input`}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none" />
-            <datalist id={`${prefix}-categorias-list`}>
-              {categorias.map((c) => <option key={c} value={c} />)}
-            </datalist>
+          <div className="md:col-span-2 relative">
+            <label className="block text-xs text-gray-500 mb-1">Item/Conta *</label>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
+              <input
+                ref={itemInputRef}
+                type="text"
+                value={buscaItem}
+                onChange={(e) => { setBuscaItem(e.target.value); setForm({ ...form, planoContasId: '', categoria: '' }); setShowItemDropdown(true); }}
+                onFocus={() => setShowItemDropdown(true)}
+                placeholder="Buscar item/conta..."
+                data-testid={`${prefix}-categoria-input`}
+                autoComplete="off"
+                className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none" />
+            </div>
+            {showItemDropdown && (
+              <div ref={itemDropdownRef}
+                className="absolute z-40 mt-1 w-full max-h-60 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg"
+                data-testid={`${prefix}-item-dropdown`}>
+                {itensFiltrados.length > 0 ? itensFiltrados.map((item) => (
+                  <button key={item.id} type="button" onClick={() => selecionarItem(item)}
+                    className={`block w-full text-left px-3 py-2 text-sm hover:bg-emerald-50 border-b border-gray-50 ${form.planoContasId === item.id ? 'bg-emerald-100 text-emerald-700 font-medium' : 'text-gray-700'}`}
+                    data-testid={`${prefix}-item-opt-${item.id}`}>
+                    {item.subcategoria ? (<><span className="text-gray-500">{item.subcategoria} → </span>{item.nome}</>) : item.nome}
+                  </button>
+                )) : (
+                  <div className="px-3 py-3 text-sm text-gray-400 text-center">
+                    {Object.keys(hierarquia).length === 0 ? 'Carregando plano de contas...' : 'Nenhum item encontrado'}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <div className="md:col-span-2">
             <label className="block text-xs text-gray-500 mb-1">Recorrência</label>
@@ -342,7 +435,7 @@ export default function ContasSection({ config }) {
               <tr>
                 <th className="text-left p-3 font-semibold text-gray-700">{dateLabel}</th>
                 <th className="text-left p-3 font-semibold text-gray-700">Descrição</th>
-                <th className="text-left p-3 font-semibold text-gray-700">Categoria</th>
+                <th className="text-left p-3 font-semibold text-gray-700">Item/Conta</th>
                 <th className="text-right p-3 font-semibold text-gray-700">Valor</th>
                 <th className="text-center p-3 font-semibold text-gray-700">Status</th>
                 <th className="text-center p-3 font-semibold text-gray-700">Ações</th>
