@@ -54,6 +54,12 @@ Sistema financeiro existente conectado a Vercel/Supabase/GitHub (React+Vite / Fa
 - Exportações PDF e Excel respeitam o filtro: exportam só o mês selecionado (arquivo `DRE_{ano}_{Mes}.pdf/csv`) ou o ano consolidado ("Todos").
 - Lógica 100% client-side, reutiliza dados de `dreAPI.getAnual(ano)` (por-mês já disponível em `valores_por_plano` e `totais`). Build Vite verificado (OK).
 
+### [Jun 2026] Projeção: nova aba "DRE Projetado"
+- Novo `DREProjetado.jsx` + aba em `ProjecaoPage.jsx` (view 'dre', data-testid `tab-dre-projetado`).
+- Lê os localStorage de Contas a Pagar/Receber e o plano de contas (`getHierarquico`); mapeia cada `planoContasId` -> categoria DRE (chave top-level da hierarquia) e monta o DRE: Receita Bruta, Deduções, Receita Líquida, Custos Variáveis, Margem de Contribuição (+%), Custos Fixos, Resultado Operacional, Resultado Não Operacional, Lucro Líquido (+%). Itens detalhados sob cada categoria; AV% sobre Receita Líquida.
+- Receber = lado receita; Pagar = lado despesa. Não-operacional: receber soma receitas, pagar soma gastos. Sem categoria mapeada: receber->Receita Bruta, pagar->Custos Variáveis. Filtro por mês/ano + botão Atualizar. Não afeta o DRE real.
+- Verificado via screenshot (mock hierárquico + seed): RB 10k, Ded 1k, RL 9k, CV 3k, MC 6k(67%), CF 4k, Res Op 2k, Lucro 2k(22%) — cálculo correto.
+
 ### [Jun 2026] Contas a Pagar/Receber: seleção múltipla + ações em lote
 - `ContasSection.jsx`: checkbox por linha + "selecionar todos" (sobre a lista filtrada). Barra de ações aparece com ≥1 selecionado: Editar em lote, Excluir selecionados, Limpar.
 - Modal de edição em lote: cada campo (Descrição, Item/Conta, Valor, Vencimento, Status) tem checkbox "alterar"; só os marcados são aplicados a todos os selecionados. Item/Conta via `<select>` de itensDisponiveis. Exclusão em lote com confirm.

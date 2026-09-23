@@ -8,6 +8,7 @@ import {
 import ContasAPagar from './ContasAPagar';
 import ContasAReceber from './ContasAReceber';
 import ComparativoContas from './ComparativoContas';
+import DREProjetado from './DREProjetado';
 
 const STORAGE_KEY = 'projecao_fluxo_caixa_v1';
 
@@ -290,12 +291,20 @@ export default function ProjecaoPage() {
           >
             Comparativo (Receber × Pagar)
           </button>
+          <button
+            onClick={() => setView('dre')}
+            className={`py-2.5 px-1 border-b-2 font-medium text-sm transition-colors ${view === 'dre' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+            data-testid="tab-dre-projetado"
+          >
+            DRE Projetado
+          </button>
         </nav>
       </div>
 
       {view === 'pagar' && <ContasAPagar />}
       {view === 'receber' && <ContasAReceber />}
       {view === 'comparativo' && <ComparativoContas />}
+      {view === 'dre' && <DREProjetado />}
     </div>
   );
 }
