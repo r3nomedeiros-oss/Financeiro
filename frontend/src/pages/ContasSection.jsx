@@ -95,12 +95,12 @@ export default function ContasSection({ config }) {
     catch (e) { console.error('Erro ao salvar contas:', e); }
   }, [contas, carregado, storageKey]);
 
-  // Preview das datas que serão geradas na recorrência (editáveis antes de salvar)
+  // Preview dos lançamentos que serão gerados na recorrência (data e valor editáveis)
   useEffect(() => {
     if (editingId || form.recorrencia === 'nenhuma' || !form.vencimento) { setDatasPreview([]); return; }
     const total = Math.min(Math.max(parseInt(form.repeticoes) || 1, 1), 120);
-    setDatasPreview(Array.from({ length: total }, (_, i) => avancarData(form.vencimento, form.recorrencia, i)));
-  }, [form.recorrencia, form.vencimento, form.repeticoes, editingId]);
+    setDatasPreview(Array.from({ length: total }, (_, i) => ({ data: avancarData(form.vencimento, form.recorrencia, i), valor: form.valor })));
+  }, [form.recorrencia, form.vencimento, form.repeticoes, form.valor, editingId]);
 
   // Carregar plano de contas hierárquico (para o campo Item/Conta)
   useEffect(() => {
@@ -218,9 +218,9 @@ export default function ContasSection({ config }) {
     if (editingId) {
       setContas((prev) => prev.map((c) => (c.id === editingId ? { ...c, descricao, valor, vencimento: form.vencimento, categoria, planoContasId, status: form.status } : c)));
     } else if (form.recorrencia && form.recorrencia !== 'nenhuma') {
-      const datas = (datasPreview.length ? datasPreview : [form.vencimento]).filter(Boolean);
+      const itensPreview = (datasPreview.length ? datasPreview : [{ data: form.vencimento, valor: form.valor }]).filter((it) => it.data);
       const serieId = uid();
-      const novos = datas.map((venc) => ({ id: uid(), descricao, valor, vencimento: venc, categoria, planoContasId, status: form.status, recorrente: true, serieId }));
+      const novos = itensPreview.map((it) => ({ id: uid(), descricao, valor: parseNumero(it.valor) || valor, vencimento: it.data, categoria, planoContasId, status: form.status, recorrente: true, serieId }));
       setContas((prev) => [...prev, ...novos]);
     } else {
       setContas((prev) => [...prev, { id: uid(), descricao, valor, vencimento: form.vencimento, categoria, planoContasId, status: form.status }]);
@@ -458,23 +458,27 @@ export default function ContasSection({ config }) {
             <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
               <p className="text-xs font-medium text-gray-600 flex items-center gap-1.5">
                 <Repeat size={14} className="text-emerald-600" />
-                {datasPreview.length} {datasPreview.length === 1 ? 'lançamento será criado' : 'lançamentos serão criados'} — revise/ajuste as datas antes de salvar
+                {datasPreview.length} {datasPreview.length === 1 ? 'lançamento será criado' : 'lançamentos serão criados'} — ajuste data e valor antes de salvar
               </p>
               <p className="text-xs text-gray-500" data-testid={`${prefix}-preview-total`}>
-                Total: {fmtMoeda(parseNumero(form.valor) * datasPreview.length)}
+                Total: {fmtMoeda(datasPreview.reduce((a, it) => a + (parseNumero(it.valor) || 0), 0))}
               </p>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
-              {datasPreview.map((d, i) => (
-                <div key={i} className="flex items-center gap-1">
-                  <span className="text-[11px] text-gray-400 w-5 shrink-0">{i + 1}º</span>
-                  <input type="date" value={d}
-                    onChange={(e) => setDatasPreview((prev) => prev.map((x, idx) => (idx === i ? e.target.value : x)))}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+              {datasPreview.map((item, i) => (
+                <div key={i} className="flex items-center gap-1.5 border border-gray-100 rounded-lg p-1.5 bg-gray-50/60">
+                  <span className="text-[11px] text-gray-400 w-5 shrink-0 text-center">{i + 1}º</span>
+                  <input type="date" value={item.data}
+                    onChange={(e) => setDatasPreview((prev) => prev.map((x, idx) => (idx === i ? { ...x, data: e.target.value } : x)))}
                     data-testid={`${prefix}-preview-data-${i}`}
                     className="flex-1 min-w-0 px-2 py-1 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-emerald-500 outline-none" />
+                  <input type="text" inputMode="decimal" value={item.valor} placeholder="0,00"
+                    onChange={(e) => setDatasPreview((prev) => prev.map((x, idx) => (idx === i ? { ...x, valor: e.target.value } : x)))}
+                    data-testid={`${prefix}-preview-valor-${i}`}
+                    className="w-20 shrink-0 px-2 py-1 border border-gray-300 rounded text-xs text-right focus:ring-2 focus:ring-emerald-500 outline-none" />
                   {datasPreview.length > 1 && (
                     <button onClick={() => setDatasPreview((prev) => prev.filter((_, idx) => idx !== i))}
-                      className="text-gray-300 hover:text-red-600 shrink-0" title="Remover esta data"
+                      className="text-gray-300 hover:text-red-600 shrink-0" title="Remover este lançamento"
                       data-testid={`${prefix}-preview-remover-${i}`}>
                       <X size={13} />
                     </button>
