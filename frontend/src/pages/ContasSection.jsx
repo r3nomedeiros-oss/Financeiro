@@ -48,11 +48,11 @@ const avancarData = (iso, freq, i) => {
 export default function ContasSection({ config }) {
   const {
     storageKey, prefix, viewTestid, chartTitle, lineColor, lineName,
-    dateLabel, totalLabel, doneLabel, categorias, descricaoPlaceholder,
+    dateLabel, previsaoLabel, totalLabel, doneLabel, categorias, descricaoPlaceholder,
     isolamentoText, atrasadoLabel, tipoPlano,
   } = config;
 
-  const formVazio = () => ({ descricao: '', valor: '', vencimento: hoje(), categoria: '', planoContasId: '', status: 'pendente', recorrencia: 'nenhuma', repeticoes: 12 });
+  const formVazio = () => ({ descricao: '', valor: '', vencimento: hoje(), previsaoPagamento: '', categoria: '', planoContasId: '', status: 'pendente', recorrencia: 'nenhuma', repeticoes: 12 });
 
   const [contas, setContas] = useState([]);
   const [carregado, setCarregado] = useState(false);
@@ -216,14 +216,14 @@ export default function ContasSection({ config }) {
     const planoContasId = form.planoContasId;
     const categoria = form.categoria;
     if (editingId) {
-      setContas((prev) => prev.map((c) => (c.id === editingId ? { ...c, descricao, valor, vencimento: form.vencimento, categoria, planoContasId, status: form.status } : c)));
+      setContas((prev) => prev.map((c) => (c.id === editingId ? { ...c, descricao, valor, vencimento: form.vencimento, previsaoPagamento: form.previsaoPagamento || '', categoria, planoContasId, status: form.status } : c)));
     } else if (form.recorrencia && form.recorrencia !== 'nenhuma') {
       const itensPreview = (datasPreview.length ? datasPreview : [{ data: form.vencimento, valor: form.valor }]).filter((it) => it.data);
       const serieId = uid();
-      const novos = itensPreview.map((it) => ({ id: uid(), descricao, valor: parseNumero(it.valor) || valor, vencimento: it.data, categoria, planoContasId, status: form.status, recorrente: true, serieId }));
+      const novos = itensPreview.map((it) => ({ id: uid(), descricao, valor: parseNumero(it.valor) || valor, vencimento: it.data, previsaoPagamento: '', categoria, planoContasId, status: form.status, recorrente: true, serieId }));
       setContas((prev) => [...prev, ...novos]);
     } else {
-      setContas((prev) => [...prev, { id: uid(), descricao, valor, vencimento: form.vencimento, categoria, planoContasId, status: form.status }]);
+      setContas((prev) => [...prev, { id: uid(), descricao, valor, vencimento: form.vencimento, previsaoPagamento: form.previsaoPagamento || '', categoria, planoContasId, status: form.status }]);
     }
     setForm(formVazio());
     setBuscaItem('');
@@ -231,7 +231,7 @@ export default function ContasSection({ config }) {
   };
   const editar = (c) => {
     setEditingId(c.id);
-    setForm({ descricao: c.descricao, valor: String(c.valor).replace('.', ','), vencimento: c.vencimento, categoria: c.categoria || '', planoContasId: c.planoContasId || '', status: c.status, recorrencia: 'nenhuma', repeticoes: 12 });
+    setForm({ descricao: c.descricao, valor: String(c.valor).replace('.', ','), vencimento: c.vencimento, previsaoPagamento: c.previsaoPagamento || '', categoria: c.categoria || '', planoContasId: c.planoContasId || '', status: c.status, recorrencia: 'nenhuma', repeticoes: 12 });
     setBuscaItem(c.categoria || '');
   };
   const cancelarEdicao = () => { setForm(formVazio()); setBuscaItem(''); setEditingId(null); };
@@ -246,6 +246,7 @@ export default function ContasSection({ config }) {
     if (confirm('Excluir este registro?')) setContas((prev) => prev.filter((x) => x.id !== id));
   };
   const toggleStatus = (id) => setContas((prev) => prev.map((c) => (c.id === id ? { ...c, status: c.status === 'pago' ? 'pendente' : 'pago' } : c)));
+  const setPrevisao = (id, val) => setContas((prev) => prev.map((c) => (c.id === id ? { ...c, previsaoPagamento: val } : c)));
   const isAtrasada = (c) => c.status === 'pendente' && c.vencimento < hoje();
 
   // ---------- seleção múltipla / lote ----------
@@ -385,6 +386,12 @@ export default function ContasSection({ config }) {
               data-testid={`${prefix}-vencimento-input`}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none" />
           </div>
+          <div className="md:col-span-2">
+            <label className="block text-xs text-gray-500 mb-1 truncate" title={`${previsaoLabel || 'Previsão'} (opcional)`}>{previsaoLabel || 'Previsão'} <span className="text-gray-300">(opcional)</span></label>
+            <input type="date" value={form.previsaoPagamento} onChange={(e) => setForm({ ...form, previsaoPagamento: e.target.value })}
+              data-testid={`${prefix}-previsao-input`}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+          </div>
           <div className="md:col-span-2 relative">
             <label className="block text-xs text-gray-500 mb-1">Item/Conta *</label>
             <div className="relative">
@@ -507,7 +514,7 @@ export default function ContasSection({ config }) {
       {/* Lista */}
       <div className="bg-white rounded-xl shadow-md overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[740px]" data-testid={`${prefix}-table`}>
+          <table className="w-full text-sm min-w-[860px]" data-testid={`${prefix}-table`}>
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="p-3 w-10 text-center">
@@ -515,6 +522,7 @@ export default function ContasSection({ config }) {
                     className="w-4 h-4 accent-emerald-600 cursor-pointer" title="Selecionar todos" />
                 </th>
                 <th className="text-left p-3 font-semibold text-gray-700">{dateLabel}</th>
+                <th className="text-left p-3 font-semibold text-gray-700">{previsaoLabel || 'Previsão'}</th>
                 <th className="text-left p-3 font-semibold text-gray-700">Descrição</th>
                 <th className="text-left p-3 font-semibold text-gray-700">Item/Conta</th>
                 <th className="text-right p-3 font-semibold text-gray-700">Valor</th>
@@ -524,7 +532,7 @@ export default function ContasSection({ config }) {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filtradas.length === 0 ? (
-                <tr><td colSpan={7} className="p-8 text-center text-gray-500">Nenhum registro neste período.</td></tr>
+                <tr><td colSpan={8} className="p-8 text-center text-gray-500">Nenhum registro neste período.</td></tr>
               ) : filtradas.map((c) => (
                 <tr key={c.id} className={`hover:bg-gray-50 ${selecionados.includes(c.id) ? 'bg-emerald-50/60' : ''}`} data-testid={`${prefix}-row-${c.id}`}>
                   <td className="p-3 text-center">
@@ -533,6 +541,12 @@ export default function ContasSection({ config }) {
                   </td>
                   <td className={`p-3 whitespace-nowrap ${isAtrasada(c) ? 'text-red-600 font-semibold' : 'text-gray-700'}`}>
                     {fmtData(c.vencimento)}{isAtrasada(c) && <span className="ml-1 text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded">{atrasadoLabel}</span>}
+                  </td>
+                  <td className="p-3 whitespace-nowrap">
+                    <input type="date" value={c.previsaoPagamento || ''} onChange={(e) => setPrevisao(c.id, e.target.value)}
+                      data-testid={`${prefix}-previsao-cell-${c.id}`}
+                      title={c.previsaoPagamento ? 'Previsão informada' : 'Informe a data prevista de pagamento (não altera o vencimento)'}
+                      className={`px-2 py-1 border rounded text-xs outline-none focus:ring-2 focus:ring-blue-500 ${c.previsaoPagamento ? 'border-blue-300 text-blue-700 bg-blue-50 font-medium' : 'border-gray-200 text-gray-400 bg-white'}`} />
                   </td>
                   <td className="p-3 text-gray-800">
                     <span className="inline-flex items-center gap-1.5">
@@ -561,7 +575,7 @@ export default function ContasSection({ config }) {
             {filtradas.length > 0 && (
               <tfoot className="bg-gray-100 border-t-2 border-gray-300">
                 <tr>
-                  <td colSpan={4} className="p-3 font-bold text-right">Total do período ({filtradas.length}):</td>
+                  <td colSpan={5} className="p-3 font-bold text-right">Total do período ({filtradas.length}):</td>
                   <td className="p-3 text-right font-bold whitespace-nowrap">{fmtNumero(resumo.total)}</td>
                   <td colSpan={2}></td>
                 </tr>

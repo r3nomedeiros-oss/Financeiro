@@ -9,6 +9,7 @@ const CONFIG = {
   lineColor: '#dc2626',
   lineName: 'Total a pagar',
   dateLabel: 'Vencimento',
+  previsaoLabel: 'Previsão de pagamento',
   totalLabel: 'Total a Pagar',
   doneLabel: 'Pago',
   atrasadoLabel: 'vencida',

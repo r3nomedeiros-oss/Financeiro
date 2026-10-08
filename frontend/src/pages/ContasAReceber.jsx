@@ -9,6 +9,7 @@ const CONFIG = {
   lineColor: '#059669',
   lineName: 'Total a receber',
   dateLabel: 'Recebimento',
+  previsaoLabel: 'Previsão de recebimento',
   totalLabel: 'Total a Receber',
   doneLabel: 'Recebido',
   atrasadoLabel: 'atrasada',

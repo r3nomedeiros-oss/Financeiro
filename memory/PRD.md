@@ -116,3 +116,9 @@ Sistema financeiro existente conectado a Vercel/Supabase/GitHub (React+Vite / Fa
 - Fix (`server.py`): novo helper `_fetch_movimentacoes_periodo(user_id, data_inicio, data_fim)` que pagina em blocos de 1000. Aplicado em `get_dashboard_dados`, `get_dre_anual` e `get_dre` (mensal). (O GET /api/movimentacoes já paginava.)
 - Verificado via API com dados reais: DRE outubro Receita Bruta 4100 -> 70416; Custos Fixos 2202 -> 71304. Correto.
 - PENDENTE DEPLOY: é mudança de código no backend -> precisa ir pro GitHub (Save to GitHub) e Vercel refazer o deploy para valer em produção.
+
+### [Out 2026] Projeção: campo "Previsão de pagamento" + projeção por previsão no Comparativo
+- `ContasSection.jsx` (Contas a Pagar/Receber): novo campo `previsaoPagamento` (opcional) no form e coluna editável inline na tabela (`${prefix}-previsao-cell-<id>`). O vencimento ORIGINAL nunca muda (conta atrasada continua marcada como vencida). Config ganhou `previsaoLabel` ("Previsão de pagamento" / "Previsão de recebimento"). colSpans da tabela ajustados (7->8 / tfoot 4->5).
+- `ComparativoContas.jsx`: seletor `comp-base-data-select` ("Projetar por: Vencimento" | "Previsão de pagamento") + checkbox `comp-incluir-pagos-check` ("Mostrar já quitados"). `getDataRef()` usa a previsão quando no modo previsão e quando informada; filtro exclui status 'pago' por padrão (conta paga some dos 2 cenários). Datas de bucket/range usam getDataRef.
+- Verificado via screenshot (dados mock): A Pagar=4500 (exclui a paga de 800), reposiciona conta atrasada para a previsão. Build Vite OK.
+- PENDENTE DEPLOY: Save to GitHub + Vercel redeploy para ir à produção.

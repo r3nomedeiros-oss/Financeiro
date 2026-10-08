@@ -35,6 +35,12 @@ export default function ComparativoContas() {
   const [de, setDe] = useState(new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0]);
   const [ate, setAte] = useState(new Date(now.getFullYear(), 11, 31).toISOString().split('T')[0]);
   const [saldoInicialStr, setSaldoInicialStr] = useState('');
+  const [baseData, setBaseData] = useState('vencimento'); // 'vencimento' | 'previsao'
+  const [incluirPagos, setIncluirPagos] = useState(false);
+
+  // Data de referência usada na projeção: no modo "previsão", usa a previsão de
+  // pagamento quando informada (ex.: conta atrasada reagendada); senão o vencimento.
+  const getDataRef = (c) => (baseData === 'previsao' && c.previsaoPagamento ? c.previsaoPagamento : c.vencimento);
 
   const recarregar = () => { setPagar(lerLS(KEY_PAGAR)); setReceber(lerLS(KEY_RECEBER)); };
   useEffect(() => {
@@ -52,7 +58,9 @@ export default function ComparativoContas() {
     return { start, end };
   }, [modo, ano, mes, de, ate]);
 
-  const filtrar = (lista) => lista.filter((c) => { const d = toDate(c.vencimento); return d >= range.start && d <= range.end; });
+  const filtrar = (lista) => lista
+    .filter((c) => incluirPagos || c.status !== 'pago')
+    .filter((c) => { const d = toDate(getDataRef(c)); return d >= range.start && d <= range.end; });
 
   const dados = useMemo(() => {
     const fp = filtrar(pagar), fr = filtrar(receber);
@@ -68,8 +76,8 @@ export default function ComparativoContas() {
         buckets.push(key);
         cursor.setDate(cursor.getDate() + 1);
       }
-      fp.forEach((c) => { if (mapa[c.vencimento]) mapa[c.vencimento].pagar += Number(c.valor) || 0; });
-      fr.forEach((c) => { if (mapa[c.vencimento]) mapa[c.vencimento].receber += Number(c.valor) || 0; });
+      fp.forEach((c) => { const k = getDataRef(c); if (mapa[k]) mapa[k].pagar += Number(c.valor) || 0; });
+      fr.forEach((c) => { const k = getDataRef(c); if (mapa[k]) mapa[k].receber += Number(c.valor) || 0; });
     } else {
       const cursor = new Date(range.start.getFullYear(), range.start.getMonth(), 1);
       const fim = new Date(range.end.getFullYear(), range.end.getMonth(), 1);
@@ -79,8 +87,8 @@ export default function ComparativoContas() {
         buckets.push(key);
         cursor.setMonth(cursor.getMonth() + 1);
       }
-      fp.forEach((c) => { const k = c.vencimento.slice(0, 7); if (mapa[k]) mapa[k].pagar += Number(c.valor) || 0; });
-      fr.forEach((c) => { const k = c.vencimento.slice(0, 7); if (mapa[k]) mapa[k].receber += Number(c.valor) || 0; });
+      fp.forEach((c) => { const k = getDataRef(c).slice(0, 7); if (mapa[k]) mapa[k].pagar += Number(c.valor) || 0; });
+      fr.forEach((c) => { const k = getDataRef(c).slice(0, 7); if (mapa[k]) mapa[k].receber += Number(c.valor) || 0; });
     }
 
     let acumulado = saldoInicial;
@@ -98,7 +106,7 @@ export default function ComparativoContas() {
     const totalReceber = fr.reduce((a, c) => a + (Number(c.valor) || 0), 0);
     const totalPagar = fp.reduce((a, c) => a + (Number(c.valor) || 0), 0);
     return { serie, totalReceber, totalPagar, saldo: totalReceber - totalPagar, saldoFinal: saldoInicial + totalReceber - totalPagar };
-  }, [pagar, receber, range, saldoInicial]);
+  }, [pagar, receber, range, saldoInicial, baseData, incluirPagos]);
 
   return (
     <div className="space-y-5" data-testid="comparativo-view">
@@ -132,11 +140,24 @@ export default function ComparativoContas() {
               className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none" data-testid="comp-filtro-ate-input" />
           </div>
         )}
-        <button onClick={recarregar}
-          className="md:ml-auto flex items-center gap-1.5 px-3 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
-          data-testid="comp-recarregar-btn" title="Atualizar com os dados mais recentes">
-          <RefreshCw size={15} /> Atualizar
-        </button>
+        <div className="flex items-center gap-2 flex-wrap md:ml-auto">
+          <select value={baseData} onChange={(e) => setBaseData(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+            data-testid="comp-base-data-select" title="Base de datas da projeção">
+            <option value="vencimento">Projetar por: Vencimento</option>
+            <option value="previsao">Projetar por: Previsão de pagamento</option>
+          </select>
+          <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer select-none" title="Incluir contas já pagas/recebidas na projeção">
+            <input type="checkbox" checked={incluirPagos} onChange={(e) => setIncluirPagos(e.target.checked)}
+              data-testid="comp-incluir-pagos-check" className="w-4 h-4 accent-emerald-600" />
+            Mostrar já quitados
+          </label>
+          <button onClick={recarregar}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+            data-testid="comp-recarregar-btn" title="Atualizar com os dados mais recentes">
+            <RefreshCw size={15} /> Atualizar
+          </button>
+        </div>
       </div>
 
       {/* Resumo */}
@@ -187,7 +208,9 @@ export default function ComparativoContas() {
           </ResponsiveContainer>
         </div>
         <p className="text-xs text-gray-400 mt-2">
-          "Saldo acumulado" começa no Saldo Inicial e soma progressivamente (recebimentos − pagamentos) ao longo do período. Use "Atualizar" após cadastrar contas nas outras abas.
+          "Saldo acumulado" começa no Saldo Inicial e soma progressivamente (recebimentos − pagamentos) ao longo do período.
+          Por padrão a projeção considera apenas contas <b>pendentes</b> (ao marcar como paga/recebida, a conta some dos dois cenários — marque "Mostrar já quitados" para incluí-las).
+          No modo <b>"Projetar por: Previsão de pagamento"</b>, as contas com previsão informada são reposicionadas para essa data (o vencimento original não muda). Use "Atualizar" após cadastrar contas nas outras abas.
         </p>
       </div>
     </div>
