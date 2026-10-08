@@ -110,3 +110,9 @@ Sistema financeiro existente conectado a Vercel/Supabase/GitHub (React+Vite / Fa
 
 ## Known Bug (backlog)
 - `fluxoCaixaAPI.getDiario` chama `GET /api/fluxo-caixa/diario`, mas esse endpoint NÃO existe em `server.py` -> a tela Fluxo de Caixa deve falhar. Precisa implementar o endpoint.
+
+### [Out 2026] CORREÇÃO: DRE/Dashboard não contavam todas as movimentações (truncamento em 1000)
+- Sintoma: movimentações recentes (lançadas hoje) não apareciam no DRE do mês. Reno tem 1029 movs em 2026; DRE/Dashboard faziam 1 query sem paginação e o Supabase corta em 1000 linhas -> ~29 movs (as mais novas) sumiam dos relatórios. Outubro mostrava 23 de 52 lançamentos.
+- Fix (`server.py`): novo helper `_fetch_movimentacoes_periodo(user_id, data_inicio, data_fim)` que pagina em blocos de 1000. Aplicado em `get_dashboard_dados`, `get_dre_anual` e `get_dre` (mensal). (O GET /api/movimentacoes já paginava.)
+- Verificado via API com dados reais: DRE outubro Receita Bruta 4100 -> 70416; Custos Fixos 2202 -> 71304. Correto.
+- PENDENTE DEPLOY: é mudança de código no backend -> precisa ir pro GitHub (Save to GitHub) e Vercel refazer o deploy para valer em produção.

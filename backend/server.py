@@ -383,6 +383,32 @@ def _is_transferencia_mov(mov: dict) -> bool:
     categoria_raw = (plano_info.get("categoria") or "") if isinstance(plano_info, dict) else ""
     return categoria_raw.split("|")[0] == "transferencias"
 
+
+def _fetch_movimentacoes_periodo(user_id: str, data_inicio: Optional[str] = None,
+                                 data_fim: Optional[str] = None,
+                                 select: str = "*, plano_contas(*)") -> list:
+    """Busca TODAS as movimentações do usuário em um período, paginando em blocos
+    de 1000 para contornar o limite de linhas por chamada do Supabase.
+
+    Sem isso, usuários com mais de 1000 movimentações no período teriam lançamentos
+    silenciosamente descartados dos relatórios (Dashboard / DRE)."""
+    supabase = get_supabase()
+    PAGE_SIZE = 1000
+    start = 0
+    all_data: list = []
+    while True:
+        q = supabase.table("movimentacoes").select(select).eq("user_id", user_id)
+        if data_inicio:
+            q = q.gte("data", data_inicio)
+        if data_fim:
+            q = q.lt("data", data_fim)
+        batch = q.range(start, start + PAGE_SIZE - 1).execute().data or []
+        all_data.extend(batch)
+        if len(batch) < PAGE_SIZE:
+            break
+        start += PAGE_SIZE
+    return all_data
+
 @app.get("/api/categorias-dre")
 async def get_categorias_dre():
     """Retorna as categorias fixas do DRE (Nível 1)"""
@@ -714,20 +740,21 @@ async def get_dashboard_dados(
 ):
     supabase = get_supabase()
     
-    # Buscar movimentações com filtros
-    query = supabase.table("movimentacoes").select("*, plano_contas(*)").eq("user_id", user_id)
-    
+    # Buscar movimentações com filtros (paginado para não truncar em 1000)
     if mes and ano:
         data_inicio = f"{ano}-{mes:02d}-01"
         if mes == 12:
             data_fim = f"{ano + 1}-01-01"
         else:
             data_fim = f"{ano}-{mes + 1:02d}-01"
-        query = query.gte("data", data_inicio).lt("data", data_fim)
     elif ano:
-        query = query.gte("data", f"{ano}-01-01").lt("data", f"{ano + 1}-01-01")
+        data_inicio = f"{ano}-01-01"
+        data_fim = f"{ano + 1}-01-01"
+    else:
+        data_inicio = None
+        data_fim = None
     
-    movimentacoes = query.execute().data
+    movimentacoes = _fetch_movimentacoes_periodo(user_id, data_inicio, data_fim)
     # Excluir movimentações de Transferência entre contas próprias dos relatórios
     movimentacoes = [m for m in movimentacoes if not _is_transferencia_mov(m)]
     
@@ -849,11 +876,11 @@ async def get_dre_anual(ano: int, user_id: str = Depends(get_current_user)):
     """Retorna DRE anual completo no formato de planilha (Jan-Dez + Total)"""
     supabase = get_supabase()
     
-    # Buscar todas as movimentações do ano
+    # Buscar todas as movimentações do ano (paginado para não truncar em 1000)
     data_inicio = f"{ano}-01-01"
     data_fim = f"{ano + 1}-01-01"
     
-    movimentacoes = supabase.table("movimentacoes").select("*, plano_contas(*)").eq("user_id", user_id).gte("data", data_inicio).lt("data", data_fim).execute().data
+    movimentacoes = _fetch_movimentacoes_periodo(user_id, data_inicio, data_fim)
     # Excluir Transferências entre contas próprias do DRE anual
     movimentacoes = [m for m in movimentacoes if not _is_transferencia_mov(m)]
     
@@ -1032,7 +1059,7 @@ async def get_dre(mes: int, ano: int, user_id: str = Depends(get_current_user)):
     else:
         data_fim = f"{ano}-{mes + 1:02d}-01"
     
-    movimentacoes = supabase.table("movimentacoes").select("*, plano_contas(*)").eq("user_id", user_id).gte("data", data_inicio).lt("data", data_fim).execute().data
+    movimentacoes = _fetch_movimentacoes_periodo(user_id, data_inicio, data_fim)
     # Excluir Transferências entre contas próprias do DRE mensal
     movimentacoes = [m for m in movimentacoes if not _is_transferencia_mov(m)]
     
