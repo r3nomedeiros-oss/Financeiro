@@ -1,9 +1,11 @@
-# Credenciais de Teste - SFI
+# Credenciais de Teste / Acesso
 
-## Usuário Admin
-- **Email:** admin@sfi.com
-- **Senha:** admin123
+## Supabase (produção - dados reais)
+- SUPABASE_URL: https://enpvmhcxlcvapplcuwoa.supabase.co
+- SUPABASE_KEY: usar a chave **service_role** (secreta). NUNCA usar a publishable/anon (RLS bloqueia tudo).
 
-## Supabase (Backend)
-- Configurado via variáveis de ambiente em /app/backend/.env
-- SUPABASE_URL e SUPABASE_KEY já configurados
+## Usuário admin principal (dados reais no Supabase)
+- Email: r3nomedeiros@gmail.com (Reno Medeiros) — is_admin: true
+- Senha: (de posse do usuário; não armazenada aqui)
+
+> Observação: existem ~28 usuários de teste (emails *@test.com) criados por agentes de teste anteriores.

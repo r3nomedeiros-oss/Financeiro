@@ -99,3 +99,14 @@ Sistema financeiro existente conectado a Vercel/Supabase/GitHub (React+Vite / Fa
 - `/app/backend/.env` AUSENTE neste preview → backend não sobe (ValueError SUPABASE_URL/KEY). Necessário restaurar credenciais Supabase para rodar/testar localmente. Não afeta produção (Vercel/Supabase).
 
 ## Backlog
+
+### [Out 2026] CORREÇÃO: dados não apareciam / login impossível (RLS + chave errada)
+- Sintoma: usuário (dominio proprio/Vercel) nao conseguia logar e todas as telas vinham vazias, apesar de ~1123 movimentacoes no banco.
+- Causa raiz: backend estava usando a chave Supabase *publishable/anon* (`sb_publishable_...`). Com RLS ativo, a anon key retorna 0 linhas em TODAS as tabelas (inclusive `users`) -> login cai em "email/senha incorretos" e relatorios vazios.
+- Correcao: `SUPABASE_KEY` deve ser a chave **service_role** (secreta). O backend faz autorizacao propria por user_id+JWT e precisa ignorar o RLS.
+  - Preview: `/app/backend/.env` atualizado com a service_role (dados confirmados: 1029 movs do Reno, 4 contas, auth/me OK).
+  - PRODUCAO (Vercel): usuario deve trocar a env var `SUPABASE_KEY` para a service_role e refazer o deploy.
+- Também corrigido: `.gitignore` não ignorava `node_modules/` (adicionado), e adicionado `/app/frontend/.oxlintrc.json`.
+
+## Known Bug (backlog)
+- `fluxoCaixaAPI.getDiario` chama `GET /api/fluxo-caixa/diario`, mas esse endpoint NÃO existe em `server.py` -> a tela Fluxo de Caixa deve falhar. Precisa implementar o endpoint.
